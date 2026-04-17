@@ -452,7 +452,12 @@
   .mobile-bottom-nav { display: none; }
 
   /* ── Mobile Responsive ── */
+  .mobile-only { display: none; }
+  .desktop-only { display: block; }
+
   @media (max-width: 768px) {
+    .mobile-only { display: block; }
+    .desktop-only { display: none !important; }
     /* CRITICAL: prevent all horizontal scroll / wiggle */
     html, body { overflow-x: hidden !important; width: 100%; max-width: 100vw; }
     .app { height: auto; min-height: 100vh; overflow-x: hidden; width: 100%; max-width: 100vw; }
@@ -673,6 +678,7 @@ firebase.initializeApp({
 const firebaseAuth = firebase.auth();
 // Explicitly persist auth across page refreshes (survives tab close too)
 firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+const googleProvider = new firebase.auth.GoogleAuthProvider();
 const db = firebase.firestore();
 // Enable Firestore offline persistence so reads work on reload even if offline
 db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
@@ -2547,7 +2553,8 @@ function ClientList({ role }) {
           <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add Client</button>
         )}
       </div>
-      <div className="card" style={{ padding: 0 }}>
+      {/* Desktop table */}
+      <div className="card desktop-only" style={{ padding: 0 }}>
         <div className="table-wrap">
           <table>
             <thead>
@@ -2584,6 +2591,21 @@ function ClientList({ role }) {
             </tbody>
           </table>
         </div>
+      </div>
+      {/* Mobile list — name only, tap to view details */}
+      <div className="mobile-only">
+        {filtered.map(c => (
+          <div key={c.id} className="card" onClick={() => setSelectedClient(c)}
+            style={{ padding: '14px 16px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: (c.type === 'Commercial' ? '#e3f2fd' : c.type === 'Medical' ? '#f3e5f5' : '#e8f5e9'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className={`fas ${c.type === 'Commercial' ? 'fa-building' : c.type === 'Medical' ? 'fa-hospital' : 'fa-home'}`} style={{ fontSize: 14, color: (c.type === 'Commercial' ? '#1976d2' : c.type === 'Medical' ? '#7b1fa2' : '#388e3c') }} />
+              </div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name}</div>
+            </div>
+            <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
+          </div>
+        ))}
       </div>
 
       <Modal show={!!selectedClient} onClose={() => setSelectedClient(null)} title={selectedClient?.name || ''}>
@@ -2677,7 +2699,50 @@ function EmployeeProfiles({ role }) {
   const [profileTab, setProfileTab] = useState('info');
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editData, setEditData] = useState({});
+  const [editDirty, setEditDirty] = useState(false);
   const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', type: 'employee', payRate: '', address: '', emergencyContact: '' });
+
+  // Sync editData when selectedEmp changes
+  useEffect(() => {
+    if (selectedEmp) {
+      setEditData({ ...selectedEmp });
+      setEditDirty(false);
+    }
+  }, [selectedEmp?.id]);
+
+  const handleEditField = (field, value) => {
+    setEditData(prev => ({ ...prev, [field]: value }));
+    setEditDirty(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!selectedEmp?.id) return;
+    setSaving(true);
+    try {
+      const phoneDigits = (editData.phone || '').replace(/\D/g, '').slice(-10);
+      const initials = (editData.name || '').trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2);
+      await db.collection('employees').doc(selectedEmp.id).update({
+        name: (editData.name || '').trim(),
+        phone: (editData.phone || '').trim(),
+        phoneNormalized: phoneDigits,
+        email: (editData.email || '').trim().toLowerCase(),
+        role: editData.role || selectedEmp.role,
+        type: editData.type || selectedEmp.type,
+        payRate: parseFloat(editData.payRate) || 0,
+        address: (editData.address || '').trim(),
+        emergencyContact: (editData.emergencyContact || '').trim(),
+        avatar: initials || selectedEmp.avatar,
+        status: editData.status || selectedEmp.status,
+      });
+      setEditDirty(false);
+      // Update local selectedEmp to reflect saved data
+      setSelectedEmp({ ...selectedEmp, ...editData, phoneNormalized: phoneDigits, avatar: initials || selectedEmp.avatar });
+    } catch (err) {
+      alert('Error saving: ' + err.message);
+    }
+    setSaving(false);
+  };
 
   const handleAddEmployee = async () => {
     if (!newEmp.name.trim() || !newEmp.phone.trim()) return;
@@ -2799,7 +2864,9 @@ function EmployeeProfiles({ role }) {
       </Modal>
 
       {!selectedEmp ? (
-        <div className="card" style={{ padding: 0 }}>
+        <>
+        {/* Desktop table */}
+        <div className="card desktop-only" style={{ padding: 0 }}>
           <div className="table-wrap">
             <table>
               <thead>
@@ -2839,6 +2906,20 @@ function EmployeeProfiles({ role }) {
             </table>
           </div>
         </div>
+        {/* Mobile list — name + avatar only, tap to view */}
+        <div className="mobile-only">
+          {filtered.map(e => (
+            <div key={e.id} className="card" onClick={() => { setSelectedEmp(e); setProfileTab('info'); }}
+              style={{ padding: '12px 16px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="avatar" style={{ background: e.color, width: 36, height: 36, fontSize: 13 }}>{e.avatar}</div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>{e.name}</div>
+              </div>
+              <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
+            </div>
+          ))}
+        </div>
+        </>
       ) : (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -2873,19 +2954,62 @@ function EmployeeProfiles({ role }) {
             </div>
 
             {profileTab === 'info' && (
-              <div className="grid-2">
-                <div className="form-group"><label className="form-label">Phone</label><div className="form-input" style={{ background: 'var(--bg)' }}>{selectedEmp.phone}</div></div>
-                <div className="form-group"><label className="form-label">Email</label><div className="form-input" style={{ background: 'var(--bg)' }}>{selectedEmp.email}</div></div>
-                <div className="form-group"><label className="form-label">Address</label><div className="form-input" style={{ background: 'var(--bg)' }}>{selectedEmp.address}</div></div>
-                <div className="form-group"><label className="form-label">Emergency Contact</label><div className="form-input" style={{ background: 'var(--bg)' }}>{selectedEmp.emergencyContact}</div></div>
+              <div>
+                <div className="grid-2">
+                  <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={editData.name || ''} onChange={e => handleEditField('name', e.target.value)} /></div>
+                  <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editData.phone || ''} onChange={e => handleEditField('phone', e.target.value)} /></div>
+                  <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editData.email || ''} onChange={e => handleEditField('email', e.target.value)} /></div>
+                  <div className="form-group"><label className="form-label">Address</label><input className="form-input" value={editData.address || ''} onChange={e => handleEditField('address', e.target.value)} /></div>
+                  <div className="form-group"><label className="form-label">Emergency Contact</label><input className="form-input" value={editData.emergencyContact || ''} onChange={e => handleEditField('emergencyContact', e.target.value)} /></div>
+                  <div className="form-group">
+                    <label className="form-label">Status</label>
+                    <select className="form-input" value={editData.status || 'active'} onChange={e => handleEditField('status', e.target.value)}>
+                      <option value="active">Active</option>
+                      <option value="on-leave">On Leave</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+                {editDirty && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                    <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                    <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving}>
+                      {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save Changes</>}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             {profileTab === 'tax' && (
-              <div className="grid-2">
-                <div className="form-group"><label className="form-label">SSN</label><div className="form-input" style={{ background: 'var(--bg)' }}>{selectedEmp.ssn}</div></div>
-                <div className="form-group"><label className="form-label">Pay Rate</label><div className="form-input" style={{ background: 'var(--bg)' }}>${selectedEmp.payRate}/hr</div></div>
-                <div className="form-group"><label className="form-label">Employment Type</label><div className="form-input" style={{ background: 'var(--bg)' }}>{selectedEmp.type === 'employee' ? 'W-2 Employee' : '1099 Contractor'}</div></div>
-                <div className="form-group"><label className="form-label">Start Date</label><div className="form-input" style={{ background: 'var(--bg)' }}>{selectedEmp.startDate}</div></div>
+              <div>
+                <div className="grid-2">
+                  <div className="form-group"><label className="form-label">Pay Rate ($/hr)</label><input className="form-input" type="number" value={editData.payRate || ''} onChange={e => handleEditField('payRate', e.target.value)} /></div>
+                  <div className="form-group">
+                    <label className="form-label">Employment Type</label>
+                    <select className="form-input" value={editData.type || 'employee'} onChange={e => handleEditField('type', e.target.value)}>
+                      <option value="employee">W-2 Employee</option>
+                      <option value="contractor">1099 Contractor</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Role</label>
+                    <select className="form-input" value={editData.role || 'Cleaner'} onChange={e => handleEditField('role', e.target.value)}>
+                      <option>Cleaner</option>
+                      <option>Team Lead</option>
+                      <option>Supervisor</option>
+                      <option>Admin</option>
+                    </select>
+                  </div>
+                  <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
+                </div>
+                {editDirty && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                    <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                    <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving}>
+                      {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save Changes</>}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             {profileTab === 'schedule' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's schedule in the Schedule tab.</p>}
@@ -3399,6 +3523,78 @@ function LoginScreen({ onLogin, onNotFound }) {
     }
   }, []);
 
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const result = await firebaseAuth.signInWithPopup(googleProvider);
+      const user = result.user;
+      const email = (user.email || '').toLowerCase().trim();
+      if (!email) {
+        await firebaseAuth.signOut();
+        setIsLoading(false);
+        setError('No email found on this Google account.');
+        return;
+      }
+      // Check Firestore for matching employee by email
+      const empSnap = await db.collection('employees')
+        .where('email', '==', email)
+        .limit(1).get();
+      if (empSnap.empty) {
+        // Check if this is the very first user (seed admin)
+        const allEmps = await db.collection('employees').limit(1).get();
+        if (allEmps.empty) {
+          const displayName = user.displayName || 'Admin';
+          const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+          const docRef = await db.collection('employees').add({
+            name: displayName,
+            phone: '',
+            phoneNormalized: '',
+            email: email,
+            role: 'Admin',
+            type: 'employee',
+            status: 'active',
+            payRate: 0,
+            address: '',
+            emergencyContact: '',
+            avatar: initials,
+            color: '#4a6741',
+            startDate: new Date().toISOString().slice(0, 10),
+            clockedIn: false,
+            firstLogin: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+          const newEmp = { id: docRef.id, name: displayName, role: 'Admin', email: email, avatar: initials, color: '#4a6741' };
+          setIsLoading(false);
+          onLogin(newEmp);
+          return;
+        }
+        // Not in allowlist — sign out
+        await firebaseAuth.signOut();
+        setIsLoading(false);
+        setStep('google-error');
+        return;
+      }
+      const empDoc = empSnap.docs[0];
+      const emp = { id: empDoc.id, ...empDoc.data() };
+      setMatchedEmployee(emp);
+      setIsLoading(false);
+      if (emp.firstLogin && !emp.name) {
+        setSetupName(user.displayName || '');
+        setStep('setup');
+      } else {
+        onLogin(emp);
+      }
+    } catch (err) {
+      setIsLoading(false);
+      if (err.code === 'auth/popup-closed-by-user') {
+        // User closed the popup, no error needed
+        return;
+      }
+      setError(err.message || 'Google sign-in failed. Please try again.');
+    }
+  };
+
   const handleSendCode = async () => {
     setError('');
     setIsLoading(true);
@@ -3542,8 +3738,18 @@ function LoginScreen({ onLogin, onNotFound }) {
         {step === 'phone' && (
           <div className="auth-card">
             <h2>Welcome back</h2>
-            <div className="auth-subtitle">Sign in with your phone number to continue</div>
+            <div className="auth-subtitle">Sign in to continue to the team portal</div>
             {error && <div className="auth-error"><i className="fas fa-exclamation-circle" />{error}</div>}
+            <button className="auth-btn google-btn" onClick={handleGoogleSignIn} disabled={isLoading}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#fff', color: '#333', border: '1.5px solid var(--border)', fontWeight: 600, fontSize: 15 }}>
+              <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+              {isLoading ? 'Signing in...' : 'Sign in with Google'}
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 500 }}>or use phone number</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
             <div className="auth-input-group">
               <label>Phone number</label>
               <div style={{ position: 'relative' }}>
@@ -3626,6 +3832,23 @@ function LoginScreen({ onLogin, onNotFound }) {
             </div>
             <button className="auth-btn primary" style={{ marginTop: 8 }} onClick={() => { setStep('phone'); setPhone(''); setError(''); }}>
               Try a different number
+            </button>
+          </div>
+        )}
+
+        {step === 'google-error' && (
+          <div className="auth-card" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+            <h2>Email not found</h2>
+            <div className="auth-subtitle" style={{ marginBottom: 20 }}>
+              Your Google account isn't registered with any ECS organization. Your administrator needs to add your email to the system before you can sign in.
+            </div>
+            <div className="auth-error" style={{ textAlign: 'left' }}>
+              <i className="fas fa-info-circle" />
+              Ask your admin to add your email address to your employee profile, then try again.
+            </div>
+            <button className="auth-btn primary" style={{ marginTop: 8 }} onClick={() => { setStep('phone'); setError(''); }}>
+              Back to sign in
             </button>
           </div>
         )}
@@ -3721,20 +3944,29 @@ function App() {
     const unsubscribe = firebaseAuth.onAuthStateChanged(async (user) => {
       if (user) {
         try {
+          let snap;
+          // Try matching by phone first (phone auth), then by email (Google auth)
           const phoneDigits = (user.phoneNumber || '').replace(/\D/g, '');
           const last10 = phoneDigits.slice(-10);
-          // Check Firestore for matching employee
-          const snap = await db.collection('employees')
-            .where('phoneNormalized', '==', last10)
-            .limit(1).get();
-          if (!snap.empty) {
+          if (last10) {
+            snap = await db.collection('employees')
+              .where('phoneNormalized', '==', last10)
+              .limit(1).get();
+          }
+          // If no phone match, try email match
+          if ((!snap || snap.empty) && user.email) {
+            snap = await db.collection('employees')
+              .where('email', '==', user.email.toLowerCase().trim())
+              .limit(1).get();
+          }
+          if (snap && !snap.empty) {
             const empDoc = snap.docs[0];
             const empData = { id: empDoc.id, ...empDoc.data() };
             setAuthedUser(empData);
             // Cache for instant restore on next page load
             try { sessionStorage.setItem('ecs_employee', JSON.stringify(empData)); } catch (e) {}
           } else {
-            // Phone not in allowlist — sign them out
+            // Not in allowlist — sign them out
             await firebaseAuth.signOut();
             setAuthedUser(null);
             try { sessionStorage.removeItem('ecs_employee'); } catch (e) {}
@@ -4033,6 +4265,9 @@ function App() {
       </div>
 
       {/* Mobile "More" menu overlay */}
+      {showMobileMore && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMobileMore(false)} />
+      )}
       {showMobileMore && (
         <div style={{ position: 'fixed', bottom: 68, left: 0, right: 0, background: 'white', borderRadius: '16px 16px 0 0', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)', padding: '12px 8px', zIndex: 99, maxHeight: '60vh', overflowY: 'auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 8 }}>
