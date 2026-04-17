@@ -460,9 +460,9 @@
     .desktop-only { display: none !important; }
     /* CRITICAL: prevent all horizontal scroll / wiggle */
     html, body { overflow-x: hidden !important; width: 100%; max-width: 100vw; }
-    .app { height: auto; min-height: 100vh; overflow-x: hidden; width: 100%; max-width: 100vw; }
-    .main { overflow-x: hidden; width: 100%; }
-    .content { padding: 12px; overflow-x: hidden; width: 100%; max-width: 100vw; }
+    .app { height: 100vh; overflow-x: hidden; width: 100%; max-width: 100vw; }
+    .main { overflow-x: hidden; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .content { padding: 12px; overflow-x: hidden; overflow-y: auto; width: 100%; max-width: 100vw; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
 
     /* Hide desktop top nav, show mobile bottom nav */
     .topnav { display: none; }
@@ -2516,7 +2516,56 @@ function ClientList({ role }) {
   const [showAdd, setShowAdd] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [editClient, setEditClient] = useState({});
+  const [editClientDirty, setEditClientDirty] = useState(false);
   const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Commercial', frequency:'Weekly', rate:'', notes:'' });
+
+  // Sync edit state when selected client changes
+  useEffect(() => {
+    if (selectedClient) {
+      setEditClient({ ...selectedClient });
+      setEditClientDirty(false);
+    }
+  }, [selectedClient?.id]);
+
+  const handleEditClientField = (field, value) => {
+    setEditClient(prev => ({ ...prev, [field]: value }));
+    setEditClientDirty(true);
+  };
+
+  const handleSaveClient = async () => {
+    if (!selectedClient?.id) return;
+    setSaving(true);
+    try {
+      await db.collection('clients').doc(selectedClient.id).update({
+        name: (editClient.name || '').trim(),
+        contact: (editClient.contact || '').trim(),
+        phone: (editClient.phone || '').trim(),
+        email: (editClient.email || '').trim(),
+        address: (editClient.address || '').trim(),
+        type: editClient.type || 'Commercial',
+        frequency: editClient.frequency || 'Weekly',
+        rate: parseFloat(editClient.rate) || 0,
+        notes: (editClient.notes || '').trim(),
+        status: editClient.status || 'active',
+      });
+      setEditClientDirty(false);
+      setSelectedClient({ ...selectedClient, ...editClient, rate: parseFloat(editClient.rate) || 0 });
+    } catch (err) {
+      alert('Error saving: ' + err.message);
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteClient = async (clientId) => {
+    if (!confirm('Remove this client? This cannot be undone.')) return;
+    try {
+      await db.collection('clients').doc(clientId).delete();
+      setSelectedClient(null);
+    } catch (err) {
+      alert('Error removing client: ' + err.message);
+    }
+  };
 
   const handleAddClient = async () => {
     if (!newClient.name.trim()) return;
@@ -2608,20 +2657,82 @@ function ClientList({ role }) {
         ))}
       </div>
 
-      <Modal show={!!selectedClient} onClose={() => setSelectedClient(null)} title={selectedClient?.name || ''}>
+      <Modal show={!!selectedClient} onClose={() => setSelectedClient(null)} title={editClient.name || selectedClient?.name || ''}>
         {selectedClient && (
           <div>
-            <div className="grid-2" style={{ marginBottom: 16 }}>
-              <div><strong>Contact:</strong> {selectedClient.contact}</div>
-              <div><strong>Phone:</strong> {selectedClient.phone}</div>
-              <div><strong>Email:</strong> {selectedClient.email}</div>
-              <div><strong>Type:</strong> {selectedClient.type}</div>
-              <div><strong>Frequency:</strong> {selectedClient.frequency}</div>
-              <div><strong>Rate:</strong> ${selectedClient.rate}</div>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Client Name</label>
+                <input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Contact Person</label>
+                <input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} />
+              </div>
             </div>
-            <div><strong>Address:</strong> {selectedClient.address}</div>
-            <div style={{ marginTop: 12, padding: 12, background: 'var(--bg)', borderRadius: 8 }}>
-              <strong>Notes:</strong> {selectedClient.notes}
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Phone</label>
+                <input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Address</label>
+              <input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} />
+            </div>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Type</label>
+                <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
+                  <option>Commercial</option>
+                  <option>Residential</option>
+                  <option>Medical</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Frequency</label>
+                <select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}>
+                  <option>Daily</option>
+                  <option>Weekly</option>
+                  <option>Bi-weekly</option>
+                  <option>Monthly</option>
+                  <option>On-demand</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Rate ($)</label>
+                <input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Status</label>
+                <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Notes</label>
+              <textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12 }}>
+              {role === 'admin' && (
+                <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClient(selectedClient.id)}>
+                  <i className="fas fa-trash" /> Delete
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                <button className="topbar-btn" onClick={() => setSelectedClient(null)}>Cancel</button>
+                <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
+                  {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save</>}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2970,14 +3081,12 @@ function EmployeeProfiles({ role }) {
                     </select>
                   </div>
                 </div>
-                {editDirty && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
-                    <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving}>
-                      {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save Changes</>}
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                  <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                  <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
+                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save</>}
+                  </button>
+                </div>
               </div>
             )}
             {profileTab === 'tax' && (
@@ -3002,14 +3111,12 @@ function EmployeeProfiles({ role }) {
                   </div>
                   <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
                 </div>
-                {editDirty && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                    <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
-                    <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving}>
-                      {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save Changes</>}
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                  <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                  <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
+                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save</>}
+                  </button>
+                </div>
               </div>
             )}
             {profileTab === 'schedule' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's schedule in the Schedule tab.</p>}
@@ -4266,10 +4373,10 @@ function App() {
 
       {/* Mobile "More" menu overlay */}
       {showMobileMore && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setShowMobileMore(false)} />
+        <div onClick={() => setShowMobileMore(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} />
       )}
       {showMobileMore && (
-        <div style={{ position: 'fixed', bottom: 68, left: 0, right: 0, background: 'white', borderRadius: '16px 16px 0 0', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)', padding: '12px 8px', zIndex: 99, maxHeight: '60vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', bottom: 68, left: 0, right: 0, background: 'white', borderRadius: '16px 16px 0 0', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)', padding: '12px 8px', zIndex: 201, maxHeight: '60vh', overflowY: 'auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 8 }}>
             <div style={{ width: 32, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto' }} />
           </div>
