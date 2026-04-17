@@ -397,8 +397,8 @@
   .empty-state p { font-size: 14px; }
 
   /* ── Login / Auth Screens ── */
-  .auth-screen { display: flex; min-height: 100vh; background: #ffffff; }
-  .auth-left { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; color: var(--text); }
+  .auth-screen { display: flex; min-height: 100vh; background: #ffffff; overflow-y: auto; }
+  .auth-left { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px 40px 60px; color: var(--text); }
   .auth-brand { text-align: center; margin-bottom: 40px; }
   .auth-brand img { display: block; margin: 0 auto; }
   .auth-brand h1 { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
@@ -3071,19 +3071,10 @@ function LoginScreen({ onLogin }) {
           </div>
         )}
 
-        <div className="auth-features">
-          <div className="auth-feature">
-            <i className="fas fa-shield-alt" style={{ color: '#4a6741' }} />
-            <div><strong>Secure by design</strong>Only pre-registered employees can access the app</div>
-          </div>
-          <div className="auth-feature">
-            <i className="fas fa-mobile-alt" style={{ color: '#7cb342' }} />
-            <div><strong>No passwords needed</strong>Sign in with a quick verification code sent to your phone</div>
-          </div>
-          <div className="auth-feature">
-            <i className="fas fa-users-cog" style={{ color: '#c8a84e' }} />
-            <div><strong>Admin-managed access</strong>Your organization controls who can join</div>
-          </div>
+        <div style={{ display: 'flex', gap: 20, marginTop: 28, color: 'var(--text-light)', fontSize: 12 }}>
+          <span><i className="fas fa-shield-alt" style={{ color: '#4a6741', marginRight: 5 }} />Secure by design</span>
+          <span><i className="fas fa-mobile-alt" style={{ color: '#7cb342', marginRight: 5 }} />No passwords</span>
+          <span><i className="fas fa-users-cog" style={{ color: '#c8a84e', marginRight: 5 }} />Admin-managed</span>
         </div>
       </div>
     </div>
