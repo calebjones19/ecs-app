@@ -936,9 +936,10 @@ function Dashboard({ role }) {
 }
 
 // ─── Chat ──────────────────────────────────────────────────────
-function Chat({ role }) {
-  const [channels, setChannels] = useState(CHANNELS_INIT);
-  const [activeChannel, setActiveChannel] = useState(1);
+function Chat({ role, authedUser }) {
+  const [channels, setChannels] = useState([]);
+  const [activeChannel, setActiveChannel] = useState(null);
+  const [channelMessages, setChannelMessages] = useState([]);
   const [message, setMessage] = useState('');
   const [showSendLater, setShowSendLater] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
@@ -946,7 +947,6 @@ function Chat({ role }) {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showNewDM, setShowNewDM] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [chatMessages, setChatMessages] = useState(MESSAGES);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [newChannelName, setNewChannelName] = useState('');
@@ -954,6 +954,41 @@ function Chat({ role }) {
   const [newChannelVisibility, setNewChannelVisibility] = useState('public');
   const [channelSearch, setChannelSearch] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState({ public: false, private: false, dm: false });
+
+  // Load channels from Firestore (realtime)
+  useEffect(() => {
+    const unsub = db.collection('channels').orderBy('createdAt').onSnapshot(async (snap) => {
+      const chs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (chs.length === 0 && authedUser) {
+        // Seed the default "general" channel
+        await db.collection('channels').add({
+          name: 'general',
+          visibility: 'public',
+          description: 'Company-wide announcements',
+          members: [],
+          joinedBy: [authedUser.id],
+          createdBy: authedUser.id,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        return; // onSnapshot will fire again with the new channel
+      }
+      setChannels(chs);
+      if (!activeChannel && chs.length > 0) setActiveChannel(chs[0].id);
+    });
+    return () => unsub();
+  }, [authedUser]);
+
+  // Load messages for active channel from Firestore (realtime)
+  useEffect(() => {
+    if (!activeChannel) return;
+    const unsub = db.collection('channels').doc(activeChannel)
+      .collection('messages').orderBy('createdAt')
+      .onSnapshot((snap) => {
+        const msgs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setChannelMessages(msgs);
+      });
+    return () => unsub();
+  }, [activeChannel]);
   // Thread state
   const [openThread, setOpenThread] = useState(null);
   const [threadReply, setThreadReply] = useState('');
@@ -1005,9 +1040,13 @@ function Chat({ role }) {
     document.execCommand('insertText', false, emoji);
   };
   const insertGif = (gif) => {
-    const msgs = chatMessages[activeChannel] || [];
-    const newMsg = { id: msgs.length + 100, userId: 6, text: gif.emoji + ' ' + gif.label, time: "Just now", reactions: [] };
-    setChatMessages({ ...chatMessages, [activeChannel]: [...msgs, newMsg] });
+    if (!activeChannel || !authedUser) return;
+    db.collection('channels').doc(activeChannel).collection('messages').add({
+      userId: authedUser.id,
+      text: gif.emoji + ' ' + gif.label,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      reactions: [],
+    });
     setShowGifPicker(false);
   };
   const insertMention = (emp) => {
@@ -1081,47 +1120,45 @@ function Chat({ role }) {
   };
 
   const toggleReaction = (channelId, msgId, emoji, isReply, parentMsgId) => {
-    const updated = { ...chatMessages };
-    const msgs = [...(updated[channelId] || [])];
-    if (isReply && parentMsgId != null) {
-      const parentIdx = msgs.findIndex(m => m.id === parentMsgId);
-      if (parentIdx === -1) return;
-      const parent = { ...msgs[parentIdx], replies: [...(msgs[parentIdx].replies || [])] };
-      const replyIdx = parent.replies.findIndex(r => r.id === msgId);
-      if (replyIdx === -1) return;
-      const reply = { ...parent.replies[replyIdx] };
-      reply.reactions = applyReactionToggle(reply.reactions)(emoji);
-      parent.replies[replyIdx] = reply;
-      msgs[parentIdx] = parent;
-    } else {
-      const idx = msgs.findIndex(m => m.id === msgId);
-      if (idx === -1) return;
-      const msg = { ...msgs[idx] };
-      msg.reactions = applyReactionToggle(msg.reactions)(emoji);
-      msgs[idx] = msg;
-    }
-    updated[channelId] = msgs;
-    setChatMessages(updated);
+    if (!channelId) return;
+    const msgRef = db.collection('channels').doc(channelId).collection('messages').doc(isReply && parentMsgId ? parentMsgId : msgId);
+    msgRef.get().then(doc => {
+      if (!doc.exists) return;
+      const data = doc.data();
+      let reactions;
+      if (isReply && parentMsgId) {
+        const replies = [...(data.replies || [])];
+        const rIdx = replies.findIndex(r => r.id === msgId);
+        if (rIdx === -1) return;
+        replies[rIdx] = { ...replies[rIdx], reactions: applyReactionToggle(replies[rIdx].reactions || [])(emoji) };
+        msgRef.update({ replies });
+      } else {
+        reactions = applyReactionToggle(data.reactions || [])(emoji);
+        msgRef.update({ reactions });
+      }
+    });
   };
 
+  const uid = authedUser?.id;
   const channel = channels.find(c => c.id === activeChannel);
-  const joinedPublic = channels.filter(c => c.visibility === 'public' && c.joined);
-  const privateChannels = channels.filter(c => c.visibility === 'private' && c.joined);
-  const dmChannels = channels.filter(c => c.visibility === 'dm');
+  const isJoined = (ch) => ch.joinedBy && ch.joinedBy.includes(uid);
+  const joinedPublic = channels.filter(c => c.visibility === 'public' && isJoined(c));
+  const privateChannels = channels.filter(c => c.visibility === 'private' && isJoined(c));
+  const dmChannels = channels.filter(c => c.visibility === 'dm' && isJoined(c));
   const browsableChannels = channels.filter(c => c.visibility === 'public');
 
   // Get the parent message for the open thread
   const threadParent = openThread
-    ? (chatMessages[openThread.channelId] || []).find(m => m.id === openThread.msgId)
+    ? channelMessages.find(m => m.id === openThread.msgId)
     : null;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChannel, chatMessages]);
+  }, [activeChannel, channelMessages]);
 
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [openThread, chatMessages]);
+  }, [openThread, channelMessages]);
 
   // Close pickers on click outside
   useEffect(() => {
@@ -1140,12 +1177,15 @@ function Chat({ role }) {
     const editorEl = composerRef.current;
     const html = editorEl ? editorEl.innerHTML : '';
     const text = editorEl ? editorEl.textContent.trim() : '';
-    if (!text && !attachedFile) return;
-    const msgs = chatMessages[activeChannel] || [];
-    const newMsg = { id: msgs.length + 100, userId: 6, text: html, time: "Just now", reactions: [],
-      ...(attachedFile ? { file: { name: attachedFile.name, size: attachedFile.size } } : {})
+    if ((!text && !attachedFile) || !activeChannel || !authedUser) return;
+    const msgData = {
+      userId: authedUser.id,
+      text: html,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      reactions: [],
     };
-    setChatMessages({ ...chatMessages, [activeChannel]: [...msgs, newMsg] });
+    if (attachedFile) msgData.file = { name: attachedFile.name, size: attachedFile.size };
+    db.collection('channels').doc(activeChannel).collection('messages').add(msgData);
     if (editorEl) editorEl.innerHTML = '';
     setMessage('');
     setAttachedFile(null);
@@ -1154,59 +1194,70 @@ function Chat({ role }) {
   };
 
   const sendThreadReply = () => {
-    if (!threadReply.trim() || !openThread) return;
-    const updated = { ...chatMessages };
-    const msgs = updated[openThread.channelId] || [];
-    const msgIdx = msgs.findIndex(m => m.id === openThread.msgId);
-    if (msgIdx === -1) return;
-    const msg = { ...msgs[msgIdx] };
-    const replies = msg.replies ? [...msg.replies] : [];
-    replies.push({ id: Date.now(), userId: 6, text: threadReply, time: "Just now" });
-    msg.replies = replies;
-    msgs[msgIdx] = msg;
-    updated[openThread.channelId] = [...msgs];
-    setChatMessages(updated);
+    if (!threadReply.trim() || !openThread || !authedUser) return;
+    const msgRef = db.collection('channels').doc(openThread.channelId).collection('messages').doc(openThread.msgId);
+    msgRef.update({
+      replies: firebase.firestore.FieldValue.arrayUnion({
+        id: Date.now().toString(),
+        userId: authedUser.id,
+        text: threadReply,
+        time: 'Just now',
+        createdAt: new Date().toISOString(),
+      })
+    });
     setThreadReply('');
   };
 
   const sendPoll = () => {
-    if (!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2) return;
-    const msgs = chatMessages[activeChannel] || [];
-    const newMsg = {
-      id: msgs.length + 100, userId: 6, time: "Just now", reactions: [],
+    if (!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2 || !activeChannel || !authedUser) return;
+    db.collection('channels').doc(activeChannel).collection('messages').add({
+      userId: authedUser.id,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      reactions: [],
       poll: { question: pollQuestion, options: pollOptions.filter(o => o.trim()).map(o => ({ text: o, votes: 0 })), totalVotes: 0 }
-    };
-    setChatMessages({ ...chatMessages, [activeChannel]: [...msgs, newMsg] });
+    });
     setShowPollModal(false);
     setPollQuestion('');
     setPollOptions(['', '']);
   };
 
   const joinChannel = (id) => {
-    setChannels(channels.map(c => c.id === id ? { ...c, joined: true } : c));
+    if (!uid) return;
+    db.collection('channels').doc(id).update({
+      joinedBy: firebase.firestore.FieldValue.arrayUnion(uid)
+    });
     setActiveChannel(id);
     setShowBrowseChannels(false);
     setMobileShowMessages(true);
   };
 
   const leaveChannel = (id) => {
-    setChannels(channels.map(c => c.id === id ? { ...c, joined: false } : c));
-    if (activeChannel === id) setActiveChannel(1);
+    if (!uid) return;
+    db.collection('channels').doc(id).update({
+      joinedBy: firebase.firestore.FieldValue.arrayRemove(uid)
+    });
+    if (activeChannel === id && channels.length > 0) {
+      const next = channels.find(c => c.id !== id);
+      setActiveChannel(next ? next.id : null);
+    }
   };
 
-  const createChannel = () => {
-    if (!newChannelName.trim()) return;
-    const newId = Math.max(...channels.map(c => c.id)) + 1;
-    setChannels([...channels, {
-      id: newId, name: newChannelName.toLowerCase().replace(/\s+/g, '-'),
-      visibility: newChannelVisibility, unread: 0, muted: false,
-      description: newChannelDesc, joined: true, members: 1
-    }]);
+  const createChannel = async () => {
+    if (!newChannelName.trim() || !uid) return;
+    const docRef = await db.collection('channels').add({
+      name: newChannelName.toLowerCase().replace(/\s+/g, '-'),
+      visibility: newChannelVisibility,
+      description: newChannelDesc,
+      members: [],
+      joinedBy: [uid],
+      createdBy: uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
     setShowCreateChannel(false);
     setNewChannelName('');
     setNewChannelDesc('');
     setNewChannelVisibility('public');
-    setActiveChannel(newId);
+    setActiveChannel(docRef.id);
     setMobileShowMessages(true);
   };
 
@@ -1221,19 +1272,17 @@ function Chat({ role }) {
   const [editText, setEditText] = useState('');
 
   const unsendMessage = (channelId, msgId, parentMsgId) => {
-    const updated = { ...chatMessages };
-    const msgs = [...(updated[channelId] || [])];
+    if (!channelId) return;
     if (parentMsgId != null) {
-      const pIdx = msgs.findIndex(m => m.id === parentMsgId);
-      if (pIdx === -1) return;
-      const parent = { ...msgs[pIdx], replies: (msgs[pIdx].replies || []).filter(r => r.id !== msgId) };
-      msgs[pIdx] = parent;
+      // Remove reply from parent's replies array
+      const parentMsg = channelMessages.find(m => m.id === parentMsgId);
+      if (parentMsg) {
+        const updatedReplies = (parentMsg.replies || []).filter(r => r.id !== msgId);
+        db.collection('channels').doc(channelId).collection('messages').doc(parentMsgId).update({ replies: updatedReplies });
+      }
     } else {
-      updated[channelId] = msgs.filter(m => m.id !== msgId);
+      db.collection('channels').doc(channelId).collection('messages').doc(msgId).delete();
     }
-    if (parentMsgId == null) updated[channelId] = msgs.filter(m => m.id !== msgId);
-    else updated[channelId] = msgs;
-    setChatMessages(updated);
     setMoreMenuMsg(null);
   };
 
@@ -1248,22 +1297,18 @@ function Chat({ role }) {
   const saveEdit = () => {
     if (!editingMsg || !editText.trim()) return;
     const { channelId, msgId, parentMsgId } = editingMsg;
-    const updated = { ...chatMessages };
-    const msgs = [...(updated[channelId] || [])];
     const newText = editText.replace(/\n/g, '<br>');
     if (parentMsgId != null) {
-      const pIdx = msgs.findIndex(m => m.id === parentMsgId);
-      if (pIdx === -1) return;
-      const parent = { ...msgs[pIdx], replies: [...(msgs[pIdx].replies || [])] };
-      const rIdx = parent.replies.findIndex(r => r.id === msgId);
-      if (rIdx >= 0) parent.replies[rIdx] = { ...parent.replies[rIdx], text: newText, edited: true };
-      msgs[pIdx] = parent;
+      const parentMsg = channelMessages.find(m => m.id === parentMsgId);
+      if (parentMsg) {
+        const replies = [...(parentMsg.replies || [])];
+        const rIdx = replies.findIndex(r => r.id === msgId);
+        if (rIdx >= 0) replies[rIdx] = { ...replies[rIdx], text: newText, edited: true };
+        db.collection('channels').doc(channelId).collection('messages').doc(parentMsgId).update({ replies });
+      }
     } else {
-      const idx = msgs.findIndex(m => m.id === msgId);
-      if (idx >= 0) msgs[idx] = { ...msgs[idx], text: newText, edited: true };
+      db.collection('channels').doc(channelId).collection('messages').doc(msgId).update({ text: newText, edited: true });
     }
-    updated[channelId] = msgs;
-    setChatMessages(updated);
     setEditingMsg(null);
     setEditText('');
   };
@@ -1277,22 +1322,23 @@ function Chat({ role }) {
 
   const MessageBubble = ({ msg, compact, showThreadPreview, chId, parentMsgId }) => {
     const emp = EMPLOYEES.find(e => e.id === msg.userId);
-    if (!emp) return null;
+    const fallbackEmp = { name: 'Unknown', avatar: '?', color: '#999' };
+    const msgUser = emp || fallbackEmp;
     const replies = msg.replies || [];
-    const replyUsers = [...new Set(replies.map(r => r.userId))].map(uid => EMPLOYEES.find(e => e.id === uid)).filter(Boolean);
+    const replyUsers = [...new Set(replies.map(r => r.userId))].map(ruid => EMPLOYEES.find(e => e.id === ruid)).filter(Boolean);
     const lastReply = replies.length > 0 ? replies[replies.length - 1] : null;
     const isThreadOpen = openThread && openThread.channelId === activeChannel && openThread.msgId === msg.id;
-    const isOwnMsg = msg.userId === 6;
+    const isOwnMsg = msg.userId === uid;
     const isEditing = editingMsg && editingMsg.msgId === msg.id && editingMsg.channelId === (chId || activeChannel);
     const moreOpen = moreMenuMsg === msg.id;
 
     return (
       <div className="message-group" key={msg.id}>
-        <div className="msg-avatar" style={{ background: emp.color, borderRadius: 8, width: compact ? 28 : 36, height: compact ? 28 : 36, fontSize: compact ? 11 : 14 }}>{emp.avatar}</div>
+        <div className="msg-avatar" style={{ background: msgUser.color, borderRadius: 8, width: compact ? 28 : 36, height: compact ? 28 : 36, fontSize: compact ? 11 : 14 }}>{msgUser.avatar}</div>
         <div className="msg-content">
           <div className="msg-header">
-            <span className="msg-name" style={compact ? { fontSize: 13 } : {}}>{emp.name}</span>
-            <span className="msg-time">{msg.time}{msg.edited && <span className="msg-edited">(edited)</span>}</span>
+            <span className="msg-name" style={compact ? { fontSize: 13 } : {}}>{msgUser.name}</span>
+            <span className="msg-time">{msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : (msg.time || 'Just now')}{msg.edited && <span className="msg-edited">(edited)</span>}</span>
             {!compact && (
               <div className="msg-hover-actions" style={{ position: 'relative', ...(moreOpen ? { display: 'inline-flex', alignItems: 'center', gap: 2 } : {}) }}>
                 <button title="Reply in thread" onClick={() => setOpenThread({ channelId: activeChannel, msgId: msg.id })}><i className="fas fa-comment-dots" /></button>
@@ -1425,7 +1471,7 @@ function Chat({ role }) {
     return { icon: 'fa-hashtag' };
   };
   const chIcon = getChannelIcon(channel);
-  const canSend = channel && (channel.joined !== false);
+  const canSend = channel && isJoined(channel);
 
   return (
     <div className="chat-layout">
@@ -1451,7 +1497,7 @@ function Chat({ role }) {
           </div>
           {!sidebarCollapsed.public && (() => {
             const filtered = joinedPublic.filter(c => !channelSearch || c.name.toLowerCase().includes(channelSearch.toLowerCase()));
-            const unjoinedMatches = channelSearch ? channels.filter(c => c.visibility === 'public' && !c.joined && c.name.toLowerCase().includes(channelSearch.toLowerCase())) : [];
+            const unjoinedMatches = channelSearch ? channels.filter(c => c.visibility === 'public' && !isJoined(c) && c.name.toLowerCase().includes(channelSearch.toLowerCase())) : [];
             return (<>
               {filtered.map(c => (
                 <div key={c.id} className={`channel-item ${activeChannel === c.id ? 'active' : ''}`} onClick={() => { setActiveChannel(c.id); setOpenThread(null); setMobileShowMessages(true); }}>
@@ -1515,7 +1561,7 @@ function Chat({ role }) {
             </h3>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {channel?.description || ''}
-              {channel?.members && <span style={{ fontSize: 11, opacity: 0.6 }}> · {channel.members} members</span>}
+              {channel?.joinedBy && <span style={{ fontSize: 11, opacity: 0.6 }}> · {channel.joinedBy.length} members</span>}
             </span>
           </div>
           <div className="chat-header-right">
@@ -1528,24 +1574,24 @@ function Chat({ role }) {
               setChannels(channels.map(c => c.id === activeChannel ? { ...c, muted: !c.muted } : c));
             }}><i className={`fas ${channel?.muted ? 'fa-bell-slash' : 'fa-bell'}`} /></button>
             <button className="chat-icon-btn" title="Members"><i className="fas fa-user-friends" /></button>
-            {channel?.visibility === 'public' && channel?.joined && (
+            {channel?.visibility === 'public' && channel && isJoined(channel) && (
               <button className="chat-icon-btn" title="Leave channel" onClick={() => leaveChannel(activeChannel)} style={{ color: 'var(--danger)' }}><i className="fas fa-sign-out-alt" /></button>
             )}
           </div>
         </div>
 
         <div className="chat-messages">
-          {(chatMessages[activeChannel] || []).map(msg => (
+          {(channelMessages).map(msg => (
             <MessageBubble key={msg.id} msg={msg} compact={false} showThreadPreview={true} chId={activeChannel} />
           ))}
-          {(chatMessages[activeChannel] || []).length === 0 && !canSend && (
+          {(channelMessages).length === 0 && !canSend && (
             <div style={{ textAlign: 'center', padding: 40 }}>
               <i className="fas fa-hashtag" style={{ fontSize: 36, color: 'var(--border)', marginBottom: 12 }} />
               <h3 style={{ marginBottom: 4 }}>#{channel?.name}</h3>
               <p style={{ color: 'var(--text-light)' }}>{channel?.description}</p>
             </div>
           )}
-          {canSend && (chatMessages[activeChannel] || []).length === 0 && (
+          {canSend && (channelMessages).length === 0 && (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-light)' }}>
               <i className="fas fa-comment-dots" style={{ fontSize: 36, opacity: 0.3, marginBottom: 12, display: 'block' }} />
               <p>No messages yet. Start the conversation!</p>
@@ -1747,7 +1793,7 @@ function Chat({ role }) {
               <div style={{ fontWeight: 600, fontSize: 14 }}><i className="fas fa-hashtag" style={{ fontSize: 11, opacity: 0.4, marginRight: 4 }} />{c.name}</div>
               <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{c.description} · {c.members} members</div>
             </div>
-            {c.joined ? <span className="badge green">Joined</span> : <button className="topbar-btn primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => joinChannel(c.id)}>Join</button>}
+            {isJoined(c) ? <span className="badge green">Joined</span> : <button className="topbar-btn primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => joinChannel(c.id)}>Join</button>}
           </div>
         ))}
       </Modal>
@@ -1779,7 +1825,7 @@ function Chat({ role }) {
             const existingDM = dmChannels.find(c => c.empId === emp.id);
             return (
               <div key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
-                onClick={() => { if (existingDM) { setActiveChannel(existingDM.id); } else { const newId = Math.max(...channels.map(c => c.id)) + 1; setChannels([...channels, { id: newId, name: emp.name, visibility: 'dm', unread: 0, muted: false, empId: emp.id }]); setActiveChannel(newId); } setShowNewDM(false); setMobileShowMessages(true); }}>
+                onClick={async () => { if (existingDM) { setActiveChannel(existingDM.id); } else { const docRef = await db.collection('channels').add({ name: emp.name, visibility: 'dm', empId: emp.id, joinedBy: [uid, emp.id], members: [uid, emp.id], createdBy: uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); setActiveChannel(docRef.id); } setShowNewDM(false); setMobileShowMessages(true); }}>
                 <div style={{ position: 'relative' }}>
                   <div className="avatar" style={{ background: emp.color }}>{emp.avatar}</div>
                   <div style={{ position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: '50%', background: emp.clockedIn ? 'var(--success)' : '#d1d5db', border: '2px solid white' }} />
@@ -3663,6 +3709,15 @@ function App() {
 
   // Listen for Firebase auth state — check phone against Firestore employees
   useEffect(() => {
+    // Try to restore cached employee data immediately (avoids flash of login screen)
+    try {
+      const cached = sessionStorage.getItem('ecs_employee');
+      if (cached) {
+        const emp = JSON.parse(cached);
+        setAuthedUser(emp);
+      }
+    } catch (e) {}
+
     const unsubscribe = firebaseAuth.onAuthStateChanged(async (user) => {
       if (user) {
         try {
@@ -3674,23 +3729,31 @@ function App() {
             .limit(1).get();
           if (!snap.empty) {
             const empDoc = snap.docs[0];
-            setAuthedUser({ id: empDoc.id, ...empDoc.data() });
+            const empData = { id: empDoc.id, ...empDoc.data() };
+            setAuthedUser(empData);
+            // Cache for instant restore on next page load
+            try { sessionStorage.setItem('ecs_employee', JSON.stringify(empData)); } catch (e) {}
           } else {
             // Phone not in allowlist — sign them out
             await firebaseAuth.signOut();
             setAuthedUser(null);
+            try { sessionStorage.removeItem('ecs_employee'); } catch (e) {}
             setAuthLoading(false);
             return;
           }
         } catch (err) {
           console.error('Error checking employee allowlist:', err);
-          // Don't sign out on network errors — keep them authed and retry
-          // This prevents losing auth on flaky connections
+          // Don't sign out — use cached data if available
+          const cached = sessionStorage.getItem('ecs_employee');
+          if (cached) {
+            try { setAuthedUser(JSON.parse(cached)); } catch (e) {}
+          }
           setAuthLoading(false);
           return;
         }
       } else {
         setAuthedUser(null);
+        try { sessionStorage.removeItem('ecs_employee'); } catch (e) {}
       }
       setAuthLoading(false);
     });
@@ -3705,7 +3768,7 @@ function App() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const handleLogout = () => { firebaseAuth.signOut(); setAuthedUser(null); setShowUserMenu(false); };
+  const handleLogout = () => { firebaseAuth.signOut(); setAuthedUser(null); setShowUserMenu(false); try { sessionStorage.removeItem('ecs_employee'); } catch(e){} };
 
   // Navigation structure — top-level items with dropdown children
   const navItems = role === 'admin' ? [
@@ -3792,7 +3855,7 @@ function App() {
   const renderPage = () => {
     switch (page) {
       case 'dashboard': return <Dashboard role={role} />;
-      case 'chat': return <Chat role={role} />;
+      case 'chat': return <Chat role={role} authedUser={authedUser} />;
       case 'schedule': return <Schedule role={role} />;
       case 'timesheets': return <Timesheets role={role} />;
       case 'shifts': return <ShiftSwaps role={role} />;
