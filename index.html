@@ -678,7 +678,12 @@ const db = firebase.firestore();
 db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 
 // ── Firebase Cloud Messaging (Push Notifications) ──
-const messaging = firebase.messaging();
+let messaging = null;
+try {
+  messaging = firebase.messaging();
+} catch (e) {
+  console.warn('[FCM] Messaging not supported in this browser:', e);
+}
 
 // Register service worker for PWA + push notifications
 let swRegistration = null;
@@ -687,7 +692,6 @@ if ('serviceWorker' in navigator) {
     .then((reg) => {
       swRegistration = reg;
       console.log('[PWA] Service worker registered:', reg.scope);
-      messaging.useServiceWorker(reg);
     })
     .catch((err) => console.warn('[PWA] SW registration failed:', err));
 }
@@ -723,7 +727,7 @@ function playNotificationSound() {
 
 // Request push notification permission and get FCM token
 async function requestNotificationPermission(userId) {
-  if (!('Notification' in window)) {
+  if (!('Notification' in window) || !messaging) {
     console.warn('Notifications not supported');
     return null;
   }
@@ -737,7 +741,7 @@ async function requestNotificationPermission(userId) {
   try {
     // Get FCM token — this identifies this device for push delivery
     const token = await messaging.getToken({
-      vapidKey: 'BC2TFO_Vmk68IKMEOEUAFTuX5g7Jce9Z5NdFQ2gCDh2E6tFhOvhM7VdUuAv8JFU-es4QAMzuDAnBSTQabpExmlI'
+      vapidKey: 'BC2TFO_Vmk68IKMEOEUAFTuX5g7Jce9Z5NdFQ2gCDh2E6tFhOvhM7VdUuAv8JFU-es4QAMzuDAnBSTQabpExmlI',
       serviceWorkerRegistration: swRegistration
     });
 
@@ -758,7 +762,7 @@ async function requestNotificationPermission(userId) {
 }
 
 // Handle foreground messages (when the app is open and visible)
-messaging.onMessage((payload) => {
+if (messaging) messaging.onMessage((payload) => {
   console.log('[FCM] Foreground message:', payload);
   const { title, body } = payload.notification || {};
 
