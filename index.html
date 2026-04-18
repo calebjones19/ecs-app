@@ -4858,7 +4858,7 @@ function App() {
         <div onClick={() => setShowMobileMore(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} />
       )}
       {showMobileMore && (
-        <div style={{ position: 'fixed', bottom: 68, left: 0, right: 0, background: 'white', borderRadius: '16px 16px 0 0', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)', padding: '12px 8px', zIndex: 201, maxHeight: '60vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))', left: 0, right: 0, background: 'white', borderRadius: '16px 16px 0 0', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)', padding: '12px 8px', zIndex: 201, maxHeight: '60vh', overflowY: 'auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 8 }}>
             <div style={{ width: 32, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto' }} />
           </div>
