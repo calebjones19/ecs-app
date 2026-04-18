@@ -255,8 +255,8 @@
   .gif-fullscreen-header .gif-close-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: rgba(255,255,255,0.1); color: white; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .gif-fullscreen-header .gif-search-input { flex: 1; background: rgba(255,255,255,0.1); border: none; border-radius: 10px; padding: 10px 14px; font-size: 16px; color: white; outline: none; }
   .gif-fullscreen-header .gif-search-input::placeholder { color: rgba(255,255,255,0.4); }
-  .gif-fullscreen-grid { flex: 1; overflow-y: auto; padding: 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; align-content: start; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-  .gif-fullscreen-grid .gif-cell { border-radius: 6px; overflow: hidden; cursor: pointer; aspect-ratio: 1; background: rgba(255,255,255,0.05); }
+  .gif-fullscreen-grid { flex: 1; overflow-y: auto; padding: 3px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; align-content: start; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .gif-fullscreen-grid .gif-cell { border-radius: 4px; overflow: hidden; cursor: pointer; aspect-ratio: 1; background: rgba(255,255,255,0.05); }
   .gif-fullscreen-grid .gif-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .gif-fullscreen-grid .gif-cell:active { opacity: 0.7; }
   .gif-fullscreen-footer { padding: 6px 0; text-align: center; background: #1a1a1a; flex-shrink: 0; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
@@ -1933,7 +1933,7 @@ function Chat({ role, authedUser }) {
         {canSend ? (
           <div className="chat-composer" style={{ position: 'relative' }}>
             {/* Picker backdrop for mobile */}
-            {(showEmojiPicker || showGifPicker || showMentionPicker) && (
+            {(showEmojiPicker || (showGifPicker && window.innerWidth > 768) || showMentionPicker) && (
               <div className="picker-backdrop mobile-only" onClick={closeAllPickers} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 340 }} />
             )}
             {/* Emoji picker */}
@@ -1968,7 +1968,7 @@ function Chat({ role, authedUser }) {
                 </div>
               </div>
             )}
-            <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={onFileSelected} />
+            <input type="file" ref={fileInputRef} accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.pages,.numbers,.keynote" style={{ display: 'none' }} onChange={onFileSelected} />
             <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onFileSelected} />
             <input type="file" ref={photoInputRef} accept="image/*,video/*" style={{ display: 'none' }} onChange={onFileSelected} />
             {/* Desktop: old attach menu */}
@@ -2280,7 +2280,7 @@ function Chat({ role, authedUser }) {
               <i className="fas fa-photo-video" />
               <span>Choose Photo or Video</span>
             </div>
-            <div className="attach-sheet-item" onClick={() => { setShowAttachMenu(false); if (fileInputRef.current) { fileInputRef.current.accept = ''; fileInputRef.current.click(); } }}>
+            <div className="attach-sheet-item" onClick={() => { setShowAttachMenu(false); if (fileInputRef.current) fileInputRef.current.click(); }}>
               <i className="fas fa-file-upload" />
               <span>Upload a File</span>
             </div>
