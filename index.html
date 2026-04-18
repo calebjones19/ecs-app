@@ -1369,30 +1369,18 @@ function Chat({ role, authedUser, perm }) {
     { urls: 'stun:stun1.l.google.com:19302' },
   ]};
 
-  // Listen for active calls in the current channel (DMs only)
+  // Listen for the active call in the current channel (for call we initiated or joined)
   useEffect(() => {
-    if (!activeChannel) return;
-    const ch = channels.find(c => c.id === activeChannel);
-    if (!ch || ch.visibility !== 'dm') { setActiveCall(null); return; }
-    const unsub = db.collection('videoCalls')
-      .where('channelId', '==', activeChannel)
-      .where('status', '==', 'active')
-      .limit(1)
+    if (!activeChannel || !activeCall) return;
+    if (activeCall.channelId !== activeChannel) return;
+    const unsub = db.collection('videoCalls').doc(activeCall.id)
       .onSnapshot(snap => {
-        if (!snap.empty) {
-          const doc = snap.docs[0];
-          const callData = { id: doc.id, ...doc.data() };
-          setActiveCall(callData);
-          // Ring if this is an incoming call (someone else started it and we haven't joined)
-          if (callData.startedBy !== authedUser?.id && !showVideoCall) {
-            playCallRing();
-          }
-        } else {
+        if (!snap.exists || snap.data().status !== 'active') {
           setActiveCall(null);
-          stopCallRing();
+          hangUpCall();
         }
       });
-    return () => { unsub(); stopCallRing(); };
+    return () => unsub();
   }, [activeChannel]);
 
   // When call ends externally, clean up
@@ -1513,6 +1501,12 @@ function Chat({ role, authedUser, perm }) {
 
   const startVideoCall = async () => {
     if (!activeChannel || !authedUser?.id) return;
+    const ch = channels.find(c => c.id === activeChannel);
+    if (!ch || ch.visibility !== 'dm') return;
+    // Find the other person in the DM
+    const otherUserId = (ch.members || []).find(id => id !== authedUser.id) || ch.empId;
+    console.log('[VideoCall] Starting call — my ID:', authedUser.id, 'calling:', otherUserId, 'channel members:', ch.members, 'empId:', ch.empId);
+    if (!otherUserId) { console.error('[VideoCall] No other user found in DM'); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
@@ -1523,6 +1517,7 @@ function Chat({ role, authedUser, perm }) {
         channelId: activeChannel,
         startedBy: authedUser.id,
         startedByName: authedUser.name || 'Employee',
+        calledUserId: otherUserId,
         startedAt: firebase.firestore.FieldValue.serverTimestamp(),
         status: 'active',
         participants: [authedUser.id],
@@ -1651,6 +1646,41 @@ function Chat({ role, authedUser, perm }) {
     window.__ecsInVideoCall = showVideoCall;
     return () => { window.__ecsInVideoCall = false; };
   }, [showVideoCall]);
+
+  // Listen for incoming call answer from global overlay
+  useEffect(() => {
+    const handler = () => {
+      const callData = window.__ecsIncomingCallAnswer;
+      if (!callData) return;
+      window.__ecsIncomingCallAnswer = null;
+      // Switch to the call's channel
+      setActiveChannel(callData.channelId);
+      setChatSidebarTab('dms');
+      setMobileShowMessages(true);
+      // Set the active call so joinVideoCall can use it
+      setActiveCall(callData);
+      // Delay slightly to let state settle, then join
+      setTimeout(() => {
+        // Trigger join via a ref flag
+        window.__ecsPendingJoinCall = callData;
+        window.dispatchEvent(new CustomEvent('ecs-join-call'));
+      }, 300);
+    };
+    window.addEventListener('ecs-answer-call', handler);
+    return () => window.removeEventListener('ecs-answer-call', handler);
+  }, []);
+
+  // Handle the actual join after channel switch
+  useEffect(() => {
+    const handler = () => {
+      const callData = window.__ecsPendingJoinCall;
+      if (!callData) return;
+      window.__ecsPendingJoinCall = null;
+      joinVideoCall();
+    };
+    window.addEventListener('ecs-join-call', handler);
+    return () => window.removeEventListener('ecs-join-call', handler);
+  }, [activeCall]);
 
   // Load messages for active channel from Firestore (realtime)
   useEffect(() => {
@@ -2614,40 +2644,6 @@ function Chat({ role, authedUser, perm }) {
           </div>
         </div>
 
-        {/* ── Incoming Call Screen (receiver only — persistent until answered or ended) ── */}
-        {activeCall && !showVideoCall && activeCall.startedBy !== authedUser?.id && (() => {
-          const callerEmp = EMPLOYEES.find(e => e.id === activeCall.startedBy);
-          return (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #111827 0%, #1f2937 100%)', padding: 40, gap: 24 }}>
-              <div style={{ position: 'relative' }}>
-                <div className="avatar" style={{ background: callerEmp?.color || '#6366f1', width: 80, height: 80, fontSize: 28, border: '3px solid rgba(255,255,255,0.2)' }}>
-                  {callerEmp?.avatar || '?'}
-                </div>
-                <div style={{ position: 'absolute', inset: -8, borderRadius: '50%', border: '2px solid rgba(52,211,153,0.4)', animation: 'pulse 2s infinite' }} />
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ color: 'white', fontSize: 20, fontWeight: 700 }}>{activeCall.startedByName}</div>
-                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 4 }}>Incoming video call...</div>
-              </div>
-              <div style={{ display: 'flex', gap: 32, marginTop: 16 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <button onClick={() => { stopCallRing(); setActiveCall(null); }}
-                    style={{ width: 60, height: 60, borderRadius: '50%', border: 'none', cursor: 'pointer', background: '#ef4444', color: 'white', fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="fas fa-phone-slash" />
-                  </button>
-                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600 }}>Decline</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <button onClick={joinVideoCall}
-                    style={{ width: 60, height: 60, borderRadius: '50%', border: 'none', cursor: 'pointer', background: '#059669', color: 'white', fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <i className="fas fa-video" />
-                  </button>
-                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600 }}>Answer</span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* ── Video Call UI ── */}
         {showVideoCall && (
@@ -2714,7 +2710,7 @@ function Chat({ role, authedUser, perm }) {
           </div>
         )}
 
-        {!showVideoCall && !(activeCall && activeCall.startedBy !== authedUser?.id) && (
+        {!showVideoCall && (
         <div className="chat-messages">
           {(channelMessages).map(msg => (
             <MessageBubble key={msg.id} msg={msg} compact={false} showThreadPreview={true} chId={activeChannel} />
@@ -2736,7 +2732,7 @@ function Chat({ role, authedUser, perm }) {
         </div>
         )}
 
-        {canSend && !showVideoCall && !(activeCall && activeCall.startedBy !== authedUser?.id) ? (
+        {canSend && !showVideoCall ? (
           <div className="chat-composer" style={{ position: 'relative' }}>
             {/* Picker backdrop for mobile */}
             {(showEmojiPicker || (showGifPicker && window.innerWidth > 768) || showMentionPicker) && (
@@ -6316,6 +6312,49 @@ function App() {
     }
   }, [page, authedUser]);
 
+  // ── Global Incoming Call Listener ──
+  // Uses single-field query to avoid needing a Firestore composite index
+  const [incomingCall, setIncomingCall] = useState(null);
+  useEffect(() => {
+    if (!authedUser?.id) return;
+    console.log('[VideoCall] Listening for incoming calls for user:', authedUser.id);
+    const unsub = db.collection('videoCalls')
+      .where('calledUserId', '==', authedUser.id)
+      .onSnapshot(snap => {
+        const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+        // Filter client-side for active calls only (within last 5 min)
+        const activeCalls = snap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(c => c.status === 'active' && (!c.startedAt?.toDate || c.startedAt.toDate() > fiveMinAgo));
+        console.log('[VideoCall] Active calls found:', activeCalls.length, 'total docs:', snap.docs.length);
+        if (activeCalls.length > 0) {
+          setIncomingCall(activeCalls[0]);
+          playCallRing();
+        } else {
+          setIncomingCall(null);
+          stopCallRing();
+        }
+      }, err => {
+        console.error('[VideoCall] Listener error:', err);
+      });
+    return () => { unsub(); stopCallRing(); };
+  }, [authedUser?.id]);
+
+  const answerIncomingCall = () => {
+    if (!incomingCall) return;
+    stopCallRing();
+    // Navigate to chat and set the active channel via a global event
+    setPage('chat');
+    window.__ecsIncomingCallAnswer = incomingCall;
+    window.dispatchEvent(new CustomEvent('ecs-answer-call'));
+    setIncomingCall(null);
+  };
+
+  const declineIncomingCall = () => {
+    stopCallRing();
+    setIncomingCall(null);
+  };
+
   // Load employees from Firestore (realtime) — updates global + state
   useEffect(() => {
     const unsub = db.collection('employees').onSnapshot((snap) => {
@@ -6581,6 +6620,41 @@ function App() {
           <button onClick={(e) => { e.stopPropagation(); setToast(null); }} style={{ border: 'none', background: 'none', color: 'var(--text-light)', cursor: 'pointer', padding: 4, fontSize: 14 }}>
             <i className="fas fa-times" />
           </button>
+        </div>
+      )}
+
+      {/* ── Global Incoming Call Overlay ── */}
+      {incomingCall && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'linear-gradient(180deg, #111827 0%, #1f2937 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+          <div style={{ position: 'relative' }}>
+            {(() => { const callerEmp = EMPLOYEES.find(e => e.id === incomingCall.startedBy); return (
+              <div className="avatar" style={{ background: callerEmp?.color || '#6366f1', width: 96, height: 96, fontSize: 32, border: '3px solid rgba(255,255,255,0.2)' }}>
+                {callerEmp?.avatar || '?'}
+              </div>
+            ); })()}
+            <div style={{ position: 'absolute', inset: -10, borderRadius: '50%', border: '2px solid rgba(52,211,153,0.4)', animation: 'pulse 2s infinite' }} />
+            <div style={{ position: 'absolute', inset: -20, borderRadius: '50%', border: '1px solid rgba(52,211,153,0.2)', animation: 'pulse 2s infinite 0.5s' }} />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: 'white', fontSize: 22, fontWeight: 700 }}>{incomingCall.startedByName}</div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, marginTop: 6 }}>Incoming video call...</div>
+          </div>
+          <div style={{ display: 'flex', gap: 48, marginTop: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <button onClick={declineIncomingCall}
+                style={{ width: 64, height: 64, borderRadius: '50%', border: 'none', cursor: 'pointer', background: '#ef4444', color: 'white', fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(239,68,68,0.4)' }}>
+                <i className="fas fa-phone-slash" />
+              </button>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 600 }}>Decline</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <button onClick={answerIncomingCall}
+                style={{ width: 64, height: 64, borderRadius: '50%', border: 'none', cursor: 'pointer', background: '#059669', color: 'white', fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(5,150,105,0.4)' }}>
+                <i className="fas fa-video" />
+              </button>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 600 }}>Answer</span>
+            </div>
+          </div>
         </div>
       )}
 
