@@ -409,8 +409,8 @@
   .modal-close:hover { background: var(--border); }
 
   /* Tabs */
-  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
-  .tab { padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--text-light); transition: all 0.15s; }
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .tab { padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--text-light); transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 
@@ -3823,23 +3823,29 @@ function EmployeeProfiles({ role, perm }) {
                     <option value="admin">Admin</option>
                   </select>
                 </div>
-                {/* Permission descriptions */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                  {['viewer', 'scheduler', 'editor', 'admin'].map(p => (
-                    <div key={p} style={{ padding: '12px 14px', borderRadius: 10, background: (editData.permission || 'viewer') === p ? '#f0f7ee' : 'var(--bg)', border: (editData.permission || 'viewer') === p ? '2px solid var(--primary)' : '1px solid var(--border)' }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: (editData.permission || 'viewer') === p ? 'var(--primary)' : 'var(--text)' }}>
-                        {(editData.permission || 'viewer') === p && <i className="fas fa-check-circle" style={{ marginRight: 6 }} />}
-                        {PERM_LABELS[p]}
-                      </div>
-                      <div style={{ fontSize: 13, color: 'var(--text-light)', lineHeight: 1.4 }}>{PERM_DESCS[p]}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                  <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                {/* Save / Cancel */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 20, padding: '12px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+                  <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }} disabled={!editDirty}>Cancel</button>
                   <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
-                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save Permission</>}
+                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save Permission</>}
                   </button>
+                </div>
+                {/* Permission descriptions — read-only reference */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {['viewer', 'scheduler', 'editor', 'admin'].map(p => {
+                    const isSelected = (editData.permission || 'viewer') === p;
+                    return (
+                      <div key={p} style={{ padding: '12px 14px', borderRadius: 10,
+                        background: isSelected ? '#f0f7ee' : 'var(--bg)',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)' }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: isSelected ? 'var(--primary)' : 'var(--text)' }}>
+                          {isSelected && <i className="fas fa-check-circle" style={{ marginRight: 6 }} />}
+                          {PERM_LABELS[p]}
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--text-light)', lineHeight: 1.4 }}>{PERM_DESCS[p]}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
