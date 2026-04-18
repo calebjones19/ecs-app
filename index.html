@@ -1151,6 +1151,21 @@ function Chat({ role, authedUser }) {
   const joinedPublic = channels.filter(c => c.visibility === 'public' && isJoined(c));
   const privateChannels = channels.filter(c => c.visibility === 'private' && isJoined(c));
   const dmChannels = channels.filter(c => c.visibility === 'dm' && isJoined(c));
+
+  // For DMs, show the OTHER person's name, not your own
+  const getDmName = (ch) => {
+    if (ch.visibility !== 'dm') return ch.name;
+    // Find the other member's ID
+    const otherId = (ch.members || []).find(id => id !== uid) || ch.empId;
+    if (!otherId || otherId === uid) return ch.name; // fallback
+    const otherEmp = EMPLOYEES.find(e => e.id === otherId);
+    return otherEmp?.name || ch.name;
+  };
+  const getDmEmp = (ch) => {
+    if (ch.visibility !== 'dm') return null;
+    const otherId = (ch.members || []).find(id => id !== uid) || ch.empId;
+    return EMPLOYEES.find(e => e.id === otherId) || null;
+  };
   const browsableChannels = channels.filter(c => c.visibility === 'public');
 
   // Get the parent message for the open thread
@@ -1536,8 +1551,11 @@ function Chat({ role, authedUser }) {
             <span><i className={`fas fa-chevron-${sidebarCollapsed.dm ? 'right' : 'down'}`} style={{ fontSize: 9, marginRight: 4 }} /> Direct Messages</span>
             <span style={{ fontSize: 10, cursor: 'pointer', color: 'var(--primary)' }} onClick={e => { e.stopPropagation(); setShowNewDM(true); }} title="New DM"><i className="fas fa-plus" /></span>
           </div>
-          {!sidebarCollapsed.dm && dmChannels.filter(c => !channelSearch || c.name.toLowerCase().includes(channelSearch.toLowerCase())).map(c => {
-            const emp = EMPLOYEES.find(e => e.id === c.empId);
+          {!sidebarCollapsed.dm && dmChannels.filter(c => {
+            const dmName = getDmName(c);
+            return !channelSearch || dmName.toLowerCase().includes(channelSearch.toLowerCase());
+          }).map(c => {
+            const emp = getDmEmp(c);
             const isOnline = emp?.clockedIn;
             return (
               <div key={c.id} className={`channel-item ${activeChannel === c.id ? 'active' : ''}`} onClick={() => { setActiveChannel(c.id); setOpenThread(null); setMobileShowMessages(true); }}>
@@ -1545,7 +1563,7 @@ function Chat({ role, authedUser }) {
                   <div className="avatar sm" style={{ background: emp?.color || '#999' }}>{emp?.avatar || '?'}</div>
                   <div style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%', background: isOnline ? 'var(--success)' : '#d1d5db', border: '2px solid #f2f0ec' }} />
                 </div>
-                <span style={{ flex: 1 }}>{c.name}</span>
+                <span style={{ flex: 1 }}>{getDmName(c)}</span>
                 {c.unread > 0 && <span className="nav-badge" style={{ fontSize: 10, padding: '0 5px' }}>{c.unread}</span>}
               </div>
             );
@@ -1562,7 +1580,7 @@ function Chat({ role, authedUser }) {
                 <i className="fas fa-arrow-left" />
               </button>
               <i className={`fas ${chIcon.icon}`} style={{ fontSize: 13, opacity: 0.5 }} />
-              {channel?.name}
+              {channel?.visibility === 'dm' ? getDmName(channel) : channel?.name}
               {channel?.visibility === 'private' && <span className="badge purple" style={{ fontSize: 10, padding: '1px 6px' }}>Private</span>}
             </h3>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1714,7 +1732,7 @@ function Chat({ role, authedUser }) {
             )}
             <div className="composer-input-wrap">
               <div ref={composerRef} className="composer-input" contentEditable={true}
-                data-placeholder={`Message ${channel?.visibility !== 'dm' ? (channel?.visibility === 'private' ? '🔒 ' : '#') : ''}${channel?.name}...`}
+                data-placeholder={`Message ${channel?.visibility === 'dm' ? getDmName(channel) : (channel?.visibility === 'private' ? '🔒 ' : '#') + (channel?.name || '')}...`}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                 onKeyUp={updateActiveFormats}
                 onMouseUp={updateActiveFormats}
@@ -1827,8 +1845,8 @@ function Chat({ role, authedUser }) {
       <Modal show={showNewDM} onClose={() => setShowNewDM(false)} title="New Direct Message">
         <div className="form-group"><label className="form-label">Search people</label><div className="search-bar"><i className="fas fa-search" /><input placeholder="Type a name..." /></div></div>
         <div style={{ maxHeight: 300, overflow: 'auto' }}>
-          {EMPLOYEES.filter(e => e.status === 'active').map(emp => {
-            const existingDM = dmChannels.find(c => c.empId === emp.id);
+          {EMPLOYEES.filter(e => e.status === 'active' && e.id !== uid).map(emp => {
+            const existingDM = dmChannels.find(c => c.members && c.members.includes(emp.id) && c.members.includes(uid));
             return (
               <div key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
                 onClick={async () => { if (existingDM) { setActiveChannel(existingDM.id); } else { const docRef = await db.collection('channels').add({ name: emp.name, visibility: 'dm', empId: emp.id, joinedBy: [uid, emp.id], members: [uid, emp.id], createdBy: uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); setActiveChannel(docRef.id); } setShowNewDM(false); setMobileShowMessages(true); }}>
