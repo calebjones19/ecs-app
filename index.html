@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content, viewport-fit=cover" />
 <title>Essence Cleaning - Team Portal</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -216,7 +216,10 @@
   .picker-cat-section { display: flex; flex-direction: column; flex-shrink: 0; }
   .picker-cat-section .emoji-cat-label { font-size: 10px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 2px 4px; white-space: nowrap; }
   .picker-cat-section .emoji-row { display: grid; grid-template-rows: repeat(4, 34px); grid-auto-flow: column; grid-auto-columns: 34px; gap: 2px; }
-  .gif-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 8px; max-height: 300px; overflow-y: auto; }
+  .gif-grid { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
+  .gif-item { flex: 1 1 calc(50% - 3px); min-width: calc(50% - 3px); max-width: calc(50% - 3px); border-radius: 8px; overflow: hidden; cursor: pointer; position: relative; background: var(--bg); }
+  .gif-item img { width: 100%; height: auto; display: block; border-radius: 8px; transition: transform 0.15s ease; }
+  .gif-item:active img { transform: scale(0.96); }
   .gif-item { border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--bg); display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
   .gif-item:hover { transform: scale(1.03); }
   .gif-item img { display: block; }
@@ -268,7 +271,7 @@
   /* More menu dropdown — portaled to body, always fixed */
   .more-menu { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: white; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); padding: 6px; min-width: 200px; z-index: 300; }
   @media (max-width: 768px) {
-    .more-menu { left: 0; right: 0; bottom: 60px; top: auto; transform: none; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 8px 16px; min-width: auto; }
+    .more-menu { left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); top: auto; transform: none; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 8px 16px; min-width: auto; }
     body.keyboard-open .more-menu { bottom: 0; }
   }
   .more-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.1s; }
@@ -529,8 +532,8 @@
       justify-content: center;
     }
 
-    /* Add bottom padding for fixed nav */
-    .app { padding-bottom: 68px; }
+    /* Add bottom padding for fixed nav + safe area */
+    .app { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
 
     /* Page header */
     .page-header { padding: 12px 16px; }
@@ -561,7 +564,7 @@
     .card { padding: 14px; margin-bottom: 12px; overflow-x: hidden; }
 
     /* Chat layout → full width, toggle between channels and messages */
-    .chat-layout { flex-direction: column; height: calc(100dvh - 60px); }
+    .chat-layout { flex-direction: column; height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px)); }
     .chat-channels { width: 100%; border-right: none; border-bottom: 1px solid var(--border); flex: 1; }
     .chat-channels.hidden-mobile { display: none; }
     .chat-main { width: 100%; flex: 1; min-height: 0; }
@@ -578,7 +581,7 @@
     .composer-toolbar button { padding: 6px 10px; font-size: 15px; }
     .composer-input { font-size: 16px; padding: 8px 10px; min-height: 36px; }
     .composer-send { width: 38px; height: 38px; font-size: 15px; }
-    .thread-panel { width: 100%; position: fixed; top: 0; left: 0; right: 0; bottom: 60px; z-index: 200; }
+    .thread-panel { width: 100%; position: fixed; top: 0; left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); z-index: 200; }
     .thread-composer { padding: 6px 10px 4px; }
     .thread-composer textarea { padding: 6px 10px; font-size: 16px; min-height: 36px; }
 
@@ -1106,7 +1109,7 @@ function Chat({ role, authedUser }) {
   useEffect(() => {
     if (showGifPicker && giphyResults.length === 0 && !gifSearch) {
       setGiphyLoading(true);
-      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`)
+      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=12&rating=g`)
         .then(r => r.json())
         .then(data => { setGiphyResults(data.data || []); setGiphyLoading(false); })
         .catch(() => setGiphyLoading(false));
@@ -1119,7 +1122,7 @@ function Chat({ role, authedUser }) {
     if (gifSearchTimeout.current) clearTimeout(gifSearchTimeout.current);
     if (!gifSearch.trim()) {
       // Load trending when search cleared
-      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`)
+      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=12&rating=g`)
         .then(r => r.json())
         .then(data => setGiphyResults(data.data || []))
         .catch(() => {});
@@ -1127,7 +1130,7 @@ function Chat({ role, authedUser }) {
     }
     gifSearchTimeout.current = setTimeout(() => {
       setGiphyLoading(true);
-      fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(gifSearch)}&limit=20&rating=g`)
+      fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(gifSearch)}&limit=12&rating=g`)
         .then(r => r.json())
         .then(data => { setGiphyResults(data.data || []); setGiphyLoading(false); })
         .catch(() => setGiphyLoading(false));
@@ -1901,12 +1904,12 @@ function Chat({ role, authedUser }) {
                 <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
                   <input placeholder="Search GIFs..." value={gifSearch} onChange={e => setGifSearch(e.target.value)} autoFocus />
                 </div>
-                <div className="gif-grid" style={{ maxHeight: 300 }}>
-                  {giphyLoading && <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 20, color: 'var(--text-light)' }}><i className="fas fa-spinner fa-spin" /> Loading...</div>}
-                  {!giphyLoading && giphyResults.length === 0 && <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 20, color: 'var(--text-light)' }}>No GIFs found</div>}
+                <div className="gif-grid">
+                  {giphyLoading && <div style={{ width: '100%', textAlign: 'center', padding: 20, color: 'var(--text-light)' }}><i className="fas fa-spinner fa-spin" /> Loading...</div>}
+                  {!giphyLoading && giphyResults.length === 0 && <div style={{ width: '100%', textAlign: 'center', padding: 20, color: 'var(--text-light)' }}>No GIFs found</div>}
                   {giphyResults.map(g => (
-                    <div key={g.id} className="gif-item" onClick={() => insertGif(g)} title={g.title} style={{ height: 'auto', aspectRatio: '1' }}>
-                      <img src={g.images?.fixed_height_small?.url || g.images?.preview_gif?.url} alt={g.title} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} loading="lazy" />
+                    <div key={g.id} className="gif-item" onClick={() => insertGif(g)} title={g.title}>
+                      <img src={g.images?.fixed_width?.url || g.images?.fixed_height_small?.url} alt={g.title} loading="lazy" />
                     </div>
                   ))}
                 </div>
