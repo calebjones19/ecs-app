@@ -3088,22 +3088,6 @@ function Schedule({ role }) {
       {calView === 'week' && !isMobile && renderWeekView()}
       {calView === 'month' && !isMobile && renderMonthView()}
 
-      {/* Legend */}
-      {calView !== 'month' && (
-        <div style={{ marginTop: 16, display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-light)', flexWrap: 'wrap' }}>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#dceee4', borderLeft: '3px solid #2d6a4f', borderRadius: 2, marginRight: 4 }} /> Morning</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#faf3e0', borderLeft: '3px solid #c8a84e', borderRadius: 2, marginRight: 4 }} /> Afternoon</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#f0ebe4', borderLeft: '3px solid #7c6f64', borderRadius: 2, marginRight: 4 }} /> Evening</span>
-          {showLabor && (
-            <React.Fragment>
-              <span style={{ marginLeft: 8 }}>|</span>
-              <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--success)', borderRadius: 2, marginRight: 4 }} /> Actual (on/under)</span>
-              <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--danger)', borderRadius: 2, marginRight: 4 }} /> Actual (over)</span>
-              <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#e5e7eb', borderRadius: 2, marginRight: 4 }} /> Remaining</span>
-            </React.Fragment>
-          )}
-        </div>
-      )}
 
       {/* Add Shift Modal */}
       <Modal show={showAddShift} onClose={() => setShowAddShift(false)} title="Add Shift">
