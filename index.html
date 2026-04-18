@@ -1423,7 +1423,7 @@ function Chat({ role, authedUser }) {
   // Close pickers on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (!e.target.closest('.picker-popup') && !e.target.closest('.attach-menu') && !e.target.closest('.attach-sheet') && !e.target.closest('.attach-sheet-backdrop') && !e.target.closest('.composer-toolbar') && !e.target.closest('.msg-reactions') && !e.target.closest('.msg-hover-actions') && !e.target.closest('.more-menu') && !e.target.closest('.msg-edit-wrap') && !e.target.closest('.action-sheet') && !e.target.closest('.action-sheet-backdrop')) {
+      if (!e.target.closest('.picker-popup') && !e.target.closest('.attach-menu') && !e.target.closest('.attach-sheet') && !e.target.closest('.attach-sheet-backdrop') && !e.target.closest('.gif-fullscreen') && !e.target.closest('.composer-toolbar') && !e.target.closest('.msg-reactions') && !e.target.closest('.msg-hover-actions') && !e.target.closest('.more-menu') && !e.target.closest('.msg-edit-wrap') && !e.target.closest('.action-sheet') && !e.target.closest('.action-sheet-backdrop')) {
         closeAllPickers();
         setQuickReactMsg(null);
         setMoreMenuMsg(null);
@@ -2259,23 +2259,6 @@ function Chat({ role, authedUser }) {
           <div className="attach-sheet-backdrop" onClick={() => setShowAttachMenu(false)} />
           <div className="attach-sheet">
             <div className="attach-sheet-handle" />
-            <div className="attach-sheet-section-header">
-              <span>Photos & Videos</span>
-              <button onClick={() => { setShowAttachMenu(false); if (photoInputRef.current) photoInputRef.current.click(); }}>View Library</button>
-            </div>
-            <div className="attach-sheet-photos">
-              <div className="attach-sheet-camera-btn" onClick={() => { setShowAttachMenu(false); if (cameraInputRef.current) cameraInputRef.current.click(); }}>
-                <i className="fas fa-camera" />
-              </div>
-              {/* Placeholder thumbnails — in a native app these would be real camera roll photos */}
-              {[1,2,3,4,5].map(i => (
-                <div key={i} className="attach-sheet-camera-btn" onClick={() => { setShowAttachMenu(false); if (photoInputRef.current) photoInputRef.current.click(); }}
-                  style={{ background: `hsl(${i * 60}, 15%, 25%)` }}>
-                  <i className="fas fa-image" style={{ fontSize: 18, opacity: 0.4 }} />
-                </div>
-              ))}
-            </div>
-            <div className="attach-sheet-divider" />
             <div className="attach-sheet-item" onClick={() => { setShowAttachMenu(false); if (photoInputRef.current) photoInputRef.current.click(); }}>
               <i className="fas fa-photo-video" />
               <span>Choose Photo or Video</span>
