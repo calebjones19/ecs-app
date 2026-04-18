@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Essence" />
-<meta name="theme-color" content="#4a6741" />
+<meta name="theme-color" content="#2a3328" />
 <!-- Firebase Messaging SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 <style>
@@ -487,14 +487,14 @@
     .desktop-only { display: none !important; }
     /* CRITICAL: prevent all horizontal scroll / wiggle */
     html, body { overflow: hidden !important; width: 100%; max-width: 100vw; }
-    .app { height: 100dvh; height: 100vh; overflow: hidden; width: 100%; max-width: 100vw; padding-top: env(safe-area-inset-top, 0px); }
+    .app { height: 100dvh; height: 100vh; overflow: hidden; width: 100%; max-width: 100vw; padding-top: env(safe-area-inset-top, 0px); background: var(--sidebar-bg); }
     /* When keyboard open: hide nav, reclaim its space */
     body.keyboard-open .mobile-bottom-nav { display: none !important; }
     body.keyboard-open .app { padding-bottom: 0 !important; }
     body.keyboard-open .app { padding-top: 0 !important; }
     body.keyboard-open .chat-layout { height: 100dvh; height: 100vh; }
     body.keyboard-open .thread-panel { bottom: 0; top: 0; height: 100dvh; height: 100vh; }
-    .main { overflow-x: hidden; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .main { overflow-x: hidden; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; background: white; }
     .content { padding: 12px; overflow-x: hidden; overflow-y: auto; width: 100%; max-width: 100vw; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
 
     /* Hide desktop top nav, show mobile bottom nav */
@@ -586,7 +586,7 @@
     .card { padding: 14px; margin-bottom: 12px; overflow-x: hidden; }
 
     /* Chat layout → full width, toggle between channels and messages */
-    .chat-layout { flex-direction: column; height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px)); }
+    .chat-layout { flex-direction: column; height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px)); }
     .chat-channels { width: 100%; border-right: none; border-bottom: 1px solid var(--border); flex: 1; }
     .chat-channels.hidden-mobile { display: none; }
     .chat-main { width: 100%; flex: 1; min-height: 0; }
