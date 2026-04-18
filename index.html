@@ -4271,6 +4271,8 @@ function Timesheets({ role, authedUser, perm }) {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
   const [showClockInModal, setShowClockInModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null); // { id, clockIn, clockOut, label }
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   const ADMIN_CATEGORIES = [
     { id: 'training', label: 'Training', icon: 'fa-chalkboard-teacher' },
@@ -4286,41 +4288,54 @@ function Timesheets({ role, authedUser, perm }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Load today's entries from Firestore + check for active clock-in
+  // Listen for current user's active clock-in (any date — handles overnight shifts)
+  useEffect(() => {
+    if (!authedUser?.id) return;
+    const unsub = db.collection('timeEntries')
+      .where('employeeId', '==', authedUser.id)
+      .where('status', '==', 'active')
+      .limit(1)
+      .onSnapshot(snap => {
+        if (snap.empty) {
+          setActiveEntry(null);
+        } else {
+          const doc = snap.docs[0];
+          const d = { id: doc.id, ...doc.data() };
+          if (d.clockIn?.toDate) d.clockIn = d.clockIn.toDate();
+          if (d.clockOut?.toDate) d.clockOut = d.clockOut.toDate();
+          setActiveEntry(d);
+        }
+      }, err => console.error('Active entry listen error:', err));
+    return () => unsub();
+  }, [authedUser?.id]);
+
+  // Load today's completed entries from Firestore
   useEffect(() => {
     if (!authedUser?.id) { setLoading(false); return; }
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    const today = new Date().toISOString().slice(0, 10);
 
     // Query: admin sees all entries, others see only their own
     let q = db.collection('timeEntries')
-      .where('date', '==', todayStart.toISOString().slice(0, 10))
+      .where('date', '==', today)
+      .where('status', '==', 'complete')
       .orderBy('clockIn', 'desc');
     if (!isAdmin) {
       q = db.collection('timeEntries')
         .where('employeeId', '==', authedUser.id)
-        .where('date', '==', todayStart.toISOString().slice(0, 10))
+        .where('date', '==', today)
+        .where('status', '==', 'complete')
         .orderBy('clockIn', 'desc');
     }
 
     const unsub = q.onSnapshot(snap => {
       const entries = [];
-      let foundActive = null;
       snap.forEach(doc => {
         const d = { id: doc.id, ...doc.data() };
-        // Convert Firestore Timestamps to JS Dates
         if (d.clockIn?.toDate) d.clockIn = d.clockIn.toDate();
         if (d.clockOut?.toDate) d.clockOut = d.clockOut.toDate();
-        if (d.status === 'active' && d.employeeId === authedUser.id) {
-          foundActive = d;
-        } else {
-          entries.push(d);
-        }
+        entries.push(d);
       });
       setTimesheetEntries(entries);
-      setActiveEntry(foundActive);
       setLoading(false);
     }, err => {
       console.error('Time entries listen error:', err);
@@ -4403,6 +4418,45 @@ function Timesheets({ role, authedUser, perm }) {
     }
   };
 
+  // Admin: save edited timesheet entry
+  const saveEditEntry = async () => {
+    if (!editingEntry?.id) return;
+    try {
+      const ciDate = new Date(editingEntry.clockInStr);
+      const coDate = new Date(editingEntry.clockOutStr);
+      if (isNaN(ciDate) || isNaN(coDate)) { alert('Invalid date/time'); return; }
+      const hours = ((coDate - ciDate) / (1000 * 60 * 60)).toFixed(2);
+      if (parseFloat(hours) <= 0) { alert('Clock out must be after clock in'); return; }
+      await db.collection('timeEntries').doc(editingEntry.id).update({
+        clockIn: firebase.firestore.Timestamp.fromDate(ciDate),
+        clockOut: firebase.firestore.Timestamp.fromDate(coDate),
+        hours: hours,
+        label: editingEntry.label,
+      });
+      setEditingEntry(null);
+    } catch (err) {
+      alert('Error saving: ' + err.message);
+    }
+  };
+
+  // Admin: delete timesheet entry
+  const deleteEntry = async (entryId) => {
+    try {
+      await db.collection('timeEntries').doc(entryId).delete();
+      setDeleteConfirmId(null);
+    } catch (err) {
+      alert('Error deleting: ' + err.message);
+    }
+  };
+
+  // Helper: Date to datetime-local input string
+  const toLocalInput = (d) => {
+    if (!d) return '';
+    const dt = d instanceof Date ? d : new Date(d);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  };
+
   const todayDate = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   if (loading) {
@@ -4441,20 +4495,24 @@ function Timesheets({ role, authedUser, perm }) {
         )}
       </div>
 
-      {/* Clock-in modal */}
+      {/* Clock-in bottom sheet */}
       {showClockInModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
           onClick={e => { if (e.target === e.currentTarget) setShowClockInModal(false); }}>
-          <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 500, maxHeight: '75vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', boxShadow: '0 -10px 40px rgba(0,0,0,0.15)', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', animation: 'slideUp 0.25s ease-out' }}>
+            {/* Handle bar */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: '#d1d5db' }} />
+            </div>
             {/* Header */}
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ padding: '8px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 700, fontSize: 17 }}>Clock In</span>
               <button onClick={() => setShowClockInModal(false)} style={{ background: 'none', border: 'none', fontSize: 18, color: 'var(--text-light)', cursor: 'pointer', padding: 4 }}>
                 <i className="fas fa-times" />
               </button>
             </div>
 
-            <div style={{ padding: '16px 20px' }}>
+            <div style={{ padding: '0 20px 8px' }}>
               {/* Scheduled Jobs */}
               <div style={{ marginBottom: canSchedule ? 20 : 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
@@ -4542,18 +4600,87 @@ function Timesheets({ role, authedUser, perm }) {
           <div>
             {timesheetEntries.map(t => (
               <div key={t.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
-                <span className={`badge ${t.status === 'active' ? 'green' : 'gray'}`}>
-                  {t.status === 'active' ? '● Active' : 'Complete'}
-                </span>
+                <span className="badge gray">Complete</span>
                 <span style={{ fontWeight: 600 }}>{t.employeeName || 'Employee'}</span>
                 <span style={{ color: 'var(--text-light)' }}>{t.label}</span>
                 <span>{formatShort(t.clockIn)}{t.clockOut ? ` — ${formatShort(t.clockOut)}` : ' — now'}</span>
                 <span style={{ fontWeight: 700, marginLeft: 'auto' }}>{t.hours ? `${t.hours}h` : '—'}</span>
+                {isAdmin && (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="chat-icon-btn" title="Edit" onClick={() => setEditingEntry({
+                      id: t.id, label: t.label, employeeName: t.employeeName,
+                      clockInStr: toLocalInput(t.clockIn), clockOutStr: toLocalInput(t.clockOut)
+                    })}><i className="fas fa-pen" style={{ fontSize: 11 }} /></button>
+                    <button className="chat-icon-btn" title="Delete" style={{ color: 'var(--danger)' }}
+                      onClick={() => setDeleteConfirmId(t.id)}><i className="fas fa-trash" style={{ fontSize: 11 }} /></button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Admin: Edit timesheet modal */}
+      {editingEntry && isAdmin && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setEditingEntry(null); }}>
+          <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 700, fontSize: 16 }}>Edit Timesheet Entry</span>
+              <button onClick={() => setEditingEntry(null)} style={{ background: 'none', border: 'none', fontSize: 18, color: 'var(--text-light)', cursor: 'pointer' }}>
+                <i className="fas fa-times" />
+              </button>
+            </div>
+            <div style={{ padding: '16px 20px' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 12 }}>
+                <i className="fas fa-user" style={{ marginRight: 6 }} />{editingEntry.employeeName}
+              </div>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Task / Job</label>
+                <input className="form-input" value={editingEntry.label || ''} onChange={e => setEditingEntry(prev => ({ ...prev, label: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Clock In</label>
+                <input className="form-input" type="datetime-local" value={editingEntry.clockInStr || ''} onChange={e => setEditingEntry(prev => ({ ...prev, clockInStr: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="form-label">Clock Out</label>
+                <input className="form-input" type="datetime-local" value={editingEntry.clockOutStr || ''} onChange={e => setEditingEntry(prev => ({ ...prev, clockOutStr: e.target.value }))} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="topbar-btn" onClick={() => setEditingEntry(null)}>Cancel</button>
+                <button className="topbar-btn primary" onClick={saveEditEntry}>
+                  <i className="fas fa-check" style={{ marginRight: 4 }} /> Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin: Delete confirmation modal */}
+      {deleteConfirmId && isAdmin && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}>
+          <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+            <div style={{ padding: '24px 20px', textAlign: 'center' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <i className="fas fa-exclamation-triangle" style={{ color: 'var(--danger)', fontSize: 20 }} />
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Delete Timesheet Entry?</div>
+              <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 20 }}>This action cannot be undone. The entry will be permanently removed.</div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                <button className="topbar-btn" onClick={() => setDeleteConfirmId(null)}>Cancel</button>
+                <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)' }}
+                  onClick={() => deleteEntry(deleteConfirmId)}>
+                  <i className="fas fa-trash" style={{ marginRight: 4 }} /> Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
