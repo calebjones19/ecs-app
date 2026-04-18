@@ -149,6 +149,24 @@
   .channel-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
   .channel-item .unread { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; margin-left: auto; }
   .channel-type { font-size: 11px; color: var(--text-light); padding: 12px 12px 4px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+  .channel-group-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; padding: 10px 12px 4px; }
+  .channel-group-header span { font-size: 11px; color: var(--text-light); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+  .channel-group-header .group-actions { display: flex; gap: 4px; }
+  .channel-group-header .group-actions button { background: none; border: none; cursor: pointer; font-size: 10px; color: var(--text-light); padding: 2px 4px; border-radius: 4px; }
+  .channel-group-header .group-actions button:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+  .edit-mode-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--primary-light); border-bottom: 1px solid var(--border); }
+  .edit-mode-bar span { font-size: 12px; font-weight: 600; color: var(--primary); }
+  .edit-mode-bar button { background: var(--primary); color: white; border: none; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .group-add-form { display: flex; gap: 6px; padding: 6px 12px; }
+  .group-add-form input { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; background: white; }
+  .group-add-form button { background: var(--primary); color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .move-channel-picker { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 4px; margin: 4px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .move-channel-picker .move-option { padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; }
+  .move-channel-picker .move-option:hover { background: var(--bg); }
+  .channel-item-edit { display: flex; align-items: center; gap: 6px; }
+  .channel-item-edit button { background: none; border: none; cursor: pointer; font-size: 11px; color: var(--text-light); padding: 2px 6px; border-radius: 4px; }
+  .channel-item-edit button:hover { background: rgba(0,0,0,0.06); }
+  .rename-input { border: 1px solid var(--primary); border-radius: 4px; padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; width: 120px; }
 
   .chat-main { flex: 1; display: flex; flex-direction: column; }
   .chat-header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: white; }
@@ -1086,7 +1104,24 @@ function Chat({ role, authedUser }) {
   const [newChannelDesc, setNewChannelDesc] = useState('');
   const [newChannelVisibility, setNewChannelVisibility] = useState('public');
   const [channelSearch, setChannelSearch] = useState('');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState({ public: false, private: false, dm: false });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ecs-sidebar-collapsed') || '{}'); } catch { return {}; }
+  });
+  const [channelGroups, setChannelGroups] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ecs-channel-groups') || 'null');
+      if (saved && saved.length) return saved;
+    } catch {}
+    return [
+      { id: 'channels', name: 'Channels', channelIds: [] },
+      { id: 'dms', name: 'Direct Messages', channelIds: [] },
+    ];
+  });
+  const [editingGroups, setEditingGroups] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [renamingGroup, setRenamingGroup] = useState(null);
+  const [renameText, setRenameText] = useState('');
+  const [movingChannel, setMovingChannel] = useState(null); // { channelId, fromGroupId }
 
   // Load channels from Firestore (realtime)
   useEffect(() => {
@@ -1140,6 +1175,9 @@ function Chat({ role, authedUser }) {
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [mentionSearch, setMentionSearch] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
+  const [recentPhotos, setRecentPhotos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ecs-recent-photos') || '[]'); } catch { return []; }
+  });
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showFormatBar, setShowFormatBar] = useState(false);
   const [mobileShowMessages, setMobileShowMessages] = useState(false);
@@ -1309,15 +1347,35 @@ function Chat({ role, authedUser }) {
       fileInputRef.current.click();
     }
   };
+  const saveToRecentPhotos = (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = 120; canvas.height = 120;
+      const size = Math.min(img.width, img.height);
+      const sx = (img.width - size) / 2, sy = (img.height - size) / 2;
+      ctx.drawImage(img, sx, sy, size, size, 0, 0, 120, 120);
+      const thumb = canvas.toDataURL('image/jpeg', 0.6);
+      URL.revokeObjectURL(img.src);
+      setRecentPhotos(prev => {
+        const updated = [{ thumb, name: file.name, ts: Date.now() }, ...prev.filter(p => p.name !== file.name)].slice(0, 8);
+        try { localStorage.setItem('ecs-recent-photos', JSON.stringify(updated)); } catch {}
+        return updated;
+      });
+    };
+    img.src = URL.createObjectURL(file);
+  };
   const onFileSelected = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
     const { icon, color } = getFileIcon(file.name);
-    // For images, create a preview
     let preview = null;
     if (file.type.startsWith('image/')) {
       preview = URL.createObjectURL(file);
+      saveToRecentPhotos(file);
     }
     setAttachedFile({ name: file.name, size: formatFileSize(file.size), icon, color, file, preview, uploading: false, url: null });
   };
@@ -1533,8 +1591,47 @@ function Chat({ role, authedUser }) {
   };
 
   const toggleSection = (section) => {
-    setSidebarCollapsed({ ...sidebarCollapsed, [section]: !sidebarCollapsed[section] });
+    const updated = { ...sidebarCollapsed, [section]: !sidebarCollapsed[section] };
+    setSidebarCollapsed(updated);
+    try { localStorage.setItem('ecs-sidebar-collapsed', JSON.stringify(updated)); } catch {}
   };
+
+  // Channel group helpers
+  const saveGroups = (groups) => {
+    setChannelGroups(groups);
+    try { localStorage.setItem('ecs-channel-groups', JSON.stringify(groups)); } catch {}
+  };
+  const addGroup = (name) => {
+    if (!name.trim()) return;
+    const id = 'grp_' + Date.now();
+    saveGroups([...channelGroups, { id, name: name.trim(), channelIds: [] }]);
+    setNewGroupName('');
+  };
+  const deleteGroup = (groupId) => {
+    saveGroups(channelGroups.filter(g => g.id !== groupId));
+  };
+  const renameGroup = (groupId, name) => {
+    if (!name.trim()) return;
+    saveGroups(channelGroups.map(g => g.id === groupId ? { ...g, name: name.trim() } : g));
+    setRenamingGroup(null);
+    setRenameText('');
+  };
+  const moveChannelToGroup = (channelId, targetGroupId) => {
+    saveGroups(channelGroups.map(g => ({
+      ...g,
+      channelIds: g.id === targetGroupId
+        ? (g.channelIds.includes(channelId) ? g.channelIds : [...g.channelIds, channelId])
+        : g.channelIds.filter(id => id !== channelId)
+    })));
+    setMovingChannel(null);
+  };
+  const removeChannelFromGroup = (channelId, groupId) => {
+    saveGroups(channelGroups.map(g => g.id === groupId ? { ...g, channelIds: g.channelIds.filter(id => id !== channelId) } : g));
+  };
+  // Get all joined channels organized by group
+  const allJoinedChannels = [...joinedPublic, ...privateChannels, ...dmChannels];
+  const groupedChannelIds = new Set(channelGroups.flatMap(g => g.channelIds));
+  const ungroupedChannels = allJoinedChannels.filter(c => !groupedChannelIds.has(c.id));
 
   // Message actions state
   const [moreMenuMsg, setMoreMenuMsg] = useState(null); // desktop only
@@ -1807,10 +1904,19 @@ function Chat({ role, authedUser }) {
         <div className="chat-channels-header">
           <h3>Messages</h3>
           <div style={{ display: 'flex', gap: 4 }}>
+            <button className="chat-icon-btn" title={editingGroups ? 'Done editing' : 'Organize channels'} onClick={() => { setEditingGroups(!editingGroups); setMovingChannel(null); setRenamingGroup(null); }} style={editingGroups ? { background: 'var(--primary-light)', color: 'var(--primary)' } : {}}>
+              <i className={`fas ${editingGroups ? 'fa-check' : 'fa-layer-group'}`} />
+            </button>
             <button className="chat-icon-btn" title="New direct message" onClick={() => setShowNewDM(true)}><i className="fas fa-edit" /></button>
             <button className="chat-icon-btn" title="Create channel" onClick={() => setShowCreateChannel(true)}><i className="fas fa-plus" /></button>
           </div>
         </div>
+        {editingGroups && (
+          <div className="edit-mode-bar">
+            <span><i className="fas fa-layer-group" style={{ marginRight: 4 }} /> Organizing sections</span>
+            <button onClick={() => { setEditingGroups(false); setMovingChannel(null); setRenamingGroup(null); }}>Done</button>
+          </div>
+        )}
         <div style={{ padding: '8px 8px 0' }}>
           <div className="search-bar" style={{ marginBottom: 4 }}>
             <i className="fas fa-search" style={{ fontSize: 12 }} />
@@ -1818,62 +1924,142 @@ function Chat({ role, authedUser }) {
           </div>
         </div>
         <div className="channel-list">
-          <div className="channel-type" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSection('public')}>
-            <span><i className={`fas fa-chevron-${sidebarCollapsed.public ? 'right' : 'down'}`} style={{ fontSize: 9, marginRight: 4 }} /> Channels</span>
-            <span style={{ fontSize: 10, cursor: 'pointer', color: 'var(--primary)' }} onClick={e => { e.stopPropagation(); setShowBrowseChannels(true); }} title="Browse channels"><i className="fas fa-compass" /></span>
-          </div>
-          {!sidebarCollapsed.public && (() => {
-            const filtered = joinedPublic.filter(c => !channelSearch || c.name.toLowerCase().includes(channelSearch.toLowerCase()));
-            const unjoinedMatches = channelSearch ? channels.filter(c => c.visibility === 'public' && !isJoined(c) && c.name.toLowerCase().includes(channelSearch.toLowerCase())) : [];
-            return (<>
-              {filtered.map(c => (
-                <div key={c.id} className={`channel-item ${activeChannel === c.id ? 'active' : ''}`} onClick={() => { setActiveChannel(c.id); setOpenThread(null); setMobileShowMessages(true); }}>
-                  <i className="fas fa-hashtag" style={{ fontSize: 12, opacity: 0.5 }} />
-                  <span style={{ flex: 1 }}>{c.name}</span>
-                  {c.muted && <i className="fas fa-bell-slash" style={{ fontSize: 10, opacity: 0.4 }} />}
-                  {c.unread > 0 && !c.muted && <span className="nav-badge" style={{ fontSize: 10, padding: '0 5px' }}>{c.unread}</span>}
-                </div>
-              ))}
-              {unjoinedMatches.map(c => (
-                <div key={c.id} className={`channel-item ${activeChannel === c.id ? 'active' : ''}`} onClick={() => { setActiveChannel(c.id); setOpenThread(null); setMobileShowMessages(true); }} style={{ opacity: 0.6 }}>
-                  <i className="fas fa-hashtag" style={{ fontSize: 12, opacity: 0.5 }} />
-                  <span style={{ flex: 1 }}>{c.name}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-light)', fontStyle: 'italic' }}>Join</span>
-                </div>
-              ))}
-            </>);
-          })()}
-          <div className="channel-type" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none', marginTop: 8 }} onClick={() => toggleSection('private')}>
-            <span><i className={`fas fa-chevron-${sidebarCollapsed.private ? 'right' : 'down'}`} style={{ fontSize: 9, marginRight: 4 }} /> Private Channels</span>
-          </div>
-          {!sidebarCollapsed.private && privateChannels.filter(c => !channelSearch || c.name.includes(channelSearch.toLowerCase())).map(c => (
-            <div key={c.id} className={`channel-item ${activeChannel === c.id ? 'active' : ''}`} onClick={() => { setActiveChannel(c.id); setOpenThread(null); setMobileShowMessages(true); }}>
-              <i className="fas fa-lock" style={{ fontSize: 11, opacity: 0.5 }} />
-              <span style={{ flex: 1 }}>{c.name}</span>
-              {c.unread > 0 && <span className="nav-badge" style={{ fontSize: 10, padding: '0 5px' }}>{c.unread}</span>}
-            </div>
-          ))}
-          <div className="channel-type" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none', marginTop: 8 }} onClick={() => toggleSection('dm')}>
-            <span><i className={`fas fa-chevron-${sidebarCollapsed.dm ? 'right' : 'down'}`} style={{ fontSize: 9, marginRight: 4 }} /> Direct Messages</span>
-            <span style={{ fontSize: 10, cursor: 'pointer', color: 'var(--primary)' }} onClick={e => { e.stopPropagation(); setShowNewDM(true); }} title="New DM"><i className="fas fa-plus" /></span>
-          </div>
-          {!sidebarCollapsed.dm && dmChannels.filter(c => {
-            const dmName = getDmName(c);
-            return !channelSearch || dmName.toLowerCase().includes(channelSearch.toLowerCase());
-          }).map(c => {
-            const emp = getDmEmp(c);
-            const isOnline = emp?.clockedIn;
+          {/* Render each user-defined group */}
+          {channelGroups.map(group => {
+            const groupChannels = group.channelIds
+              .map(id => allJoinedChannels.find(c => c.id === id))
+              .filter(c => c && (!channelSearch || (c.visibility === 'dm' ? getDmName(c) : c.name).toLowerCase().includes(channelSearch.toLowerCase())));
+            const isCollapsed = sidebarCollapsed[group.id];
             return (
-              <div key={c.id} className={`channel-item ${activeChannel === c.id ? 'active' : ''}`} onClick={() => { setActiveChannel(c.id); setOpenThread(null); setMobileShowMessages(true); }}>
-                <div style={{ position: 'relative' }}>
-                  <div className="avatar sm" style={{ background: emp?.color || '#999' }}>{emp?.avatar || '?'}</div>
-                  <div style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%', background: isOnline ? 'var(--success)' : '#d1d5db', border: '2px solid #f2f0ec' }} />
+              <div key={group.id} style={{ marginTop: group === channelGroups[0] ? 0 : 8 }}>
+                <div className="channel-group-header" onClick={() => !renamingGroup && toggleSection(group.id)}>
+                  {renamingGroup === group.id ? (
+                    <form onSubmit={e => { e.preventDefault(); renameGroup(group.id, renameText); }} style={{ display: 'flex', gap: 4, flex: 1 }} onClick={e => e.stopPropagation()}>
+                      <input className="rename-input" value={renameText} onChange={e => setRenameText(e.target.value)} autoFocus onBlur={() => { if (renameText.trim()) renameGroup(group.id, renameText); else setRenamingGroup(null); }} />
+                    </form>
+                  ) : (
+                    <span><i className={`fas fa-chevron-${isCollapsed ? 'right' : 'down'}`} style={{ fontSize: 9, marginRight: 4 }} /> {group.name}</span>
+                  )}
+                  {editingGroups && !renamingGroup && (
+                    <div className="group-actions" onClick={e => e.stopPropagation()}>
+                      <button title="Rename" onClick={() => { setRenamingGroup(group.id); setRenameText(group.name); }}><i className="fas fa-pen" /></button>
+                      {group.id !== 'channels' && group.id !== 'dms' && (
+                        <button title="Delete section" onClick={() => deleteGroup(group.id)}><i className="fas fa-trash-alt" style={{ color: 'var(--danger)' }} /></button>
+                      )}
+                    </div>
+                  )}
+                  {!editingGroups && group.id === 'channels' && (
+                    <span style={{ fontSize: 10, cursor: 'pointer', color: 'var(--primary)' }} onClick={e => { e.stopPropagation(); setShowBrowseChannels(true); }} title="Browse channels"><i className="fas fa-compass" /></span>
+                  )}
+                  {!editingGroups && group.id === 'dms' && (
+                    <span style={{ fontSize: 10, cursor: 'pointer', color: 'var(--primary)' }} onClick={e => { e.stopPropagation(); setShowNewDM(true); }} title="New DM"><i className="fas fa-plus" /></span>
+                  )}
                 </div>
-                <span style={{ flex: 1 }}>{getDmName(c)}</span>
-                {c.unread > 0 && <span className="nav-badge" style={{ fontSize: 10, padding: '0 5px' }}>{c.unread}</span>}
+                {!isCollapsed && groupChannels.map(c => {
+                  const isDM = c.visibility === 'dm';
+                  const emp = isDM ? getDmEmp(c) : null;
+                  const isOnline = emp?.clockedIn;
+                  return (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center' }}>
+                      <div className={`channel-item ${activeChannel === c.id ? 'active' : ''}`} style={{ flex: 1 }}
+                        onClick={() => { if (!editingGroups) { setActiveChannel(c.id); setOpenThread(null); setMobileShowMessages(true); } else { setMovingChannel(movingChannel?.channelId === c.id ? null : { channelId: c.id, fromGroupId: group.id }); } }}>
+                        {isDM ? (
+                          <div style={{ position: 'relative' }}>
+                            <div className="avatar sm" style={{ background: emp?.color || '#999' }}>{emp?.avatar || '?'}</div>
+                            <div style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%', background: isOnline ? 'var(--success)' : '#d1d5db', border: '2px solid #f2f0ec' }} />
+                          </div>
+                        ) : (
+                          <i className={`fas ${c.visibility === 'private' ? 'fa-lock' : 'fa-hashtag'}`} style={{ fontSize: c.visibility === 'private' ? 11 : 12, opacity: 0.5 }} />
+                        )}
+                        <span style={{ flex: 1 }}>{isDM ? getDmName(c) : c.name}</span>
+                        {c.muted && <i className="fas fa-bell-slash" style={{ fontSize: 10, opacity: 0.4 }} />}
+                        {c.unread > 0 && !c.muted && <span className="nav-badge" style={{ fontSize: 10, padding: '0 5px' }}>{c.unread}</span>}
+                        {editingGroups && (
+                          <i className="fas fa-arrows-alt" style={{ fontSize: 10, opacity: 0.35, marginLeft: 4 }} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Move channel picker */}
+                {movingChannel && groupChannels.some(c => c.id === movingChannel.channelId) && (
+                  <div className="move-channel-picker">
+                    <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-light)' }}>Move to section:</div>
+                    {channelGroups.filter(g => g.id !== movingChannel.fromGroupId).map(g => (
+                      <div key={g.id} className="move-option" onClick={() => moveChannelToGroup(movingChannel.channelId, g.id)}>{g.name}</div>
+                    ))}
+                    <div className="move-option" onClick={() => { removeChannelFromGroup(movingChannel.channelId, movingChannel.fromGroupId); setMovingChannel(null); }} style={{ color: 'var(--text-light)' }}>
+                      Remove from section
+                    </div>
+                  </div>
+                )}
+                {!isCollapsed && groupChannels.length === 0 && !channelSearch && (
+                  <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-light)', fontStyle: 'italic' }}>
+                    {editingGroups ? 'Tap a channel to move it here' : 'No channels yet'}
+                  </div>
+                )}
               </div>
             );
           })}
+
+          {/* Ungrouped channels */}
+          {ungroupedChannels.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div className="channel-group-header" onClick={() => toggleSection('_ungrouped')}>
+                <span><i className={`fas fa-chevron-${sidebarCollapsed._ungrouped ? 'right' : 'down'}`} style={{ fontSize: 9, marginRight: 4 }} /> Ungrouped</span>
+              </div>
+              {!sidebarCollapsed._ungrouped && ungroupedChannels.filter(c => !channelSearch || (c.visibility === 'dm' ? getDmName(c) : c.name).toLowerCase().includes(channelSearch.toLowerCase())).map(c => {
+                const isDM = c.visibility === 'dm';
+                const emp = isDM ? getDmEmp(c) : null;
+                const isOnline = emp?.clockedIn;
+                return (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center' }}>
+                    <div className={`channel-item ${activeChannel === c.id ? 'active' : ''}`} style={{ flex: 1 }}
+                      onClick={() => { if (!editingGroups) { setActiveChannel(c.id); setOpenThread(null); setMobileShowMessages(true); } else { setMovingChannel(movingChannel?.channelId === c.id ? null : { channelId: c.id, fromGroupId: null }); } }}>
+                      {isDM ? (
+                        <div style={{ position: 'relative' }}>
+                          <div className="avatar sm" style={{ background: emp?.color || '#999' }}>{emp?.avatar || '?'}</div>
+                          <div style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%', background: isOnline ? 'var(--success)' : '#d1d5db', border: '2px solid #f2f0ec' }} />
+                        </div>
+                      ) : (
+                        <i className={`fas ${c.visibility === 'private' ? 'fa-lock' : 'fa-hashtag'}`} style={{ fontSize: c.visibility === 'private' ? 11 : 12, opacity: 0.5 }} />
+                      )}
+                      <span style={{ flex: 1 }}>{isDM ? getDmName(c) : c.name}</span>
+                      {c.unread > 0 && !c.muted && <span className="nav-badge" style={{ fontSize: 10, padding: '0 5px' }}>{c.unread}</span>}
+                      {editingGroups && <i className="fas fa-arrows-alt" style={{ fontSize: 10, opacity: 0.35, marginLeft: 4 }} />}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Move picker for ungrouped */}
+              {movingChannel && movingChannel.fromGroupId === null && (
+                <div className="move-channel-picker">
+                  <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-light)' }}>Move to section:</div>
+                  {channelGroups.map(g => (
+                    <div key={g.id} className="move-option" onClick={() => moveChannelToGroup(movingChannel.channelId, g.id)}>{g.name}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Add new group (edit mode) */}
+          {editingGroups && (
+            <div style={{ marginTop: 12 }}>
+              <form className="group-add-form" onSubmit={e => { e.preventDefault(); addGroup(newGroupName); }}>
+                <input placeholder="New section name..." value={newGroupName} onChange={e => setNewGroupName(e.target.value)} />
+                <button type="submit" disabled={!newGroupName.trim()}>Add</button>
+              </form>
+            </div>
+          )}
+
+          {/* Browse channels link (always visible) */}
+          {!channelSearch && !editingGroups && (
+            <div className="channel-item" style={{ marginTop: 8, opacity: 0.6 }} onClick={() => setShowBrowseChannels(true)}>
+              <i className="fas fa-compass" style={{ fontSize: 12, opacity: 0.5 }} />
+              <span>Browse all channels</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2259,6 +2445,31 @@ function Chat({ role, authedUser }) {
           <div className="attach-sheet-backdrop" onClick={() => setShowAttachMenu(false)} />
           <div className="attach-sheet">
             <div className="attach-sheet-handle" />
+            {recentPhotos.length > 0 && (<>
+              <div className="attach-sheet-section-header">
+                <span>Photos & Videos</span>
+                <button onClick={() => { setShowAttachMenu(false); if (photoInputRef.current) photoInputRef.current.click(); }}>View Library</button>
+              </div>
+              <div className="attach-sheet-photos">
+                <div className="attach-sheet-camera-btn" onClick={() => { setShowAttachMenu(false); if (cameraInputRef.current) cameraInputRef.current.click(); }}>
+                  <i className="fas fa-camera" />
+                </div>
+                {recentPhotos.map((photo, i) => (
+                  <img key={photo.ts || i} className="attach-sheet-photo-thumb" src={photo.thumb} alt={photo.name}
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      fetch(photo.thumb).then(r => r.blob()).then(blob => {
+                        const file = new File([blob], photo.name, { type: 'image/jpeg' });
+                        const preview = URL.createObjectURL(file);
+                        const { icon, color } = getFileIcon(file.name);
+                        setAttachedFile({ name: file.name, size: formatFileSize(file.size), icon, color, file, preview, uploading: false, url: null });
+                      });
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="attach-sheet-divider" />
+            </>)}
             <div className="attach-sheet-item" onClick={() => { setShowAttachMenu(false); if (photoInputRef.current) photoInputRef.current.click(); }}>
               <i className="fas fa-photo-video" />
               <span>Choose Photo or Video</span>
