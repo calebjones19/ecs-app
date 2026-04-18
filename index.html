@@ -2015,10 +2015,8 @@ function Chat({ role, authedUser }) {
             <div className="composer-input-wrap">
               <div ref={composerRef} className="composer-input" contentEditable={true}
                 data-placeholder={`Message ${channel?.visibility === 'dm' ? getDmName(channel) : (channel?.visibility === 'private' ? '🔒 ' : '#') + (channel?.name || '')}...`}
-                onMouseUp={saveSelection} onKeyUp={saveSelection} onFocus={saveSelection}
+                onMouseUp={(e) => { saveSelection(); updateActiveFormats(); }} onKeyUp={(e) => { saveSelection(); updateActiveFormats(); }} onFocus={saveSelection}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                onKeyUp={updateActiveFormats}
-                onMouseUp={updateActiveFormats}
               />
             </div>
             <div className="composer-toolbar">
@@ -2182,6 +2180,45 @@ function Chat({ role, authedUser }) {
           <button className="topbar-btn primary" onClick={sendPoll}>Post Poll</button>
         </div>
       </Modal>
+
+      {/* ── Mobile Long-Press Action Sheet (Slack-style) ── */}
+      {actionSheetMsg && ReactDOM.createPortal(
+        <>
+          <div className="action-sheet-backdrop" onClick={closeActionSheet} />
+          <div className="action-sheet">
+            <div className="action-sheet-handle" />
+            {actionSheetMsg.msg.text && (
+              <div className="action-sheet-msg-preview">
+                {actionSheetMsg.msg.text.replace(/<[^>]+>/g, '').substring(0, 80)}{actionSheetMsg.msg.text.replace(/<[^>]+>/g, '').length > 80 ? '...' : ''}
+              </div>
+            )}
+            <div className="action-sheet-reactions">
+              {['👍','❤️','😂','🔥','👀','🙏'].map(emoji => (
+                <button key={emoji} onClick={() => { toggleReaction(actionSheetMsg.chId, actionSheetMsg.msg.id, emoji, !!actionSheetMsg.parentMsgId, actionSheetMsg.parentMsgId); closeActionSheet(); }}>{emoji}</button>
+              ))}
+              <button onClick={() => { closeActionSheet(); setTimeout(() => setQuickReactMsg(actionSheetMsg.msg.id), 100); }} style={{ fontSize: 16 }}><i className="fas fa-plus" style={{ color: 'var(--text-light)' }} /></button>
+            </div>
+            <div className="action-sheet-actions">
+              {confirmUnsend && confirmUnsend.msgId === actionSheetMsg.msg.id ? (<>
+                <div style={{ padding: '8px 12px', fontSize: 14, fontWeight: 600, color: 'var(--danger)' }}>Are you sure you want to unsend?</div>
+                <div className="action-sheet-item danger" onClick={() => { unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); closeActionSheet(); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
+                <div className="action-sheet-item" onClick={closeActionSheet}><i className="fas fa-times" /> Cancel</div>
+              </>) : (<>
+                <div className="action-sheet-item" onClick={() => { closeActionSheet(); closeAllPickers(); setOpenThread({ channelId: actionSheetMsg.chId, msgId: actionSheetMsg.msg.id }); }}><i className="fas fa-comment-dots" /> Reply in thread</div>
+                <div className="action-sheet-item" onClick={() => { navigator.clipboard?.writeText(actionSheetMsg.msg.text?.replace(/<[^>]+>/g, '') || ''); closeActionSheet(); }}><i className="fas fa-copy" /> Copy text</div>
+                <div className="action-sheet-item" onClick={closeActionSheet}><i className="fas fa-thumbtack" /> Pin message</div>
+                {actionSheetMsg.msg.userId === uid && (<>
+                  <div className="action-sheet-divider" />
+                  <div className="action-sheet-item" onClick={() => { startEdit(actionSheetMsg.chId, actionSheetMsg.msg, actionSheetMsg.parentMsgId); closeActionSheet(); }}><i className="fas fa-pen" /> Edit message</div>
+                  <div className="action-sheet-item danger" onClick={() => setConfirmUnsend({ channelId: actionSheetMsg.chId, msgId: actionSheetMsg.msg.id, parentMsgId: actionSheetMsg.parentMsgId })}><i className="fas fa-trash-alt" /> Unsend</div>
+                </>)}
+              </>)}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+
     </div>
   );
 }
@@ -4784,44 +4821,6 @@ function App() {
           </div>
         </div>
       </nav>
-
-      {/* ── Mobile Long-Press Action Sheet (Slack-style) ── */}
-      {actionSheetMsg && ReactDOM.createPortal(
-        <>
-          <div className="action-sheet-backdrop" onClick={closeActionSheet} />
-          <div className="action-sheet">
-            <div className="action-sheet-handle" />
-            {actionSheetMsg.msg.text && (
-              <div className="action-sheet-msg-preview">
-                {actionSheetMsg.msg.text.replace(/<[^>]+>/g, '').substring(0, 80)}{actionSheetMsg.msg.text.replace(/<[^>]+>/g, '').length > 80 ? '...' : ''}
-              </div>
-            )}
-            <div className="action-sheet-reactions">
-              {['👍','❤️','😂','🔥','👀','🙏'].map(emoji => (
-                <button key={emoji} onClick={() => { toggleReaction(actionSheetMsg.chId, actionSheetMsg.msg.id, emoji, !!actionSheetMsg.parentMsgId, actionSheetMsg.parentMsgId); closeActionSheet(); }}>{emoji}</button>
-              ))}
-              <button onClick={() => { closeActionSheet(); setTimeout(() => setQuickReactMsg(actionSheetMsg.msg.id), 100); }} style={{ fontSize: 16 }}><i className="fas fa-plus" style={{ color: 'var(--text-light)' }} /></button>
-            </div>
-            <div className="action-sheet-actions">
-              {confirmUnsend && confirmUnsend.msgId === actionSheetMsg.msg.id ? (<>
-                <div style={{ padding: '8px 12px', fontSize: 14, fontWeight: 600, color: 'var(--danger)' }}>Are you sure you want to unsend?</div>
-                <div className="action-sheet-item danger" onClick={() => { unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); closeActionSheet(); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
-                <div className="action-sheet-item" onClick={closeActionSheet}><i className="fas fa-times" /> Cancel</div>
-              </>) : (<>
-                <div className="action-sheet-item" onClick={() => { closeActionSheet(); closeAllPickers(); setOpenThread({ channelId: actionSheetMsg.chId, msgId: actionSheetMsg.msg.id }); }}><i className="fas fa-comment-dots" /> Reply in thread</div>
-                <div className="action-sheet-item" onClick={() => { navigator.clipboard?.writeText(actionSheetMsg.msg.text?.replace(/<[^>]+>/g, '') || ''); closeActionSheet(); }}><i className="fas fa-copy" /> Copy text</div>
-                <div className="action-sheet-item" onClick={closeActionSheet}><i className="fas fa-thumbtack" /> Pin message</div>
-                {actionSheetMsg.msg.userId === uid && (<>
-                  <div className="action-sheet-divider" />
-                  <div className="action-sheet-item" onClick={() => { startEdit(actionSheetMsg.chId, actionSheetMsg.msg, actionSheetMsg.parentMsgId); closeActionSheet(); }}><i className="fas fa-pen" /> Edit message</div>
-                  <div className="action-sheet-item danger" onClick={() => setConfirmUnsend({ channelId: actionSheetMsg.chId, msgId: actionSheetMsg.msg.id, parentMsgId: actionSheetMsg.parentMsgId })}><i className="fas fa-trash-alt" /> Unsend</div>
-                </>)}
-              </>)}
-            </div>
-          </div>
-        </>,
-        document.body
-      )}
 
       {/* ── Mobile Bottom Nav ── */}
       <div className="mobile-bottom-nav">
