@@ -4671,7 +4671,7 @@ function Timesheets({ role, authedUser, perm }) {
       {showClockInModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 500, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
           onClick={e => { if (e.target === e.currentTarget) setShowClockInModal(false); }}>
-          <div style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 500, maxHeight: '75vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', boxShadow: '0 -10px 40px rgba(0,0,0,0.15)', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', animation: 'slideUp 0.25s ease-out' }}>
+          <div style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch', boxShadow: '0 -10px 40px rgba(0,0,0,0.15)', paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', animation: 'slideUp 0.25s ease-out' }}>
             {/* Handle bar */}
             <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
               <div style={{ width: 36, height: 4, borderRadius: 2, background: '#d1d5db' }} />
