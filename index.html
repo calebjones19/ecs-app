@@ -321,6 +321,7 @@
   .action-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 400; animation: fadeIn 0.15s ease; }
   .action-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.2); z-index: 401; animation: slideUp 0.2s ease; padding-bottom: env(safe-area-inset-bottom, 0px); max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
   @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   .action-sheet-handle { width: 36px; height: 4px; background: #d0d0d0; border-radius: 2px; margin: 10px auto 6px; }
   .action-sheet-msg-preview { padding: 8px 16px 12px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1293,6 +1294,144 @@ function Chat({ role, authedUser, perm }) {
     return { starred, unstarred };
   };
 
+  // ── Video Call State ──
+  const [activeCall, setActiveCall] = useState(null); // { channelId, roomName, startedBy, startedAt }
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const jitsiContainerRef = useRef(null);
+  const jitsiApiRef = useRef(null);
+
+  // Listen for active calls in the current channel
+  useEffect(() => {
+    if (!activeChannel) return;
+    const unsub = db.collection('videoCalls')
+      .where('channelId', '==', activeChannel)
+      .where('status', '==', 'active')
+      .limit(1)
+      .onSnapshot(snap => {
+        if (!snap.empty) {
+          const doc = snap.docs[0];
+          setActiveCall({ id: doc.id, ...doc.data() });
+        } else {
+          setActiveCall(null);
+          // If we had a call open and it ended, close the UI
+          if (showVideoCall) {
+            setShowVideoCall(false);
+            if (jitsiApiRef.current) { try { jitsiApiRef.current.dispose(); } catch {} jitsiApiRef.current = null; }
+          }
+        }
+      });
+    return () => unsub();
+  }, [activeChannel]);
+
+  // Initialize Jitsi when joining a call
+  useEffect(() => {
+    if (!showVideoCall || !activeCall || !jitsiContainerRef.current) return;
+    // Load Jitsi external API script if not already loaded
+    const loadAndInit = () => {
+      if (jitsiApiRef.current) { try { jitsiApiRef.current.dispose(); } catch {} }
+      const domain = 'meet.jit.si';
+      const options = {
+        roomName: activeCall.roomName,
+        parentNode: jitsiContainerRef.current,
+        width: '100%',
+        height: '100%',
+        userInfo: { displayName: authedUser?.name || 'Employee' },
+        configOverwrite: {
+          startWithAudioMuted: false,
+          startWithVideoMuted: false,
+          prejoinPageEnabled: false,
+          disableDeepLinking: true,
+          toolbarButtons: ['microphone', 'camera', 'desktop', 'chat', 'raisehand', 'tileview', 'hangup', 'fullscreen'],
+        },
+        interfaceConfigOverwrite: {
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_WATERMARK_FOR_GUESTS: false,
+          SHOW_BRAND_WATERMARK: false,
+          TOOLBAR_ALWAYS_VISIBLE: true,
+          MOBILE_APP_PROMO: false,
+          HIDE_INVITE_MORE_HEADER: true,
+        },
+      };
+      const api = new window.JitsiMeetExternalAPI(domain, options);
+      jitsiApiRef.current = api;
+      api.addEventListener('videoConferenceLeft', () => {
+        setShowVideoCall(false);
+        if (jitsiApiRef.current) { try { jitsiApiRef.current.dispose(); } catch {} jitsiApiRef.current = null; }
+      });
+    };
+    if (window.JitsiMeetExternalAPI) {
+      loadAndInit();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://meet.jit.si/external_api.js';
+      script.async = true;
+      script.onload = loadAndInit;
+      document.head.appendChild(script);
+    }
+    return () => {
+      if (jitsiApiRef.current) { try { jitsiApiRef.current.dispose(); } catch {} jitsiApiRef.current = null; }
+    };
+  }, [showVideoCall, activeCall?.roomName]);
+
+  const startVideoCall = async () => {
+    if (!activeChannel || !authedUser?.id) return;
+    const roomName = 'ECS-' + activeChannel + '-' + Date.now();
+    const callData = {
+      channelId: activeChannel,
+      roomName,
+      startedBy: authedUser.id,
+      startedByName: authedUser.name || 'Employee',
+      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'active',
+      participants: [authedUser.id],
+    };
+    const docRef = await db.collection('videoCalls').add(callData);
+    setActiveCall({ id: docRef.id, ...callData, roomName });
+    setShowVideoCall(true);
+    // Post a system message to the channel
+    await db.collection('channels').doc(activeChannel).collection('messages').add({
+      text: '',
+      sender: 'system',
+      senderName: 'System',
+      type: 'video_call_started',
+      callId: docRef.id,
+      callerName: authedUser.name || 'Employee',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  };
+
+  const joinVideoCall = async () => {
+    if (!activeCall?.id || !authedUser?.id) return;
+    setShowVideoCall(true);
+    // Add self to participants
+    await db.collection('videoCalls').doc(activeCall.id).update({
+      participants: firebase.firestore.FieldValue.arrayUnion(authedUser.id),
+    });
+  };
+
+  const endVideoCall = async () => {
+    if (!activeCall?.id) return;
+    setShowVideoCall(false);
+    if (jitsiApiRef.current) { try { jitsiApiRef.current.dispose(); } catch {} jitsiApiRef.current = null; }
+    await db.collection('videoCalls').doc(activeCall.id).update({ status: 'ended' });
+    // Post end message
+    await db.collection('channels').doc(activeChannel).collection('messages').add({
+      text: '',
+      sender: 'system',
+      senderName: 'System',
+      type: 'video_call_ended',
+      callId: activeCall.id,
+      callerName: authedUser.name || 'Employee',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    setActiveCall(null);
+  };
+
+  const leaveVideoCall = () => {
+    setShowVideoCall(false);
+    if (jitsiApiRef.current) { try { jitsiApiRef.current.dispose(); } catch {} jitsiApiRef.current = null; }
+  };
+
   // Load channels from Firestore (realtime)
   useEffect(() => {
     const unsub = db.collection('channels').orderBy('createdAt').onSnapshot(async (snap) => {
@@ -1916,6 +2055,27 @@ function Chat({ role, authedUser, perm }) {
   const [reactPickerSearch, setReactPickerSearch] = useState('');
 
   const MessageBubble = ({ msg, compact, showThreadPreview, chId, parentMsgId }) => {
+    // Video call system messages
+    if (msg.type === 'video_call_started') {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0', color: 'var(--text-light)', fontSize: 13 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className="fas fa-video" style={{ fontSize: 11, color: '#059669' }} />
+          </div>
+          <span><strong style={{ color: 'var(--text)' }}>{msg.callerName}</strong> started a video call</span>
+        </div>
+      );
+    }
+    if (msg.type === 'video_call_ended') {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '8px 0', color: 'var(--text-light)', fontSize: 13 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className="fas fa-phone-slash" style={{ fontSize: 11, color: '#ef4444' }} />
+          </div>
+          <span>Video call ended</span>
+        </div>
+      );
+    }
     const emp = EMPLOYEES.find(e => e.id === msg.userId);
     const fallbackEmp = { name: 'Unknown', avatar: '?', color: '#999' };
     const msgUser = emp || fallbackEmp;
@@ -2251,6 +2411,11 @@ function Chat({ role, authedUser, perm }) {
             {channel?.visibility === 'private' && (perm?.isAdmin || role === 'admin') && (
               <button className="chat-icon-btn" title="Invite people" onClick={() => setShowInviteModal(true)}><i className="fas fa-user-plus" /></button>
             )}
+            <button className="chat-icon-btn" title={activeCall ? 'Join call' : 'Start video call'}
+              onClick={() => { if (activeCall) joinVideoCall(); else startVideoCall(); }}
+              style={activeCall ? { color: 'var(--success)', animation: 'pulse 2s infinite' } : {}}>
+              <i className="fas fa-video" />
+            </button>
             <button className="chat-icon-btn" title="Search"><i className="fas fa-search" /></button>
             <button className="chat-icon-btn" title="Pin messages"><i className="fas fa-thumbtack" /></button>
             <button className="chat-icon-btn" title={isStarred(activeChannel) ? 'Unstar' : 'Star'} onClick={() => toggleStar(activeChannel)}
@@ -2266,6 +2431,55 @@ function Chat({ role, authedUser, perm }) {
           </div>
         </div>
 
+        {/* ── Active Call Banner ── */}
+        {activeCall && !showVideoCall && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: 'linear-gradient(135deg, #059669, #10b981)', color: 'white', cursor: 'pointer' }}
+            onClick={joinVideoCall}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="fas fa-video" style={{ fontSize: 14 }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#34d399', marginRight: 6, animation: 'pulse 2s infinite' }} />
+                Video call in progress
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.9 }}>Started by {activeCall.startedByName} · Tap to join</div>
+            </div>
+            <div style={{ background: 'white', color: '#059669', fontWeight: 700, fontSize: 13, padding: '6px 16px', borderRadius: 20 }}>
+              Join
+            </div>
+          </div>
+        )}
+
+        {/* ── Video Call UI ── */}
+        {showVideoCall && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#1a1a2e', position: 'relative', minHeight: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: 'rgba(0,0,0,0.3)', color: 'white' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="fas fa-video" style={{ color: '#34d399' }} />
+                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                  {channel?.visibility === 'dm' ? getDmName(channel) : channel?.name}
+                </span>
+                <span style={{ fontSize: 12, opacity: 0.6 }}>· Video Call</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={leaveVideoCall}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  <i className="fas fa-compress" style={{ marginRight: 4 }} />Minimize
+                </button>
+                {activeCall?.startedBy === authedUser?.id && (
+                  <button onClick={endVideoCall}
+                    style={{ background: '#ef4444', border: 'none', color: 'white', padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    <i className="fas fa-phone-slash" style={{ marginRight: 4 }} />End Call
+                  </button>
+                )}
+              </div>
+            </div>
+            <div ref={jitsiContainerRef} style={{ flex: 1, minHeight: 0 }} />
+          </div>
+        )}
+
+        {!showVideoCall && (
         <div className="chat-messages">
           {(channelMessages).map(msg => (
             <MessageBubble key={msg.id} msg={msg} compact={false} showThreadPreview={true} chId={activeChannel} />
@@ -2285,8 +2499,9 @@ function Chat({ role, authedUser, perm }) {
           )}
           <div ref={messagesEndRef} />
         </div>
+        )}
 
-        {canSend ? (
+        {canSend && !showVideoCall ? (
           <div className="chat-composer" style={{ position: 'relative' }}>
             {/* Picker backdrop for mobile */}
             {(showEmojiPicker || (showGifPicker && window.innerWidth > 768) || showMentionPicker) && (
