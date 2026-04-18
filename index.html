@@ -4187,6 +4187,7 @@ function Timesheets({ role, authedUser, perm }) {
   const [timesheetEntries, setTimesheetEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
+  const [showClockInModal, setShowClockInModal] = useState(false);
 
   const ADMIN_CATEGORIES = [
     { id: 'training', label: 'Training', icon: 'fa-chalkboard-teacher' },
@@ -4280,6 +4281,7 @@ function Timesheets({ role, authedUser, perm }) {
 
   const clockIn = async (category, label) => {
     if (!authedUser?.id) return;
+    setShowClockInModal(false);
     try {
       const nowDate = new Date();
       const docRef = await db.collection('timeEntries').add({
@@ -4326,78 +4328,86 @@ function Timesheets({ role, authedUser, perm }) {
 
   return (
     <div>
-      {/* Clock-in UI — everyone sees this */}
-      <>
-        {/* Active clock display */}
-        <div className="card" style={{ textAlign: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 4 }}>{todayDate}</div>
-          <div className="clock-display">{activeEntry ? getElapsed(activeEntry.clockIn) : formatTime(now)}</div>
-          {activeEntry ? (
-            <div>
-              <div style={{ marginBottom: 12, color: 'var(--success)', fontWeight: 600 }}>
-                <i className="fas fa-circle" style={{ fontSize: 8, marginRight: 6, verticalAlign: 'middle' }} />
-                Clocked in — {activeEntry.label} — since {formatShort(activeEntry.clockIn)}
-              </div>
-              <button className="clock-btn out" onClick={clockOut}>
-                <i className="fas fa-stop-circle" style={{ marginRight: 8 }} /> Clock Out
+      {/* Clock display — always visible */}
+      <div className="card" style={{ textAlign: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 4 }}>{todayDate}</div>
+        <div className="clock-display">{activeEntry ? getElapsed(activeEntry.clockIn) : formatTime(now)}</div>
+        {activeEntry ? (
+          <div>
+            <div style={{ marginBottom: 12, color: 'var(--success)', fontWeight: 600 }}>
+              <i className="fas fa-circle" style={{ fontSize: 8, marginRight: 6, verticalAlign: 'middle' }} />
+              Clocked in — {activeEntry.label} — since {formatShort(activeEntry.clockIn)}
+            </div>
+            <button className="clock-btn out" onClick={clockOut}>
+              <i className="fas fa-stop-circle" style={{ marginRight: 8 }} /> Clock Out
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ color: 'var(--text-light)', fontWeight: 600, marginBottom: 12 }}>Not clocked in</div>
+            {(todayJobs.length > 0 || canSchedule) ? (
+              <button className="clock-btn in" onClick={() => setShowClockInModal(true)}>
+                <i className="fas fa-play-circle" style={{ marginRight: 8 }} /> Clock In
               </button>
-            </div>
-          ) : (
-            <div style={{ color: 'var(--text-light)', fontWeight: 600 }}>Not clocked in</div>
-          )}
-        </div>
-
-        {/* Clock-in categories (only show when not clocked in) */}
-        {!activeEntry && (
-          <div style={{ marginBottom: 24 }}>
-            {/* Scheduled Jobs */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8, padding: '0 4px' }}>
-                <i className="fas fa-calendar-check" style={{ marginRight: 6 }} /> Today's Scheduled Jobs
-              </div>
-              {todayJobs.length === 0 ? (
-                <div className="card" style={{ padding: '16px', color: 'var(--text-light)', fontSize: 13, textAlign: 'center' }}>
-                  <i className="fas fa-calendar-times" style={{ fontSize: 20, opacity: 0.3, marginBottom: 6, display: 'block' }} />
-                  No jobs scheduled for today
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {todayJobs.map((shift, i) => (
-                    <div key={i} className="card" style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                      onClick={() => clockIn('job', shift.client)}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15 }}>{shift.client}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{shift.time}</div>
-                      </div>
-                      <button className="topbar-btn primary" style={{ padding: '8px 16px', fontSize: 13 }} onClick={e => { e.stopPropagation(); clockIn('job', shift.client); }}>
-                        <i className="fas fa-play" style={{ marginRight: 6 }} /> Clock In
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Administrative Work — Scheduler+ only */}
-            {canSchedule && (
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8, padding: '0 4px' }}>
-                  <i className="fas fa-briefcase" style={{ marginRight: 6 }} /> Administrative
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
-                  {ADMIN_CATEGORIES.map(cat => (
-                    <div key={cat.id} className="card" style={{ padding: '14px 12px', cursor: 'pointer', textAlign: 'center' }}
-                      onClick={() => clockIn('admin', cat.label)}>
-                      <i className={`fas ${cat.icon}`} style={{ fontSize: 20, color: 'var(--primary)', marginBottom: 6, display: 'block' }} />
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{cat.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            ) : (
+              <button className="clock-btn in" disabled style={{ opacity: 0.4, cursor: 'not-allowed' }}>
+                <i className="fas fa-play-circle" style={{ marginRight: 8 }} /> Clock In
+              </button>
             )}
           </div>
         )}
-      </>
+      </div>
+
+      {/* Clock-in modal */}
+      <Modal show={showClockInModal} onClose={() => setShowClockInModal(false)} title="Clock In">
+        {/* Scheduled Jobs */}
+        {todayJobs.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+              <i className="fas fa-calendar-check" style={{ marginRight: 6 }} /> Today's Scheduled Jobs
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {todayJobs.map((shift, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--bg)', borderRadius: 10, cursor: 'pointer', border: '1px solid var(--border)' }}
+                  onClick={() => clockIn('job', shift.client)}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{shift.client}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{shift.time}</div>
+                  </div>
+                  <i className="fas fa-play" style={{ color: 'var(--primary)', fontSize: 14 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {todayJobs.length === 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+              <i className="fas fa-calendar-check" style={{ marginRight: 6 }} /> Today's Scheduled Jobs
+            </div>
+            <div style={{ padding: '14px', color: 'var(--text-light)', fontSize: 13, textAlign: 'center', background: 'var(--bg)', borderRadius: 10 }}>
+              No jobs scheduled for today
+            </div>
+          </div>
+        )}
+        {/* Administrative Work — Scheduler+ only */}
+        {canSchedule && (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+              <i className="fas fa-briefcase" style={{ marginRight: 6 }} /> Administrative
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+              {ADMIN_CATEGORIES.map(cat => (
+                <div key={cat.id} style={{ padding: '14px 10px', cursor: 'pointer', textAlign: 'center', background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border)' }}
+                  onClick={() => clockIn('admin', cat.label)}>
+                  <i className={`fas ${cat.icon}`} style={{ fontSize: 20, color: 'var(--primary)', marginBottom: 6, display: 'block' }} />
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{cat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Today's Timesheets */}
       <div className="card" style={{ padding: 0 }}>
@@ -4797,6 +4807,12 @@ function LoginScreen({ onLogin, onNotFound }) {
       }
       const empDoc = empSnap.docs[0];
       const emp = { id: empDoc.id, ...empDoc.data() };
+      // Auto-migrate permission field
+      if (emp.role === 'Admin' && (!emp.permission || emp.permission === 'viewer')) {
+        emp.permission = 'admin';
+        db.collection('employees').doc(empDoc.id).update({ permission: 'admin' }).catch(() => {});
+      }
+      if (!emp.permission) { emp.permission = 'viewer'; }
       setMatchedEmployee(emp);
       setIsLoading(false);
       if (emp.firstLogin && !emp.name) {
@@ -4894,6 +4910,12 @@ function LoginScreen({ onLogin, onNotFound }) {
         }
         const empDoc = empSnap.docs[0];
         const emp = { id: empDoc.id, ...empDoc.data() };
+        // Auto-migrate permission field
+        if (emp.role === 'Admin' && (!emp.permission || emp.permission === 'viewer')) {
+          emp.permission = 'admin';
+          db.collection('employees').doc(empDoc.id).update({ permission: 'admin' }).catch(() => {});
+        }
+        if (!emp.permission) { emp.permission = 'viewer'; }
         setMatchedEmployee(emp);
         setIsLoading(false);
         if (emp.firstLogin && !emp.name) {
@@ -5224,6 +5246,16 @@ function App() {
           if (snap && !snap.empty) {
             const empDoc = snap.docs[0];
             const empData = { id: empDoc.id, ...empDoc.data() };
+            // Auto-migrate: if role is 'Admin' but permission field is missing/viewer, upgrade to admin
+            if (empData.role === 'Admin' && (!empData.permission || empData.permission === 'viewer')) {
+              empData.permission = 'admin';
+              db.collection('employees').doc(empDoc.id).update({ permission: 'admin' }).catch(e => console.warn('Permission migration error:', e));
+            }
+            // Auto-migrate: ensure every employee record has a permission field
+            if (!empData.permission) {
+              empData.permission = 'viewer';
+              db.collection('employees').doc(empDoc.id).update({ permission: 'viewer' }).catch(e => console.warn('Permission init error:', e));
+            }
             setAuthedUser(empData);
             // Cache for instant restore on next page load
             try { sessionStorage.setItem('ecs_employee', JSON.stringify(empData)); } catch (e) {}
