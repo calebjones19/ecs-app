@@ -859,6 +859,44 @@ function playNotificationSound() {
   }
 }
 
+// Video call ring sound — Web Audio API (repeating ringtone)
+let _ringInterval = null;
+function playCallRing() {
+  stopCallRing();
+  const ringOnce = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      // Three-tone ascending ring pattern
+      const tones = [
+        { freq: 523.25, start: 0, dur: 0.15 },     // C5
+        { freq: 659.25, start: 0.18, dur: 0.15 },   // E5
+        { freq: 783.99, start: 0.36, dur: 0.25 },   // G5
+      ];
+      tones.forEach(({ freq, start, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + start);
+        gain.gain.linearRampToValueAtTime(0.2, now + start + 0.02);
+        gain.gain.setValueAtTime(0.2, now + start + dur - 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + start);
+        osc.stop(now + start + dur + 0.05);
+      });
+      setTimeout(() => ctx.close(), 1500);
+    } catch (e) { console.warn('Ring sound error:', e); }
+  };
+  ringOnce();
+  _ringInterval = setInterval(ringOnce, 2500);
+}
+function stopCallRing() {
+  if (_ringInterval) { clearInterval(_ringInterval); _ringInterval = null; }
+}
+
 // Request push notification permission and get FCM token
 async function requestNotificationPermission(userId) {
   if (!('Notification' in window) || !messaging) {
@@ -907,16 +945,30 @@ let _badgeCount = 0;
 // Track which channel is currently being viewed (set by Chat component)
 window.__ecsActiveChannel = null;
 window.__ecsActivePage = null;
+window.__ecsInVideoCall = false; // Set to true when user is in a video call
 
 // Handle foreground messages (when the app is open and visible)
 if (messaging) messaging.onMessage((payload) => {
   console.log('[FCM] Foreground message:', payload);
   const { title, body } = payload.notification || {};
   const msgChannelId = payload.data?.channelId || '';
+  const msgType = payload.data?.type || '';
+
+  // Suppress system messages entirely (video call started/ended, etc.)
+  if (msgType === 'video_call_started' || msgType === 'video_call_ended' || payload.data?.sender === 'system') {
+    console.log('[FCM] Suppressed — system message');
+    return;
+  }
 
   // If user is currently viewing this exact channel, suppress notification entirely
   if (window.__ecsActivePage === 'chat' && window.__ecsActiveChannel === msgChannelId) {
     console.log('[FCM] Suppressed — user is viewing this channel');
+    return;
+  }
+
+  // If user is in an active video call, suppress all chat notifications
+  if (window.__ecsInVideoCall) {
+    console.log('[FCM] Suppressed — user is in a video call');
     return;
   }
 
@@ -1317,9 +1369,11 @@ function Chat({ role, authedUser, perm }) {
     { urls: 'stun:stun1.l.google.com:19302' },
   ]};
 
-  // Listen for active calls in the current channel
+  // Listen for active calls in the current channel (DMs only)
   useEffect(() => {
     if (!activeChannel) return;
+    const ch = channels.find(c => c.id === activeChannel);
+    if (!ch || ch.visibility !== 'dm') { setActiveCall(null); return; }
     const unsub = db.collection('videoCalls')
       .where('channelId', '==', activeChannel)
       .where('status', '==', 'active')
@@ -1327,12 +1381,18 @@ function Chat({ role, authedUser, perm }) {
       .onSnapshot(snap => {
         if (!snap.empty) {
           const doc = snap.docs[0];
-          setActiveCall({ id: doc.id, ...doc.data() });
+          const callData = { id: doc.id, ...doc.data() };
+          setActiveCall(callData);
+          // Ring if this is an incoming call (someone else started it and we haven't joined)
+          if (callData.startedBy !== authedUser?.id && !showVideoCall) {
+            playCallRing();
+          }
         } else {
           setActiveCall(null);
+          stopCallRing();
         }
       });
-    return () => unsub();
+    return () => { unsub(); stopCallRing(); };
   }, [activeChannel]);
 
   // When call ends externally, clean up
@@ -1487,6 +1547,7 @@ function Chat({ role, authedUser, perm }) {
 
   const joinVideoCall = async () => {
     if (!activeCall?.id || !authedUser?.id) return;
+    stopCallRing();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
@@ -1507,6 +1568,7 @@ function Chat({ role, authedUser, perm }) {
   };
 
   const hangUpCall = () => {
+    stopCallRing();
     // Close all peer connections
     Object.values(peersRef.current).forEach(pc => { try { pc.close(); } catch {} });
     peersRef.current = {};
@@ -1594,6 +1656,12 @@ function Chat({ role, authedUser, perm }) {
     window.__ecsActiveChannel = activeChannel;
     return () => { window.__ecsActiveChannel = null; };
   }, [activeChannel]);
+
+  // Sync video call status to global so notification handler can suppress during calls
+  useEffect(() => {
+    window.__ecsInVideoCall = showVideoCall;
+    return () => { window.__ecsInVideoCall = false; };
+  }, [showVideoCall]);
 
   // Load messages for active channel from Firestore (realtime)
   useEffect(() => {
@@ -2552,11 +2620,13 @@ function Chat({ role, authedUser, perm }) {
             {channel?.visibility === 'private' && (perm?.isAdmin || role === 'admin') && (
               <button className="chat-icon-btn" title="Invite people" onClick={() => setShowInviteModal(true)}><i className="fas fa-user-plus" /></button>
             )}
+            {channel?.visibility === 'dm' && (
             <button className="chat-icon-btn" title={activeCall ? 'Join call' : 'Start video call'}
               onClick={() => { if (activeCall) joinVideoCall(); else startVideoCall(); }}
               style={activeCall ? { color: 'var(--success)', animation: 'pulse 2s infinite' } : {}}>
               <i className="fas fa-video" />
             </button>
+            )}
             <button className="chat-icon-btn" title="Search"><i className="fas fa-search" /></button>
             <button className="chat-icon-btn" title="Pin messages"><i className="fas fa-thumbtack" /></button>
             <button className="chat-icon-btn" title={isStarred(activeChannel) ? 'Unstar' : 'Star'} onClick={() => toggleStar(activeChannel)}
@@ -2837,12 +2907,12 @@ function Chat({ role, authedUser, perm }) {
               </div>
             )}
           </div>
-        ) : (
+        ) : !showVideoCall ? (
           <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', background: '#f7f6f3', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <span style={{ fontSize: 13, color: 'var(--text-light)' }}>You're viewing <b>#{channel?.name}</b></span>
             <button className="topbar-btn primary" onClick={() => joinChannel(channel.id)} style={{ padding: '6px 16px' }}><i className="fas fa-plus-circle" style={{ marginRight: 6 }} />Join Channel</button>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* ── Thread Panel (column 3) ── */}
