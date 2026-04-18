@@ -281,7 +281,7 @@
   .msg-edit-wrap { margin-top: 4px; }
   .msg-edit-input { width: 100%; border: 2px solid var(--primary); border-radius: 8px; padding: 8px 12px; font-size: 15px; font-family: inherit; resize: none; outline: none; min-height: 44px; line-height: 1.5; background: #fafff8; }
   .msg-edit-actions { display: flex; gap: 8px; margin-top: 6px; align-items: center; }
-  .msg-edit-actions button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 14px; cursor: pointer; font-weight: 600; }
+  .msg-edit-actions button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 14px; cursor: pointer; font-weight: 600; touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,0,0,0.1); position: relative; z-index: 10; }
   .msg-edit-actions button.primary { background: var(--primary); color: white; border-color: var(--primary); }
   .msg-edited { font-size: 11px; color: var(--text-light); font-style: italic; margin-left: 4px; }
 
@@ -1360,7 +1360,7 @@ function Chat({ role, authedUser }) {
   // Close pickers on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (!e.target.closest('.picker-popup') && !e.target.closest('.attach-menu') && !e.target.closest('.composer-toolbar') && !e.target.closest('.msg-reactions') && !e.target.closest('.msg-hover-actions') && !e.target.closest('.more-menu')) {
+      if (!e.target.closest('.picker-popup') && !e.target.closest('.attach-menu') && !e.target.closest('.composer-toolbar') && !e.target.closest('.msg-reactions') && !e.target.closest('.msg-hover-actions') && !e.target.closest('.more-menu') && !e.target.closest('.msg-edit-wrap')) {
         closeAllPickers();
         setQuickReactMsg(null);
         setMoreMenuMsg(null);
@@ -1587,8 +1587,8 @@ function Chat({ role, authedUser }) {
                 ref={el => { if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200); } }}
                 rows={Math.min(Math.max(2, (editText.match(/\n/g) || []).length + 1), 6)} />
               <div className="msg-edit-actions">
-                <button onClick={cancelEdit}>Cancel</button>
-                <button className="primary" onClick={saveEdit}>Save</button>
+                <button onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); cancelEdit(); }} onClick={cancelEdit}>Cancel</button>
+                <button className="primary" onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); saveEdit(); }} onClick={saveEdit}>Save</button>
               </div>
             </div>
           ) : msg.text ? (
