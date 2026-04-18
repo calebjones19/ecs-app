@@ -3843,20 +3843,31 @@ function LoginScreen({ onLogin, onNotFound }) {
         </div>
 
         {step === 'phone' && (
-          <div className="auth-card">
+          <div className="auth-card" style={{ textAlign: 'center' }}>
             <h2>Welcome back</h2>
             <div className="auth-subtitle">Sign in to continue to the team portal</div>
-            {error && <div className="auth-error"><i className="fas fa-exclamation-circle" />{error}</div>}
+            {error && <div className="auth-error" style={{ textAlign: 'left' }}><i className="fas fa-exclamation-circle" />{error}</div>}
             <button className="auth-btn google-btn" onClick={handleGoogleSignIn} disabled={isLoading}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#fff', color: '#333', border: '1.5px solid var(--border)', fontWeight: 600, fontSize: 15 }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#fff', color: '#333', border: '1.5px solid var(--border)', fontWeight: 600, fontSize: 15, marginTop: 8 }}>
               <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
               {isLoading ? 'Signing in...' : 'Sign in with Google'}
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
-              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-              <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 500 }}>or use phone number</span>
-              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <div style={{ marginTop: 24 }}>
+              <span className="auth-link" onClick={() => setStep('phone-entry')} style={{ fontSize: 13, color: 'var(--text-light)' }}>
+                <i className="fas fa-mobile-alt" style={{ marginRight: 6 }} />Sign in with phone number instead
+              </span>
             </div>
+            <div style={{ marginTop: 20 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-light)' }}>Don't have access? Contact your administrator.</span>
+            </div>
+          </div>
+        )}
+
+        {step === 'phone-entry' && (
+          <div className="auth-card">
+            <h2>Phone sign in</h2>
+            <div className="auth-subtitle">We'll text you a verification code</div>
+            {error && <div className="auth-error"><i className="fas fa-exclamation-circle" />{error}</div>}
             <div className="auth-input-group">
               <label>Phone number</label>
               <div style={{ position: 'relative' }}>
@@ -3872,8 +3883,10 @@ function LoginScreen({ onLogin, onNotFound }) {
             <button className="auth-btn primary" disabled={rawDigits.length < 10 || isLoading} onClick={handleSendCode}>
               {isLoading ? <><i className="fas fa-spinner fa-spin" style={{ marginRight: 8 }} />Sending code...</> : 'Send verification code'}
             </button>
-            <div style={{ textAlign: 'center', marginTop: 20 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-light)' }}>Don't have access? Contact your administrator.</span>
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <span className="auth-link" onClick={() => { setStep('phone'); setError(''); }} style={{ fontSize: 13 }}>
+                <i className="fas fa-arrow-left" style={{ marginRight: 6 }} />Back to Google sign in
+              </span>
             </div>
           </div>
         )}
@@ -3894,7 +3907,7 @@ function LoginScreen({ onLogin, onNotFound }) {
             {isLoading && <div style={{ marginBottom: 16 }}><i className="fas fa-spinner fa-spin" style={{ color: 'var(--primary)', fontSize: 20 }} /></div>}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 16, fontSize: 13 }}>
               <span className="auth-link" onClick={handleResend}>Resend code</span>
-              <span className="auth-link" onClick={() => { setStep('phone'); setCode(['','','','','','']); }}>Change number</span>
+              <span className="auth-link" onClick={() => { setStep('phone-entry'); setCode(['','','','','','']); }}>Change number</span>
             </div>
             <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-light)' }}>
               Didn't receive the code? Check your SMS messages
@@ -3937,7 +3950,7 @@ function LoginScreen({ onLogin, onNotFound }) {
               <i className="fas fa-info-circle" />
               Ask your admin to add your phone number to the system, then try again.
             </div>
-            <button className="auth-btn primary" style={{ marginTop: 8 }} onClick={() => { setStep('phone'); setPhone(''); setError(''); }}>
+            <button className="auth-btn primary" style={{ marginTop: 8 }} onClick={() => { setStep('phone-entry'); setPhone(''); setError(''); }}>
               Try a different number
             </button>
           </div>
