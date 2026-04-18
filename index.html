@@ -1502,23 +1502,28 @@ function Chat({ role, authedUser }) {
     setMoreMenuMsg(null);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingMsg || !editText.trim()) return;
     const { channelId, msgId, parentMsgId } = editingMsg;
     const newText = editText.replace(/\n/g, '<br>');
-    if (parentMsgId != null) {
-      const parentMsg = channelMessages.find(m => m.id === parentMsgId);
-      if (parentMsg) {
-        const replies = [...(parentMsg.replies || [])];
-        const rIdx = replies.findIndex(r => r.id === msgId);
-        if (rIdx >= 0) replies[rIdx] = { ...replies[rIdx], text: newText, edited: true };
-        db.collection('channels').doc(channelId).collection('messages').doc(parentMsgId).update({ replies });
+    try {
+      if (parentMsgId != null) {
+        const parentMsg = channelMessages.find(m => m.id === parentMsgId);
+        if (parentMsg) {
+          const replies = [...(parentMsg.replies || [])];
+          const rIdx = replies.findIndex(r => r.id === msgId);
+          if (rIdx >= 0) replies[rIdx] = { ...replies[rIdx], text: newText, edited: true };
+          await db.collection('channels').doc(channelId).collection('messages').doc(parentMsgId).update({ replies });
+        }
+      } else {
+        await db.collection('channels').doc(channelId).collection('messages').doc(msgId).update({ text: newText, edited: true });
       }
-    } else {
-      db.collection('channels').doc(channelId).collection('messages').doc(msgId).update({ text: newText, edited: true });
+      setEditingMsg(null);
+      setEditText('');
+    } catch (err) {
+      console.error('Edit save failed:', err);
+      alert('Could not save edit. Please try again.');
     }
-    setEditingMsg(null);
-    setEditText('');
   };
 
   const cancelEdit = () => { setEditingMsg(null); setEditText(''); };
@@ -1561,14 +1566,14 @@ function Chat({ role, authedUser }) {
                     </div>
                     {confirmUnsend && confirmUnsend.msgId === msg.id ? (<>
                       <div style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>Are you sure you want to unsend?</div>
-                      <div className="more-menu-item danger" onClick={() => { unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); setConfirmUnsend(null); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
-                      <div className="more-menu-item" onClick={() => { setConfirmUnsend(null); setMoreMenuMsg(null); }}><i className="fas fa-times" /> Cancel</div>
+                      <div className="more-menu-item danger" onClick={(e) => { e.stopPropagation(); unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); setConfirmUnsend(null); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
+                      <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); setConfirmUnsend(null); setMoreMenuMsg(null); }}><i className="fas fa-times" /> Cancel</div>
                     </>) : (<>
-                      {isOwnMsg && <div className="more-menu-item" onClick={() => startEdit(chId || activeChannel, msg, parentMsgId)}><i className="fas fa-pen" /> Edit message</div>}
-                      <div className="more-menu-item" onClick={() => { navigator.clipboard?.writeText(msg.text.replace(/<[^>]+>/g, '')); setMoreMenuMsg(null); }}><i className="fas fa-copy" /> Copy text</div>
-                      <div className="more-menu-item" onClick={() => { closeAllPickers(); setMoreMenuMsg(null); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /> Reply in thread</div>
+                      {isOwnMsg && <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); startEdit(chId || activeChannel, msg, parentMsgId); }}><i className="fas fa-pen" /> Edit message</div>}
+                      <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(msg.text.replace(/<[^>]+>/g, '')); setMoreMenuMsg(null); }}><i className="fas fa-copy" /> Copy text</div>
+                      <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); closeAllPickers(); setMoreMenuMsg(null); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /> Reply in thread</div>
                       <div className="more-menu-item"><i className="fas fa-thumbtack" /> Pin message</div>
-                      {isOwnMsg && <div className="more-menu-item danger" onClick={() => setConfirmUnsend({ channelId: chId || activeChannel, msgId: msg.id, parentMsgId })}><i className="fas fa-trash-alt" /> Unsend</div>}
+                      {isOwnMsg && <div className="more-menu-item danger" onClick={(e) => { e.stopPropagation(); setConfirmUnsend({ channelId: chId || activeChannel, msgId: msg.id, parentMsgId }); }}><i className="fas fa-trash-alt" /> Unsend</div>}
                     </>)}
                   </div>
                 </>, document.body)}
