@@ -232,6 +232,22 @@
   .attach-menu-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.1s; }
   .attach-menu-item:hover { background: var(--bg); }
   .attach-menu-item i { width: 20px; text-align: center; font-size: 15px; }
+
+  /* Slack-style attach sheet (mobile) */
+  .attach-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 400; animation: fadeIn 0.15s ease; }
+  .attach-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; border-radius: 14px 14px 0 0; z-index: 401; animation: slideUp 0.2s ease; padding-bottom: env(safe-area-inset-bottom, 0px); max-height: 75vh; overflow-y: auto; overscroll-behavior: contain; }
+  .attach-sheet-handle { width: 36px; height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; margin: 10px auto 12px; }
+  .attach-sheet-section-header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px 10px; }
+  .attach-sheet-section-header span { font-size: 15px; font-weight: 700; color: white; }
+  .attach-sheet-section-header button { background: none; border: none; color: #4a9eff; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; }
+  .attach-sheet-photos { display: flex; gap: 8px; padding: 0 16px 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .attach-sheet-photos::-webkit-scrollbar { display: none; }
+  .attach-sheet-camera-btn { min-width: 80px; height: 80px; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+  .attach-sheet-camera-btn i { font-size: 24px; color: rgba(255,255,255,0.6); }
+  .attach-sheet-photo-thumb { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; flex-shrink: 0; cursor: pointer; }
+  .attach-sheet-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 4px 16px; }
+  .attach-sheet-item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; font-size: 15px; font-weight: 500; color: white; }
+  .attach-sheet-item i { font-size: 18px; width: 24px; text-align: center; color: rgba(255,255,255,0.7); }
   .file-attachment-preview { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
   .file-attachment-preview .file-remove { margin-left: auto; border: none; background: none; cursor: pointer; color: var(--text-light); font-size: 14px; padding: 4px; border-radius: 4px; }
   .file-attachment-preview .file-remove:hover { background: #f5e1dc; color: var(--danger); }
@@ -1120,6 +1136,8 @@ function Chat({ role, authedUser }) {
   const threadEndRef = useRef(null);
   const composerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const photoInputRef = useRef(null);
   const [uploadingFile, setUploadingFile] = useState(false);
 
   const EMOJI_FAVORITES = ['😀','😂','😍','🥳','👍','👏','🔥','❤️','✅','🎉','💯','🙌','😎','🤔','👀','😅','🙏','💪','⭐','🚀','😊','🤣','😁','💬','📌','⚡','🎯','💡','🛠️','📋'];
@@ -1393,7 +1411,7 @@ function Chat({ role, authedUser }) {
   // Close pickers on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (!e.target.closest('.picker-popup') && !e.target.closest('.attach-menu') && !e.target.closest('.composer-toolbar') && !e.target.closest('.msg-reactions') && !e.target.closest('.msg-hover-actions') && !e.target.closest('.more-menu') && !e.target.closest('.msg-edit-wrap') && !e.target.closest('.action-sheet') && !e.target.closest('.action-sheet-backdrop')) {
+      if (!e.target.closest('.picker-popup') && !e.target.closest('.attach-menu') && !e.target.closest('.attach-sheet') && !e.target.closest('.attach-sheet-backdrop') && !e.target.closest('.composer-toolbar') && !e.target.closest('.msg-reactions') && !e.target.closest('.msg-hover-actions') && !e.target.closest('.more-menu') && !e.target.closest('.msg-edit-wrap') && !e.target.closest('.action-sheet') && !e.target.closest('.action-sheet-backdrop')) {
         closeAllPickers();
         setQuickReactMsg(null);
         setMoreMenuMsg(null);
@@ -1939,7 +1957,10 @@ function Chat({ role, authedUser }) {
               </div>
             )}
             <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={onFileSelected} />
-            {showAttachMenu && !showGifPicker && (
+            <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onFileSelected} />
+            <input type="file" ref={photoInputRef} accept="image/*,video/*" style={{ display: 'none' }} onChange={onFileSelected} />
+            {/* Desktop: old attach menu */}
+            {showAttachMenu && !showGifPicker && window.innerWidth > 768 && (
               <div className="attach-menu">
                 <div className="attach-menu-item" onClick={() => { handleFileAttach(''); setShowAttachMenu(false); }}>
                   <i className="fas fa-file" style={{ color: 'var(--primary)' }} />
@@ -2213,6 +2234,46 @@ function Chat({ role, authedUser }) {
                   <div className="action-sheet-item danger" onClick={() => setConfirmUnsend({ channelId: actionSheetMsg.chId, msgId: actionSheetMsg.msg.id, parentMsgId: actionSheetMsg.parentMsgId })}><i className="fas fa-trash-alt" /> Unsend</div>
                 </>)}
               </>)}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+
+      {/* ── Mobile Attach Sheet (Slack-style) ── */}
+      {showAttachMenu && window.innerWidth <= 768 && ReactDOM.createPortal(
+        <>
+          <div className="attach-sheet-backdrop" onClick={() => setShowAttachMenu(false)} />
+          <div className="attach-sheet">
+            <div className="attach-sheet-handle" />
+            <div className="attach-sheet-section-header">
+              <span>Photos & Videos</span>
+              <button onClick={() => { setShowAttachMenu(false); if (photoInputRef.current) photoInputRef.current.click(); }}>View Library</button>
+            </div>
+            <div className="attach-sheet-photos">
+              <div className="attach-sheet-camera-btn" onClick={() => { setShowAttachMenu(false); if (cameraInputRef.current) cameraInputRef.current.click(); }}>
+                <i className="fas fa-camera" />
+              </div>
+              {/* Placeholder thumbnails — in a native app these would be real camera roll photos */}
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="attach-sheet-camera-btn" onClick={() => { setShowAttachMenu(false); if (photoInputRef.current) photoInputRef.current.click(); }}
+                  style={{ background: `hsl(${i * 60}, 15%, 25%)` }}>
+                  <i className="fas fa-image" style={{ fontSize: 18, opacity: 0.4 }} />
+                </div>
+              ))}
+            </div>
+            <div className="attach-sheet-divider" />
+            <div className="attach-sheet-item" onClick={() => { setShowAttachMenu(false); if (photoInputRef.current) photoInputRef.current.click(); }}>
+              <i className="fas fa-photo-video" />
+              <span>Choose Photo or Video</span>
+            </div>
+            <div className="attach-sheet-item" onClick={() => { setShowAttachMenu(false); if (fileInputRef.current) { fileInputRef.current.accept = ''; fileInputRef.current.click(); } }}>
+              <i className="fas fa-file-upload" />
+              <span>Upload a File</span>
+            </div>
+            <div className="attach-sheet-item" onClick={() => { setShowAttachMenu(false); togglePicker('gif'); }}>
+              <i className="fas fa-icons" />
+              <span>Add a GIF</span>
             </div>
           </div>
         </>,
