@@ -4532,8 +4532,16 @@ function Timesheets({ role, authedUser, perm }) {
   const clockIn = async (category, label) => {
     if (!authedUser?.id) return;
     setShowClockInModal(false);
+    const nowDate = new Date();
+    // Optimistically set active entry immediately
+    setActiveEntry({
+      id: 'temp_' + Date.now(),
+      employeeId: authedUser.id,
+      employeeName: authedUser.name || 'Employee',
+      category, label, clockIn: nowDate, clockOut: null, hours: null,
+      status: 'active', date: nowDate.toISOString().slice(0, 10),
+    });
     try {
-      const nowDate = new Date();
       const docRef = await db.collection('timeEntries').add({
         employeeId: authedUser.id,
         employeeName: authedUser.name || 'Employee',
@@ -4546,9 +4554,11 @@ function Timesheets({ role, authedUser, perm }) {
         date: nowDate.toISOString().slice(0, 10),
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
-      // Local state will update via onSnapshot listener
+      // Update temp id with real Firestore id
+      setActiveEntry(prev => prev ? { ...prev, id: docRef.id } : prev);
     } catch (err) {
       console.error('Clock in error:', err);
+      setActiveEntry(null);
       alert('Error clocking in: ' + err.message);
     }
   };
@@ -4558,12 +4568,15 @@ function Timesheets({ role, authedUser, perm }) {
     try {
       const nowDate = new Date();
       const hours = getHours(activeEntry.clockIn, nowDate);
+      // Optimistically update local state immediately
+      const completedEntry = { ...activeEntry, clockOut: nowDate, hours, status: 'complete' };
+      setActiveEntry(null);
+      setTimesheetEntries(prev => [completedEntry, ...prev]);
       await db.collection('timeEntries').doc(activeEntry.id).update({
         clockOut: firebase.firestore.Timestamp.fromDate(nowDate),
         hours: hours,
         status: 'complete',
       });
-      // Local state will update via onSnapshot listener
     } catch (err) {
       console.error('Clock out error:', err);
       alert('Error clocking out: ' + err.message);
