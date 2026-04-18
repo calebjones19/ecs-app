@@ -265,10 +265,11 @@
   }
   .thread-messages .message-group { padding: 8px 12px; }
 
-  /* More menu dropdown */
-  .more-menu { position: absolute; bottom: 100%; right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 150px; z-index: 20; margin-bottom: 4px; }
+  /* More menu dropdown — portaled to body, always fixed */
+  .more-menu { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: white; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); padding: 6px; min-width: 200px; z-index: 300; }
   @media (max-width: 768px) {
-    .more-menu { position: fixed; bottom: 60px; left: 0; right: 0; top: auto; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 8px 16px; min-width: auto; z-index: 300; margin-bottom: 0; }
+    .more-menu { left: 0; right: 0; bottom: 60px; top: auto; transform: none; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 8px 16px; min-width: auto; }
+    body.keyboard-open .more-menu { bottom: 0; }
   }
   .more-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.1s; }
   .more-menu-item:hover { background: var(--bg); }
@@ -1552,7 +1553,7 @@ function Chat({ role, authedUser }) {
                 <button className="mobile-hide" title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
                 <button className="mobile-hide" title="Pin"><i className="fas fa-thumbtack" /></button>
                 <button title="More" onClick={() => setMoreMenuMsg(moreOpen ? null : msg.id)}><i className="fas fa-ellipsis-h" /></button>
-                {moreOpen && (<>
+                {moreOpen && ReactDOM.createPortal(<>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => { setMoreMenuMsg(null); setConfirmUnsend(null); }} />
                   <div className="more-menu">
                     <div style={{ textAlign: 'center', marginBottom: 4 }} className="mobile-only">
@@ -1570,7 +1571,7 @@ function Chat({ role, authedUser }) {
                       {isOwnMsg && <div className="more-menu-item danger" onClick={() => setConfirmUnsend({ channelId: chId || activeChannel, msgId: msg.id, parentMsgId })}><i className="fas fa-trash-alt" /> Unsend</div>}
                     </>)}
                   </div>
-                </>)}
+                </>, document.body)}
               </div>
             )}
           </div>
