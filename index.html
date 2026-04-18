@@ -3762,34 +3762,86 @@ function EmployeeProfiles({ role }) {
 // ─── Availability ──────────────────────────────────────────────
 function AvailabilityView({ role }) {
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const fullDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const isMobile = window.innerWidth <= 768;
+  const [selectedDay, setSelectedDay] = useState(Math.min(new Date().getDay() - 1, 6) >= 0 ? Math.min(new Date().getDay() - 1, 6) : 0);
+  const activeEmps = EMPLOYEES.filter(e => e.status !== 'inactive');
+
+  const statusIcon = (a) => a === 'available' ? '✓' : a === 'unavailable' ? '✗' : '½';
+  const statusLabel = (a) => a === 'available' ? 'Available' : a === 'unavailable' ? 'Unavailable' : 'Partial';
+  const statusColor = (a) => a === 'available' ? '#dceee4' : a === 'unavailable' ? '#f5e1dc' : '#fef3c7';
+  const statusTextColor = (a) => a === 'available' ? '#1b4332' : a === 'unavailable' ? '#7a2e20' : '#8a6d2b';
 
   return (
     <div>
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">Employee Availability — Week of April 20</span>
-          {role === 'employee' && <button className="topbar-btn primary"><i className="fas fa-edit" /> Edit</button>}
-        </div>
-        <div className="avail-grid">
-          <div className="avail-cell header"></div>
-          {days.map(d => <div className="avail-cell header" key={d}>{d}</div>)}
-          {EMPLOYEES.filter(e => e.status !== 'inactive').map(emp => (
-            <React.Fragment key={emp.id}>
-              <div className="avail-cell header" style={{ textAlign: 'left', fontWeight: 500 }}>{emp.name.split(' ')[0]}</div>
-              {(AVAILABILITY[emp.id] || []).map((a, i) => (
-                <div className={`avail-cell ${a}`} key={i}>
-                  {a === 'available' ? '✓' : a === 'unavailable' ? '✗' : '½'}
+      {isMobile ? (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Week of April 20</span>
+            {role === 'employee' && <button className="topbar-btn primary" style={{ padding: '6px 12px', fontSize: 12 }}><i className="fas fa-edit" /> Edit</button>}
+          </div>
+          {/* Day selector pills */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+            {days.map((d, i) => (
+              <button key={d} onClick={() => setSelectedDay(i)}
+                style={{
+                  padding: '8px 14px', borderRadius: 20, border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  background: selectedDay === i ? 'var(--primary)' : 'var(--bg)',
+                  color: selectedDay === i ? 'white' : 'var(--text)',
+                  whiteSpace: 'nowrap', flexShrink: 0
+                }}>
+                {d}
+              </button>
+            ))}
+          </div>
+          {/* Day card */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{fullDays[selectedDay]}</h3>
+              <span style={{ fontSize: 12, color: 'var(--text-light)' }}>
+                {activeEmps.filter(e => (AVAILABILITY[e.id] || [])[selectedDay] === 'available').length} available,{' '}
+                {activeEmps.filter(e => (AVAILABILITY[e.id] || [])[selectedDay] === 'partial').length} partial,{' '}
+                {activeEmps.filter(e => (AVAILABILITY[e.id] || [])[selectedDay] === 'unavailable').length} unavailable
+              </span>
+            </div>
+            {activeEmps.map(emp => {
+              const a = (AVAILABILITY[emp.id] || [])[selectedDay] || 'unavailable';
+              return (
+                <div key={emp.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid var(--border)', gap: 12 }}>
+                  <div className="avatar sm" style={{ background: emp.color, flexShrink: 0 }}>{emp.avatar}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{emp.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{emp.role}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 12, background: statusColor(a), color: statusTextColor(a), fontSize: 12, fontWeight: 600 }}>
+                    <span>{statusIcon(a)}</span>
+                    <span>{statusLabel(a)}</span>
+                  </div>
                 </div>
-              ))}
-            </React.Fragment>
-          ))}
+              );
+            })}
+          </div>
         </div>
-        <div style={{ marginTop: 12, display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-light)' }}>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#dceee4', borderRadius: 2, marginRight: 4 }} /> Available</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#fef3c7', borderRadius: 2, marginRight: 4 }} /> Partial</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 12, background: '#f5e1dc', borderRadius: 2, marginRight: 4 }} /> Unavailable</span>
+      ) : (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Employee Availability — Week of April 20</span>
+            {role === 'employee' && <button className="topbar-btn primary"><i className="fas fa-edit" /> Edit</button>}
+          </div>
+          <div className="avail-grid">
+            <div className="avail-cell header"></div>
+            {days.map(d => <div className="avail-cell header" key={d}>{d}</div>)}
+            {activeEmps.map(emp => (
+              <React.Fragment key={emp.id}>
+                <div className="avail-cell header" style={{ textAlign: 'left', fontWeight: 500 }}>{emp.name.split(' ')[0]}</div>
+                {(AVAILABILITY[emp.id] || []).map((a, i) => (
+                  <div className={`avail-cell ${a}`} key={i}>{statusIcon(a)}</div>
+                ))}
+              </React.Fragment>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -3888,54 +3940,167 @@ function ShiftSwaps({ role }) {
 function Checklists({ role }) {
   const [selectedChecklist, setSelectedChecklist] = useState(null);
   const [items, setItems] = useState({});
+  const [customChecklists, setCustomChecklists] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ecs-checklists') || '{}'); } catch { return {}; }
+  });
+  const [showCreate, setShowCreate] = useState(false);
+  const [newListName, setNewListName] = useState('');
+  const [newListItems, setNewListItems] = useState(['']);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [addItemText, setAddItemText] = useState('');
 
-  const toggleItem = (listName, itemId) => {
-    const key = listName;
-    const current = items[key] || CHECKLISTS[listName].map(i => ({ ...i }));
-    const updated = current.map(i => i.id === itemId ? { ...i, done: !i.done } : i);
-    setItems({ ...items, [key]: updated });
+  const allChecklists = { ...CHECKLISTS, ...customChecklists };
+
+  const saveCustom = (updated) => {
+    setCustomChecklists(updated);
+    try { localStorage.setItem('ecs-checklists', JSON.stringify(updated)); } catch {}
   };
 
-  const getItems = (name) => items[name] || CHECKLISTS[name];
+  const createChecklist = () => {
+    const validItems = newListItems.filter(t => t.trim());
+    if (!newListName.trim() || validItems.length === 0) return;
+    const listItems = validItems.map((text, i) => ({ id: i + 1, text: text.trim(), done: false }));
+    saveCustom({ ...customChecklists, [newListName.trim()]: listItems });
+    setNewListName('');
+    setNewListItems(['']);
+    setShowCreate(false);
+  };
+
+  const deleteChecklist = (name) => {
+    const updated = { ...customChecklists };
+    delete updated[name];
+    saveCustom(updated);
+    setSelectedChecklist(null);
+  };
+
+  const addItemToList = (listName, text) => {
+    if (!text.trim()) return;
+    const current = getItems(listName);
+    const newItem = { id: Date.now(), text: text.trim(), done: false };
+    const updated = [...current, newItem];
+    setItems({ ...items, [listName]: updated });
+    if (customChecklists[listName]) {
+      saveCustom({ ...customChecklists, [listName]: updated });
+    }
+    setAddItemText('');
+    setShowAddItem(false);
+  };
+
+  const toggleItem = (listName, itemId) => {
+    const current = items[listName] || (allChecklists[listName] || []).map(i => ({ ...i }));
+    const updated = current.map(i => i.id === itemId ? { ...i, done: !i.done } : i);
+    setItems({ ...items, [listName]: updated });
+    if (customChecklists[listName]) {
+      saveCustom({ ...customChecklists, [listName]: updated });
+    }
+  };
+
+  const getItems = (name) => items[name] || allChecklists[name] || [];
   const getProgress = (name) => {
     const list = getItems(name);
+    if (list.length === 0) return 0;
     const done = list.filter(i => i.done).length;
     return Math.round((done / list.length) * 100);
   };
 
+  const resetChecklist = (name) => {
+    const current = getItems(name);
+    const reset = current.map(i => ({ ...i, done: false }));
+    setItems({ ...items, [name]: reset });
+    if (customChecklists[name]) {
+      saveCustom({ ...customChecklists, [name]: reset });
+    }
+  };
+
   return (
     <div>
-      {!selectedChecklist ? (
+      {showCreate ? (
+        <div>
+          <button className="topbar-btn" style={{ marginBottom: 16 }} onClick={() => setShowCreate(false)}>
+            <i className="fas fa-arrow-left" /> Back
+          </button>
+          <div className="card">
+            <div className="card-header"><span className="card-title">Create Checklist</span></div>
+            <div className="form-group">
+              <label className="form-label">Checklist Name</label>
+              <input className="form-input" placeholder="e.g. Office Deep Clean" value={newListName} onChange={e => setNewListName(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Items</label>
+              {newListItems.map((item, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  <input className="form-input" placeholder={`Item ${i + 1}`} value={item}
+                    onChange={e => { const n = [...newListItems]; n[i] = e.target.value; setNewListItems(n); }} />
+                  {newListItems.length > 1 && (
+                    <button className="topbar-btn" onClick={() => setNewListItems(newListItems.filter((_, j) => j !== i))} style={{ padding: '6px 10px' }}>
+                      <i className="fas fa-times" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button className="topbar-btn" onClick={() => setNewListItems([...newListItems, ''])} style={{ marginTop: 4 }}>
+                <i className="fas fa-plus" /> Add Item
+              </button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button className="topbar-btn" onClick={() => setShowCreate(false)}>Cancel</button>
+              <button className="topbar-btn primary" onClick={createChecklist} disabled={!newListName.trim() || newListItems.filter(t => t.trim()).length === 0}>
+                <i className="fas fa-check" /> Create
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : !selectedChecklist ? (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ fontSize: 14, color: 'var(--text-light)', flex: 1, minWidth: 200 }}>Select a client location to view its onsite checklist</span>
-            {role === 'admin' && <button className="topbar-btn primary"><i className="fas fa-plus" /> Create</button>}
+            <span style={{ fontSize: 14, color: 'var(--text-light)', flex: 1, minWidth: 200 }}>
+              {Object.keys(allChecklists).length === 0 ? 'No checklists yet — create one to get started' : 'Select a checklist to view and track progress'}
+            </span>
+            {role === 'admin' && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-plus" /> Create</button>}
           </div>
-          <div className="grid-2">
-            {Object.keys(CHECKLISTS).map(name => (
-              <div className="card" key={name} style={{ cursor: 'pointer' }} onClick={() => setSelectedChecklist(name)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{name}</h3>
-                    <p style={{ fontSize: 13, color: 'var(--text-light)' }}>{CHECKLISTS[name].length} items</p>
+          {Object.keys(allChecklists).length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+              <i className="fas fa-clipboard-check" style={{ fontSize: 40, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+              <p style={{ color: 'var(--text-light)', marginBottom: 16 }}>Create your first checklist to track tasks for client locations, cleaning procedures, or daily routines.</p>
+              {role === 'admin' && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-plus" /> Create Checklist</button>}
+            </div>
+          ) : (
+            <div className="grid-2">
+              {Object.keys(allChecklists).map(name => (
+                <div className="card" key={name} style={{ cursor: 'pointer' }} onClick={() => setSelectedChecklist(name)}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{name}</h3>
+                      <p style={{ fontSize: 13, color: 'var(--text-light)' }}>{getItems(name).length} items</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: getProgress(name) === 100 ? 'var(--success)' : 'var(--text)' }}>{getProgress(name)}%</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-light)' }}>complete</div>
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: getProgress(name) === 100 ? 'var(--success)' : 'var(--text)' }}>{getProgress(name)}%</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-light)' }}>complete</div>
+                  <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, marginTop: 12 }}>
+                    <div style={{ height: '100%', background: getProgress(name) === 100 ? 'var(--success)' : 'var(--primary)', borderRadius: 2, width: `${getProgress(name)}%`, transition: 'width 0.3s' }} />
                   </div>
                 </div>
-                <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, marginTop: 12 }}>
-                  <div style={{ height: '100%', background: getProgress(name) === 100 ? 'var(--success)' : 'var(--primary)', borderRadius: 2, width: `${getProgress(name)}%`, transition: 'width 0.3s' }} />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div>
-          <button className="topbar-btn" style={{ marginBottom: 16 }} onClick={() => setSelectedChecklist(null)}>
-            <i className="fas fa-arrow-left" /> Back to Checklists
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+            <button className="topbar-btn" onClick={() => { setSelectedChecklist(null); setShowAddItem(false); }}>
+              <i className="fas fa-arrow-left" /> Back
+            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="topbar-btn" onClick={() => resetChecklist(selectedChecklist)} title="Reset all"><i className="fas fa-redo" /> Reset</button>
+              {customChecklists[selectedChecklist] && role === 'admin' && (
+                <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => { if (confirm('Delete this checklist?')) deleteChecklist(selectedChecklist); }}>
+                  <i className="fas fa-trash-alt" /> Delete
+                </button>
+              )}
+            </div>
+          </div>
           <div className="card">
             <div className="card-header">
               <div>
@@ -3959,6 +4124,21 @@ function Checklists({ role }) {
                 <span className="checklist-text">{item.text}</span>
               </div>
             ))}
+            {role === 'admin' && (
+              showAddItem ? (
+                <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+                  <input className="form-input" placeholder="New item..." value={addItemText} onChange={e => setAddItemText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addItemToList(selectedChecklist, addItemText); }}
+                    autoFocus style={{ flex: 1 }} />
+                  <button className="topbar-btn primary" onClick={() => addItemToList(selectedChecklist, addItemText)}>Add</button>
+                  <button className="topbar-btn" onClick={() => { setShowAddItem(false); setAddItemText(''); }}>Cancel</button>
+                </div>
+              ) : (
+                <button className="topbar-btn" style={{ marginTop: 12 }} onClick={() => setShowAddItem(true)}>
+                  <i className="fas fa-plus" /> Add Item
+                </button>
+              )
+            )}
           </div>
         </div>
       )}
