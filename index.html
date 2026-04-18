@@ -1003,7 +1003,7 @@ function Modal({ show, onClose, title, children }) {
 }
 
 // ─── Dashboard ─────────────────────────────────────────────────
-function Dashboard({ role }) {
+function Dashboard({ role, perm }) {
   const activeEmps = EMPLOYEES.filter(e => e.status === 'active').length;
   const clockedIn = EMPLOYEES.filter(e => e.clockedIn).length;
   const activeClients = CLIENTS.filter(c => c.status === 'active').length;
@@ -1087,7 +1087,7 @@ function Dashboard({ role }) {
 }
 
 // ─── Chat ──────────────────────────────────────────────────────
-function Chat({ role, authedUser }) {
+function Chat({ role, authedUser, perm }) {
   const [channels, setChannels] = useState([]);
   const [activeChannel, setActiveChannel] = useState(null);
   const [channelMessages, setChannelMessages] = useState([]);
@@ -2081,7 +2081,7 @@ function Chat({ role, authedUser }) {
             </span>
           </div>
           <div className="chat-header-right">
-            {channel?.visibility === 'private' && role === 'admin' && (
+            {channel?.visibility === 'private' && (perm?.isAdmin || role === 'admin') && (
               <button className="chat-icon-btn" title="Invite people" onClick={() => setShowInviteModal(true)}><i className="fas fa-user-plus" /></button>
             )}
             <button className="chat-icon-btn" title="Search"><i className="fas fa-search" /></button>
@@ -2517,7 +2517,9 @@ function Chat({ role, authedUser }) {
 }
 
 // ─── Schedule ──────────────────────────────────────────────────
-function Schedule({ role }) {
+function Schedule({ role, perm }) {
+  const canSchedule = perm?.canSchedule || role === 'admin';
+  const isAdmin = perm?.isAdmin || role === 'admin';
   const [showAddShift, setShowAddShift] = useState(false);
   const [newShift, setNewShift] = useState({ employee: '', day: 0, startTime: '08:00', endTime: '12:00', client: '' });
   const [scheduleData, setScheduleData] = useState(SCHEDULE_DATA);
@@ -2771,7 +2773,7 @@ function Schedule({ role }) {
               ))}
             </div>
           ))}
-          {role === 'admin' && (
+          {canSchedule && (
             <div className="card" style={{ marginBottom: 12, padding: '14px 16px', cursor: 'pointer', border: '2px dashed var(--border)', background: '#f7f6f3', textAlign: 'center', color: 'var(--text-light)', transition: 'all 0.15s' }}
               onClick={() => openAddShift({ day: dayIndex })}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
@@ -2780,7 +2782,7 @@ function Schedule({ role }) {
             </div>
           )}
           {allShifts.length === 0 && (
-            <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{role === 'admin' ? 'Click above or on any empty space to add a shift.' : 'No one is scheduled for this day.'}</p></div>
+            <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{canSchedule ? 'Click above or on any empty space to add a shift.' : 'No one is scheduled for this day.'}</p></div>
           )}
         </div>
       );
@@ -2817,12 +2819,12 @@ function Schedule({ role }) {
             <div className={`schedule-shift ${s.type}`} style={{ margin: 0, minWidth: 80 }}>
               <div className="shift-time">{s.time}</div>
             </div>
-            {role === 'employee' && (
+            {!canSchedule && (
               <button className="chat-icon-btn" title="Request swap"><i className="fas fa-exchange-alt" /></button>
             )}
           </div>
         ))}
-        {role === 'admin' && (
+        {canSchedule && (
           <div className="card" style={{ padding: '14px 16px', cursor: 'pointer', border: '2px dashed var(--border)', background: '#fafbfc', textAlign: 'center', color: 'var(--text-light)', transition: 'all 0.15s' }}
             onClick={() => openAddShift({ day: dayIndex })}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
@@ -2831,7 +2833,7 @@ function Schedule({ role }) {
           </div>
         )}
         {allShifts.length === 0 && (
-          <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{role === 'admin' ? 'Click the button above to add a shift.' : 'No one is scheduled for this day.'}</p></div>
+          <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{canSchedule ? 'Click the button above to add a shift.' : 'No one is scheduled for this day.'}</p></div>
         )}
       </div>
     );
@@ -2867,14 +2869,14 @@ function Schedule({ role }) {
                 const dayShifts = shifts.filter(s => s.day === day);
                 return (
                   <div className="schedule-cell" key={day}
-                    onClick={(e) => { if (role === 'admin' && e.target === e.currentTarget) openAddShift({ day, client: clientName }); }}>
+                    onClick={(e) => { if (canSchedule && e.target === e.currentTarget) openAddShift({ day, client: clientName }); }}>
                     {dayShifts.map((s, i) => (
                       <div className={`schedule-shift ${s.type}`} key={i} title={s.empName}>
                         <div className="shift-time">{s.time}</div>
                         <div className="shift-client">{s.empName.split(' ')[0]}</div>
                       </div>
                     ))}
-                    {role === 'admin' && <button className="cell-add-btn" onClick={(e) => { e.stopPropagation(); openAddShift({ day, client: clientName }); }}><i className="fas fa-plus" /></button>}
+                    {canSchedule && <button className="cell-add-btn" onClick={(e) => { e.stopPropagation(); openAddShift({ day, client: clientName }); }}><i className="fas fa-plus" /></button>}
                   </div>
                 );
               })}
@@ -2912,15 +2914,15 @@ function Schedule({ role }) {
               const shifts = (scheduleData[emp.id] || []).filter(s => s.day === day);
               return (
                 <div className="schedule-cell" key={day}
-                  onClick={(e) => { if (role === 'admin' && e.target === e.currentTarget) openAddShift({ day, employee: String(emp.id) }); }}>
+                  onClick={(e) => { if (canSchedule && e.target === e.currentTarget) openAddShift({ day, employee: String(emp.id) }); }}>
                   {shifts.map((s, i) => (
                     <div className={`schedule-shift ${s.type}`} key={i}>
                       <div className="shift-time">{s.time}</div>
                       <div className="shift-client">{s.client}</div>
-                      {role === 'employee' && <span className="swap-icon" title="Request swap"><i className="fas fa-exchange-alt" /></span>}
+                      {!canSchedule && <span className="swap-icon" title="Request swap"><i className="fas fa-exchange-alt" /></span>}
                     </div>
                   ))}
-                  {role === 'admin' && <button className="cell-add-btn" onClick={(e) => { e.stopPropagation(); openAddShift({ day, employee: String(emp.id) }); }}><i className="fas fa-plus" /></button>}
+                  {canSchedule && <button className="cell-add-btn" onClick={(e) => { e.stopPropagation(); openAddShift({ day, employee: String(emp.id) }); }}><i className="fas fa-plus" /></button>}
                 </div>
               );
             })}
@@ -2983,7 +2985,7 @@ function Schedule({ role }) {
                     {info.clients.length > 2 && <div style={{ fontSize: 10, color: 'var(--text-light)' }}>+{info.clients.length - 2} more</div>}
                   </div>
                 )}
-                {role === 'admin' && md.inMonth && (
+                {canSchedule && md.inMonth && (
                   <button className="cell-add-btn" onClick={(e) => { e.stopPropagation(); openAddShift({ day: dayIdx }); }}>
                     <i className="fas fa-plus" />
                   </button>
@@ -3070,10 +3072,10 @@ function Schedule({ role }) {
             </button>
           )}
 
-          {role === 'admin' && (
+          {canSchedule && (
             <button className="topbar-btn primary" onClick={() => setShowAddShift(true)}><i className="fas fa-plus" />{isMobile ? '' : ' Add Shift'}</button>
           )}
-          {role === 'admin' && !isMobile && (
+          {canSchedule && !isMobile && (
             <React.Fragment>
               <button className="topbar-btn"><i className="fas fa-bell" /> Notify All</button>
               <button className="topbar-btn"><i className="fas fa-download" /> Export</button>
@@ -3142,7 +3144,8 @@ function Schedule({ role }) {
 }
 
 // ─── Clients ───────────────────────────────────────────────────
-function ClientList({ role }) {
+function ClientList({ role, perm }) {
+  const canEdit = perm?.canEdit || role === 'admin';
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -3229,7 +3232,7 @@ function ClientList({ role }) {
           <i className="fas fa-search" />
           <input placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        {role === 'admin' && (
+        {canEdit && (
           <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add Client</button>
         )}
       </div>
@@ -3353,7 +3356,7 @@ function ClientList({ role }) {
               <textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12 }}>
-              {role === 'admin' && (
+              {canEdit && (
                 <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClient(selectedClient.id)}>
                   <i className="fas fa-trash" /> Delete
                 </button>
@@ -3434,7 +3437,9 @@ function ClientList({ role }) {
 }
 
 // ─── Employee Profiles ─────────────────────────────────────────
-function EmployeeProfiles({ role }) {
+function EmployeeProfiles({ role, perm }) {
+  const canEdit = perm?.canEdit || role === 'admin';
+  const isAdmin = perm?.isAdmin || role === 'admin';
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -3443,7 +3448,7 @@ function EmployeeProfiles({ role }) {
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState({});
   const [editDirty, setEditDirty] = useState(false);
-  const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', type: 'employee', payRate: '', address: '', emergencyContact: '' });
+  const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '' });
 
   // Sync editData when selectedEmp changes
   useEffect(() => {
@@ -3470,6 +3475,7 @@ function EmployeeProfiles({ role }) {
         phoneNormalized: phoneDigits,
         email: (editData.email || '').trim().toLowerCase(),
         role: editData.role || selectedEmp.role,
+        permission: editData.permission || selectedEmp.permission || 'viewer',
         type: editData.type || selectedEmp.type,
         payRate: parseFloat(editData.payRate) || 0,
         address: (editData.address || '').trim(),
@@ -3500,6 +3506,7 @@ function EmployeeProfiles({ role }) {
         phoneNormalized: phoneDigits,
         email: newEmp.email.trim(),
         role: newEmp.role,
+        permission: newEmp.permission || 'viewer',
         type: newEmp.type,
         status: 'active',
         payRate: parseFloat(newEmp.payRate) || 0,
@@ -3512,7 +3519,7 @@ function EmployeeProfiles({ role }) {
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       setShowAdd(false);
-      setNewEmp({ name: '', phone: '', email: '', role: 'Cleaner', type: 'employee', payRate: '', address: '', emergencyContact: '' });
+      setNewEmp({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '' });
     } catch (err) {
       alert('Error adding employee: ' + err.message);
     }
@@ -3548,7 +3555,7 @@ function EmployeeProfiles({ role }) {
           <option value="contractor">Contractors</option>
           <option value="active">Active Only</option>
         </select>
-        {role === 'admin' && (
+        {canEdit && (
           <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add</button>
         )}
       </div>
@@ -3569,16 +3576,27 @@ function EmployeeProfiles({ role }) {
         </div>
         <div className="grid-2">
           <div className="form-group">
-            <label className="form-label">Role</label>
+            <label className="form-label">Job Title</label>
             <select className="form-input" value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value})}>
               <option>Cleaner</option>
               <option>Team Lead</option>
               <option>Supervisor</option>
-              <option>Admin</option>
+              <option>Account Manager</option>
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Type</label>
+            <label className="form-label">Permission Level</label>
+            <select className="form-input" value={newEmp.permission} onChange={e => setNewEmp({...newEmp, permission: e.target.value})}>
+              <option value="viewer">Schedule Viewer</option>
+              <option value="scheduler">Scheduler</option>
+              <option value="editor">Editor</option>
+              {isAdmin && <option value="admin">Admin</option>}
+            </select>
+          </div>
+        </div>
+        <div className="grid-2">
+          <div className="form-group">
+            <label className="form-label">Employment Type</label>
             <select className="form-input" value={newEmp.type} onChange={e => setNewEmp({...newEmp, type: e.target.value})}>
               <option value="employee">W-2 Employee</option>
               <option value="contractor">1099 Contractor</option>
@@ -3614,7 +3632,8 @@ function EmployeeProfiles({ role }) {
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Role</th>
+                  <th>Title</th>
+                  <th>Permission</th>
                   <th>Type</th>
                   <th>Status</th>
                   <th>Start Date</th>
@@ -3635,6 +3654,7 @@ function EmployeeProfiles({ role }) {
                       </div>
                     </td>
                     <td>{e.role}</td>
+                    <td><span className="badge" style={{ background: '#e8f0e6', color: '#4a6741', fontSize: 11 }}>{({ admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Viewer' })[e.permission || 'viewer']}</span></td>
                     <td><span className={`badge ${e.type === 'employee' ? 'blue' : 'purple'}`}>{e.type}</span></td>
                     <td><span className={`badge ${e.status === 'active' ? 'green' : e.status === 'on-leave' ? 'yellow' : 'red'}`}>{e.status}</span></td>
                     <td>{e.startDate}</td>
@@ -3668,7 +3688,7 @@ function EmployeeProfiles({ role }) {
             <button className="topbar-btn" onClick={() => setSelectedEmp(null)}>
               <i className="fas fa-arrow-left" /> Back to List
             </button>
-            {role === 'admin' && (
+            {canEdit && (
               <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => handleDeleteEmployee(selectedEmp.id)}>
                 <i className="fas fa-trash" /> Remove
               </button>
@@ -3680,8 +3700,9 @@ function EmployeeProfiles({ role }) {
               <div className="profile-info">
                 <h2>{selectedEmp.name}</h2>
                 <p>{selectedEmp.role} · {selectedEmp.type} · Started {selectedEmp.startDate}</p>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                   <span className={`badge ${selectedEmp.status === 'active' ? 'green' : 'yellow'}`}>{selectedEmp.status}</span>
+                  <span className="badge" style={{ background: '#e8f0e6', color: '#4a6741' }}>{({ admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' })[selectedEmp.permission || 'viewer']}</span>
                   {selectedEmp.clockedIn && <span className="badge green">● Clocked In</span>}
                 </div>
               </div>
@@ -3732,12 +3753,21 @@ function EmployeeProfiles({ role }) {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Role</label>
+                    <label className="form-label">Job Title</label>
                     <select className="form-input" value={editData.role || 'Cleaner'} onChange={e => handleEditField('role', e.target.value)}>
                       <option>Cleaner</option>
                       <option>Team Lead</option>
                       <option>Supervisor</option>
-                      <option>Admin</option>
+                      <option>Account Manager</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Permission Level</label>
+                    <select className="form-input" value={editData.permission || 'viewer'} onChange={e => handleEditField('permission', e.target.value)}>
+                      <option value="viewer">Schedule Viewer</option>
+                      <option value="scheduler">Scheduler</option>
+                      <option value="editor">Editor</option>
+                      {isAdmin && <option value="admin">Admin</option>}
                     </select>
                   </div>
                   <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
@@ -3760,7 +3790,8 @@ function EmployeeProfiles({ role }) {
 }
 
 // ─── Availability ──────────────────────────────────────────────
-function AvailabilityView({ role }) {
+function AvailabilityView({ role, perm }) {
+  const canEdit = perm?.canEdit || role === 'admin';
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const fullDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const isMobile = window.innerWidth <= 768;
@@ -3778,7 +3809,7 @@ function AvailabilityView({ role }) {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Week of April 20</span>
-            {role === 'employee' && <button className="topbar-btn primary" style={{ padding: '6px 12px', fontSize: 12 }}><i className="fas fa-edit" /> Edit</button>}
+            {!canEdit && <button className="topbar-btn primary" style={{ padding: '6px 12px', fontSize: 12 }}><i className="fas fa-edit" /> Edit</button>}
           </div>
           {/* Day selector pills */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
@@ -3826,7 +3857,7 @@ function AvailabilityView({ role }) {
         <div className="card">
           <div className="card-header">
             <span className="card-title">Employee Availability — Week of April 20</span>
-            {role === 'employee' && <button className="topbar-btn primary"><i className="fas fa-edit" /> Edit</button>}
+            {!canEdit && <button className="topbar-btn primary"><i className="fas fa-edit" /> Edit</button>}
           </div>
           <div className="avail-grid">
             <div className="avail-cell header"></div>
@@ -3847,7 +3878,8 @@ function AvailabilityView({ role }) {
 }
 
 // ─── Shift Swaps ───────────────────────────────────────────────
-function ShiftSwaps({ role }) {
+function ShiftSwaps({ role, perm }) {
+  const canSchedule = perm?.canSchedule || role === 'admin';
   const [tab, setTab] = useState('pending');
   const [showRequestSwap, setShowRequestSwap] = useState(false);
 
@@ -3867,7 +3899,7 @@ function ShiftSwaps({ role }) {
             </div>
           ))}
         </div>
-        {role === 'employee' && (
+        {!canSchedule && (
           <button className="topbar-btn primary" onClick={() => setShowRequestSwap(true)}>
             <i className="fas fa-exchange-alt" /> Swap
           </button>
@@ -3892,13 +3924,13 @@ function ShiftSwaps({ role }) {
           </div>
           {s.status !== 'approved' && (
             <div className="swap-actions">
-              {role === 'admin' && s.status === 'pending' && (
+              {canSchedule && s.status === 'pending' && (
                 <>
                   <button className="approve"><i className="fas fa-check" /> Approve</button>
                   <button className="deny"><i className="fas fa-times" /> Deny</button>
                 </>
               )}
-              {role === 'employee' && s.type === 'pickup' && s.status === 'open' && (
+              {!canSchedule && s.type === 'pickup' && s.status === 'open' && (
                 <button className="claim"><i className="fas fa-hand-paper" /> Claim Shift</button>
               )}
             </div>
@@ -3937,7 +3969,8 @@ function ShiftSwaps({ role }) {
 }
 
 // ─── Checklists ────────────────────────────────────────────────
-function Checklists({ role }) {
+function Checklists({ role, perm }) {
+  const canSchedule = perm?.canSchedule || role === 'admin';
   const [selectedChecklist, setSelectedChecklist] = useState(null);
   const [items, setItems] = useState({});
   const [customChecklists, setCustomChecklists] = useState(() => {
@@ -4056,13 +4089,13 @@ function Checklists({ role }) {
             <span style={{ fontSize: 14, color: 'var(--text-light)', flex: 1, minWidth: 200 }}>
               {Object.keys(allChecklists).length === 0 ? 'No checklists yet — create one to get started' : 'Select a checklist to view and track progress'}
             </span>
-            {role === 'admin' && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-plus" /> Create</button>}
+            {canSchedule && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-plus" /> Create</button>}
           </div>
           {Object.keys(allChecklists).length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: 40 }}>
               <i className="fas fa-clipboard-check" style={{ fontSize: 40, opacity: 0.2, marginBottom: 12, display: 'block' }} />
               <p style={{ color: 'var(--text-light)', marginBottom: 16 }}>Create your first checklist to track tasks for client locations, cleaning procedures, or daily routines.</p>
-              {role === 'admin' && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-plus" /> Create Checklist</button>}
+              {canSchedule && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-plus" /> Create Checklist</button>}
             </div>
           ) : (
             <div className="grid-2">
@@ -4094,7 +4127,7 @@ function Checklists({ role }) {
             </button>
             <div style={{ display: 'flex', gap: 6 }}>
               <button className="topbar-btn" onClick={() => resetChecklist(selectedChecklist)} title="Reset all"><i className="fas fa-redo" /> Reset</button>
-              {customChecklists[selectedChecklist] && role === 'admin' && (
+              {customChecklists[selectedChecklist] && canSchedule && (
                 <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => { if (confirm('Delete this checklist?')) deleteChecklist(selectedChecklist); }}>
                   <i className="fas fa-trash-alt" /> Delete
                 </button>
@@ -4124,7 +4157,7 @@ function Checklists({ role }) {
                 <span className="checklist-text">{item.text}</span>
               </div>
             ))}
-            {role === 'admin' && (
+            {canSchedule && (
               showAddItem ? (
                 <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                   <input className="form-input" placeholder="New item..." value={addItemText} onChange={e => setAddItemText(e.target.value)}
@@ -4147,87 +4180,199 @@ function Checklists({ role }) {
 }
 
 // ─── Timesheets ────────────────────────────────────────────────
-function Timesheets({ role }) {
-  const [clockedIn, setClockedIn] = useState(false);
-  const [clockTime, setClockTime] = useState(null);
+function Timesheets({ role, authedUser, perm }) {
+  const isAdmin = perm?.isAdmin || role === 'admin';
+  const canSchedule = perm?.canSchedule || role === 'admin';
+  const [activeEntry, setActiveEntry] = useState(null); // { category, label, clockIn }
+  const [timesheetEntries, setTimesheetEntries] = useState([]);
   const [now, setNow] = useState(new Date());
+
+  const ADMIN_CATEGORIES = [
+    { id: 'training', label: 'Training', icon: 'fa-chalkboard-teacher' },
+    { id: 'meeting', label: 'Team Meeting', icon: 'fa-users' },
+    { id: 'travel', label: 'Travel', icon: 'fa-car' },
+    { id: 'admin', label: 'Office / Admin', icon: 'fa-briefcase' },
+    { id: 'supply_run', label: 'Supply Run', icon: 'fa-shopping-cart' },
+  ];
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
+  // Get today's scheduled jobs for this employee
+  const getTodayJobs = () => {
+    if (!authedUser) return [];
+    const todayDow = new Date().getDay(); // 0=Sun, 1=Mon...
+    const dayIndex = todayDow === 0 ? 6 : todayDow - 1; // convert to 0=Mon
+    const empShifts = SCHEDULE_DATA[authedUser.id] || [];
+    return empShifts.filter(s => s.day === dayIndex);
+  };
+
+  const todayJobs = getTodayJobs();
+
   const formatTime = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const getElapsed = () => {
-    if (!clockTime) return '00:00:00';
-    const diff = Math.floor((now - clockTime) / 1000);
+  const formatShort = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const getElapsed = (from) => {
+    if (!from) return '00:00:00';
+    const diff = Math.floor((now - from) / 1000);
     const h = String(Math.floor(diff / 3600)).padStart(2, '0');
     const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
     const s = String(diff % 60).padStart(2, '0');
     return `${h}:${m}:${s}`;
   };
+  const getHours = (start, end) => {
+    const diff = (end - start) / (1000 * 60 * 60);
+    return diff.toFixed(2);
+  };
+
+  const clockIn = (category, label) => {
+    setActiveEntry({ category, label, clockIn: new Date() });
+  };
+
+  const clockOut = () => {
+    if (!activeEntry) return;
+    const entry = {
+      id: Date.now(),
+      emp: authedUser?.name || 'Employee',
+      category: activeEntry.category,
+      label: activeEntry.label,
+      clockIn: activeEntry.clockIn,
+      clockOut: new Date(),
+      hours: getHours(activeEntry.clockIn, new Date()),
+      status: 'complete',
+    };
+    setTimesheetEntries(prev => [entry, ...prev]);
+    setActiveEntry(null);
+  };
+
+  const todayDate = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   return (
     <div>
-      {role === 'employee' && (
-        <div className="card" style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 4 }}>{now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
-          <div className="clock-display">{clockedIn ? getElapsed() : formatTime(now)}</div>
-          <div style={{ marginBottom: 16, color: clockedIn ? 'var(--success)' : 'var(--text-light)', fontWeight: 600 }}>
-            {clockedIn ? `Clocked in at ${clockTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : 'Not clocked in'}
+      {!canSchedule && (
+        <>
+          {/* Active clock display */}
+          <div className="card" style={{ textAlign: 'center', marginBottom: 16 }}>
+            <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 4 }}>{todayDate}</div>
+            <div className="clock-display">{activeEntry ? getElapsed(activeEntry.clockIn) : formatTime(now)}</div>
+            {activeEntry ? (
+              <div>
+                <div style={{ marginBottom: 12, color: 'var(--success)', fontWeight: 600 }}>
+                  <i className="fas fa-circle" style={{ fontSize: 8, marginRight: 6, verticalAlign: 'middle' }} />
+                  Clocked in — {activeEntry.label} — since {formatShort(activeEntry.clockIn)}
+                </div>
+                <button className="clock-btn out" onClick={clockOut}>
+                  <i className="fas fa-stop-circle" style={{ marginRight: 8 }} /> Clock Out
+                </button>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-light)', fontWeight: 600 }}>Not clocked in</div>
+            )}
           </div>
-          <button
-            className={`clock-btn ${clockedIn ? 'out' : 'in'}`}
-            onClick={() => { setClockedIn(!clockedIn); setClockTime(clockedIn ? null : new Date()); }}
-          >
-            <i className={`fas ${clockedIn ? 'fa-stop-circle' : 'fa-play-circle'}`} style={{ marginRight: 8 }} />
-            {clockedIn ? 'Clock Out' : 'Clock In'}
-          </button>
-        </div>
+
+          {/* Clock-in categories (only show when not clocked in) */}
+          {!activeEntry && (
+            <div style={{ marginBottom: 24 }}>
+              {/* Scheduled Jobs */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8, padding: '0 4px' }}>
+                  <i className="fas fa-calendar-check" style={{ marginRight: 6 }} /> Today's Scheduled Jobs
+                </div>
+                {todayJobs.length === 0 ? (
+                  <div className="card" style={{ padding: '16px', color: 'var(--text-light)', fontSize: 13, textAlign: 'center' }}>
+                    <i className="fas fa-calendar-times" style={{ fontSize: 20, opacity: 0.3, marginBottom: 6, display: 'block' }} />
+                    No jobs scheduled for today
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {todayJobs.map((shift, i) => (
+                      <div key={i} className="card" style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                        onClick={() => clockIn('job', shift.client)}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 15 }}>{shift.client}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{shift.time}</div>
+                        </div>
+                        <button className="topbar-btn primary" style={{ padding: '8px 16px', fontSize: 13 }} onClick={e => { e.stopPropagation(); clockIn('job', shift.client); }}>
+                          <i className="fas fa-play" style={{ marginRight: 6 }} /> Clock In
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Administrative Work */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8, padding: '0 4px' }}>
+                  <i className="fas fa-briefcase" style={{ marginRight: 6 }} /> Administrative
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
+                  {ADMIN_CATEGORIES.map(cat => (
+                    <div key={cat.id} className="card" style={{ padding: '14px 12px', cursor: 'pointer', textAlign: 'center' }}
+                      onClick={() => clockIn('admin', cat.label)}>
+                      <i className={`fas ${cat.icon}`} style={{ fontSize: 20, color: 'var(--primary)', marginBottom: 6, display: 'block' }} />
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{cat.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
+      {/* Today's Timesheets */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <span style={{ fontWeight: 700 }}>Today's Timesheets</span>
-          {role === 'admin' && (
+          {isAdmin && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="topbar-btn"><i className="fas fa-download" /> Export</button>
               <button className="topbar-btn"><i className="fas fa-file-invoice" /> Payroll</button>
             </div>
           )}
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Employee</th>
-                <th>Date</th>
-                <th>Clock In</th>
-                <th>Clock Out</th>
-                <th>Hours</th>
-                <th>Client</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {TIMESHEET_DATA.map(t => (
-                <tr key={t.id}>
-                  <td style={{ fontWeight: 600 }}>{t.emp}</td>
-                  <td>{t.date}</td>
-                  <td>{t.clockIn}</td>
-                  <td>{t.clockOut || '—'}</td>
-                  <td style={{ fontWeight: 600 }}>{t.hours ? `${t.hours}h` : '—'}</td>
-                  <td>{t.client}</td>
-                  <td>
-                    <span className={`badge ${t.status === 'clocked-in' ? 'green' : 'gray'}`}>
-                      {t.status === 'clocked-in' ? '● Active' : 'Complete'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* Active entry */}
+        {activeEntry && (
+          <div style={{ padding: '12px 16px', background: '#f0fdf4', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span className="badge green">● Active</span>
+            <span style={{ fontWeight: 600 }}>{authedUser?.name || 'You'}</span>
+            <span style={{ color: 'var(--text-light)', fontSize: 13 }}>{activeEntry.label}</span>
+            <span style={{ fontSize: 13 }}>{formatShort(activeEntry.clockIn)} — now</span>
+            <span style={{ fontWeight: 700, marginLeft: 'auto', fontFamily: 'monospace' }}>{getElapsed(activeEntry.clockIn)}</span>
+          </div>
+        )}
+        {/* Completed entries */}
+        {timesheetEntries.length === 0 && !activeEntry && TIMESHEET_DATA.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-light)' }}>
+            <i className="fas fa-clock" style={{ fontSize: 24, opacity: 0.2, marginBottom: 8, display: 'block' }} />
+            {!canSchedule ? 'Clock in above to start tracking time' : 'No timesheet entries for today'}
+          </div>
+        ) : (
+          <div>
+            {timesheetEntries.map(t => (
+              <div key={t.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
+                <span className="badge gray">Complete</span>
+                <span style={{ fontWeight: 600 }}>{t.emp}</span>
+                <span style={{ color: 'var(--text-light)' }}>{t.label}</span>
+                <span>{formatShort(t.clockIn)} — {formatShort(t.clockOut)}</span>
+                <span style={{ fontWeight: 700, marginLeft: 'auto' }}>{t.hours}h</span>
+              </div>
+            ))}
+            {TIMESHEET_DATA.map(t => (
+              <div key={t.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
+                <span className={`badge ${t.status === 'clocked-in' ? 'green' : 'gray'}`}>
+                  {t.status === 'clocked-in' ? '● Active' : 'Complete'}
+                </span>
+                <span style={{ fontWeight: 600 }}>{t.emp}</span>
+                <span style={{ color: 'var(--text-light)' }}>{t.client}</span>
+                <span>{t.clockIn}{t.clockOut ? ` — ${t.clockOut}` : ' — now'}</span>
+                <span style={{ fontWeight: 700, marginLeft: 'auto' }}>{t.hours ? `${t.hours}h` : '—'}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -4558,6 +4703,7 @@ function LoginScreen({ onLogin, onNotFound }) {
             phoneNormalized: '',
             email: email,
             role: 'Admin',
+            permission: 'admin',
             type: 'employee',
             status: 'active',
             payRate: 0,
@@ -4570,7 +4716,7 @@ function LoginScreen({ onLogin, onNotFound }) {
             firstLogin: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           });
-          const newEmp = { id: docRef.id, name: displayName, role: 'Admin', email: email, avatar: initials, color: '#4a6741' };
+          const newEmp = { id: docRef.id, name: displayName, role: 'Admin', permission: 'admin', email: email, avatar: initials, color: '#4a6741' };
           setIsLoading(false);
           onLogin(newEmp);
           return;
@@ -4652,6 +4798,7 @@ function LoginScreen({ onLogin, onNotFound }) {
               phoneNormalized: digits,
               email: '',
               role: 'Admin',
+              permission: 'admin',
               type: 'employee',
               status: 'active',
               payRate: 0,
@@ -4664,7 +4811,7 @@ function LoginScreen({ onLogin, onNotFound }) {
               firstLogin: true,
               createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             });
-            const newEmp = { id: docRef.id, name: 'Admin', role: 'Admin', avatar: 'A1', color: '#4a6741', firstLogin: true };
+            const newEmp = { id: docRef.id, name: 'Admin', role: 'Admin', permission: 'admin', avatar: 'A1', color: '#4a6741', firstLogin: true };
             setMatchedEmployee(newEmp);
             setIsLoading(false);
             setSetupName('');
@@ -4887,7 +5034,15 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [employees, setEmployees] = useState([]);
   const [clients, setClients] = useState([]);
-  const [role, setRole] = useState('admin');
+  // Permission system: admin > editor > scheduler > viewer
+  // Derived from authedUser.permission field (defaults to 'viewer')
+  const PERM_LEVELS = { viewer: 0, scheduler: 1, editor: 2, admin: 3 };
+  const getUserPerm = (u) => u?.permission || 'viewer';
+  const permLevel = PERM_LEVELS[getUserPerm(authedUser)] || 0;
+  const canSchedule = permLevel >= 1;  // scheduler+
+  const canEdit = permLevel >= 2;      // editor+
+  const isAdmin = permLevel >= 3;      // admin only
+  const role = isAdmin ? 'admin' : canEdit ? 'editor' : canSchedule ? 'scheduler' : 'employee';
   const [page, setPage] = useState('dashboard');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
@@ -5041,74 +5196,81 @@ function App() {
 
   const handleLogout = () => { firebaseAuth.signOut(); setAuthedUser(null); setShowUserMenu(false); try { sessionStorage.removeItem('ecs_employee'); } catch(e){} };
 
-  // Navigation structure — top-level items with dropdown children
-  const navItems = role === 'admin' ? [
-    { id: 'dashboard', label: 'Home', icon: 'fa-th-large', desc: 'Overview & stats', color: '#4a6741', singlePage: true },
-    { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: chatUnread || 0, singlePage: true },
-    { id: 'operations', label: 'Operations', icon: 'fa-briefcase', children: [
-      { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule', desc: 'Assign shifts & manage the calendar', color: '#4a6741' },
-      { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets', desc: 'Clock in/out records & payroll hours', color: '#5a8a4a' },
-      { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Swap requests & open shift pickups', color: '#c8a84e', badge: 2 },
-      { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists for each location', color: '#b85c4a' },
-    ]},
-    { id: 'people', label: 'People', icon: 'fa-users', children: [
-      { id: 'employees', icon: 'fa-id-badge', label: 'Employees', desc: 'Profiles, pay rates & tax info', color: '#7c6f64' },
-      { id: 'availability', icon: 'fa-calendar-check', label: 'Availability', desc: 'Weekly availability for each team member', color: '#5e8a7a' },
-      { id: 'clients', icon: 'fa-building', label: 'Clients', desc: 'Client locations, contacts & rates', color: '#c8a84e' },
-    ]},
-    { id: 'notifications', label: 'Settings', icon: 'fa-cog', desc: 'Notification preferences', color: '#6b7568', singlePage: true },
-  ] : [
-    { id: 'dashboard', label: 'Home', icon: 'fa-th-large', desc: 'Overview & stats', color: '#4a6741', singlePage: true },
-    { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: chatUnread || 0, singlePage: true },
-    { id: 'mywork', label: 'My Work', icon: 'fa-briefcase', children: [
-      { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule', desc: 'View your upcoming shifts', color: '#4a6741' },
-      { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out', desc: 'Track your hours', color: '#5a8a4a' },
-      { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Request swaps or pick up shifts', color: '#c8a84e' },
-      { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists', color: '#b85c4a' },
-      { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability', desc: 'Set when you can work', color: '#5e8a7a' },
-    ]},
-    { id: 'notifications', label: 'Settings', icon: 'fa-cog', desc: 'Notification preferences', color: '#6b7568', singlePage: true },
-  ];
+  // Navigation structure — built dynamically based on permission level
+  const buildNavItems = () => {
+    const items = [
+      { id: 'dashboard', label: 'Home', icon: 'fa-th-large', desc: 'Overview & stats', color: '#4a6741', singlePage: true },
+      { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: chatUnread || 0, singlePage: true },
+    ];
+    if (canSchedule) {
+      // Scheduler+ sees Operations group
+      const opsChildren = [
+        { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule', desc: canSchedule ? 'Assign shifts & manage the calendar' : 'View your upcoming shifts', color: '#4a6741' },
+        { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets', desc: 'Clock in/out records & payroll hours', color: '#5a8a4a' },
+        { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Swap requests & open shift pickups', color: '#c8a84e', badge: 2 },
+        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists for each location', color: '#b85c4a' },
+      ];
+      items.push({ id: 'operations', label: 'Operations', icon: 'fa-briefcase', children: opsChildren });
+      if (canEdit) {
+        // Editor+ sees People group
+        items.push({ id: 'people', label: 'People', icon: 'fa-users', children: [
+          { id: 'employees', icon: 'fa-id-badge', label: 'Employees', desc: 'Profiles, pay rates & tax info', color: '#7c6f64' },
+          { id: 'availability', icon: 'fa-calendar-check', label: 'Availability', desc: 'Weekly availability for each team member', color: '#5e8a7a' },
+          { id: 'clients', icon: 'fa-building', label: 'Clients', desc: 'Client locations, contacts & rates', color: '#c8a84e' },
+        ]});
+      }
+    } else {
+      // Viewer sees My Work group
+      items.push({ id: 'mywork', label: 'My Work', icon: 'fa-briefcase', children: [
+        { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule', desc: 'View your upcoming shifts', color: '#4a6741' },
+        { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out', desc: 'Track your hours', color: '#5a8a4a' },
+        { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Request swaps or pick up shifts', color: '#c8a84e' },
+        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists', color: '#b85c4a' },
+        { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability', desc: 'Set when you can work', color: '#5e8a7a' },
+      ]});
+    }
+    items.push({ id: 'notifications', label: 'Settings', icon: 'fa-cog', desc: 'Notification preferences', color: '#6b7568', singlePage: true });
+    return items;
+  };
+  const navItems = buildNavItems();
 
-  const adminNav = [
-    { section: "Main", items: [
-      { id: 'dashboard', icon: 'fa-th-large', label: 'Dashboard' },
-      { id: 'chat', icon: 'fa-comments', label: 'Chat', badge: 8 },
-    ]},
-    { section: "Operations", items: [
-      { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule' },
-      { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets' },
-      { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', badge: 2 },
-      { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists' },
-    ]},
-    { section: "People", items: [
-      { id: 'employees', icon: 'fa-users', label: 'Employees' },
-      { id: 'availability', icon: 'fa-calendar-check', label: 'Availability' },
-      { id: 'clients', icon: 'fa-building', label: 'Clients' },
-    ]},
-    { section: "Settings", items: [
+  const buildSidebarNav = () => {
+    const sections = [
+      { section: "Main", items: [
+        { id: 'dashboard', icon: 'fa-th-large', label: 'Dashboard' },
+        { id: 'chat', icon: 'fa-comments', label: 'Chat', badge: chatUnread || 0 },
+      ]},
+    ];
+    if (canSchedule) {
+      sections.push({ section: "Operations", items: [
+        { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule' },
+        { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets' },
+        { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', badge: 2 },
+        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists' },
+      ]});
+      if (canEdit) {
+        sections.push({ section: "People", items: [
+          { id: 'employees', icon: 'fa-users', label: 'Employees' },
+          { id: 'availability', icon: 'fa-calendar-check', label: 'Availability' },
+          { id: 'clients', icon: 'fa-building', label: 'Clients' },
+        ]});
+      }
+    } else {
+      sections.push({ section: "My Work", items: [
+        { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule' },
+        { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out' },
+        { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps' },
+        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists' },
+        { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability' },
+      ]});
+    }
+    sections.push({ section: "Settings", items: [
       { id: 'notifications', icon: 'fa-bell', label: 'Notifications' },
-    ]},
-  ];
+    ]});
+    return sections;
+  };
 
-  const employeeNav = [
-    { section: "Main", items: [
-      { id: 'dashboard', icon: 'fa-th-large', label: 'Dashboard' },
-      { id: 'chat', icon: 'fa-comments', label: 'Chat', badge: 4 },
-    ]},
-    { section: "My Work", items: [
-      { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule' },
-      { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out' },
-      { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps' },
-      { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists' },
-      { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability' },
-    ]},
-    { section: "Settings", items: [
-      { id: 'notifications', icon: 'fa-bell', label: 'Notifications' },
-    ]},
-  ];
-
-  const nav = role === 'admin' ? adminNav : employeeNav;
+  const nav = buildSidebarNav();
 
   const pageTitles = {
     dashboard: 'Dashboard',
@@ -5124,18 +5286,19 @@ function App() {
   };
 
   const renderPage = () => {
+    const perm = { role, isAdmin, canEdit, canSchedule, permLevel };
     switch (page) {
-      case 'dashboard': return <Dashboard role={role} />;
-      case 'chat': return <Chat role={role} authedUser={authedUser} />;
-      case 'schedule': return <Schedule role={role} />;
-      case 'timesheets': return <Timesheets role={role} />;
-      case 'shifts': return <ShiftSwaps role={role} />;
-      case 'checklists': return <Checklists role={role} />;
-      case 'employees': return <EmployeeProfiles role={role} />;
-      case 'availability': return <AvailabilityView role={role} />;
-      case 'clients': return <ClientList role={role} />;
+      case 'dashboard': return <Dashboard role={role} perm={perm} />;
+      case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm} />;
+      case 'schedule': return <Schedule role={role} perm={perm} />;
+      case 'timesheets': return <Timesheets role={role} authedUser={authedUser} perm={perm} />;
+      case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
+      case 'checklists': return <Checklists role={role} perm={perm} />;
+      case 'employees': return <EmployeeProfiles role={role} perm={perm} />;
+      case 'availability': return <AvailabilityView role={role} perm={perm} />;
+      case 'clients': return <ClientList role={role} perm={perm} />;
       case 'notifications': return <NotificationSettings userId={authedUser?.id} />;
-      default: return <Dashboard role={role} />;
+      default: return <Dashboard role={role} perm={perm} />;
     }
   };
 
@@ -5238,10 +5401,6 @@ function App() {
         </div>
 
         <div className="topnav-right">
-          <div className="role-toggle">
-            <div className={`role-btn ${role === 'admin' ? 'active' : ''}`} onClick={() => setRole('admin')}>Admin</div>
-            <div className={`role-btn ${role === 'employee' ? 'active' : ''}`} onClick={() => setRole('employee')}>Employee</div>
-          </div>
           <div className="search-bar" style={{ width: 180, background: 'rgba(255,255,255,0.08)', borderColor: 'transparent' }}>
             <i className="fas fa-search" style={{ fontSize: 12, color: '#9ea2a6' }} />
             <input placeholder="Search..." style={{ fontSize: 13, color: 'white' }} />
@@ -5258,7 +5417,7 @@ function App() {
               <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: 'white', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.15)', padding: 6, minWidth: 220, zIndex: 999 }}>
                 <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{authedUser.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>{authedUser.role || 'Employee'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>{authedUser.role || 'Employee'} · {({ admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' })[getUserPerm(authedUser)] || 'Schedule Viewer'}</div>
                 </div>
                 <div className="dd-item" onClick={() => setShowUserMenu(false)}>
                   <i className="fas fa-user" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
@@ -5319,26 +5478,22 @@ function App() {
           <div style={{ textAlign: 'center', marginBottom: 8 }}>
             <div style={{ width: 32, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto' }} />
           </div>
-          {/* Role toggle for mobile */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-            <div className="role-toggle">
-              <div className={`role-btn ${role === 'admin' ? 'active' : ''}`} onClick={() => setRole('admin')}>Admin</div>
-              <div className={`role-btn ${role === 'employee' ? 'active' : ''}`} onClick={() => setRole('employee')}>Employee</div>
-            </div>
+          {/* Permission badge */}
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <span className="badge green" style={{ fontSize: 11 }}>{({ admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' })[getUserPerm(authedUser)] || 'Schedule Viewer'}</span>
           </div>
-          {(role === 'admin' ? [
+          {[
+            // Base items everyone sees
             { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', color: '#c8a84e' },
             { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', color: '#b85c4a' },
-            { id: 'employees', icon: 'fa-id-badge', label: 'Employees', color: '#7c6f64' },
-            { id: 'availability', icon: 'fa-calendar-check', label: 'Availability', color: '#5e8a7a' },
-            { id: 'clients', icon: 'fa-building', label: 'Clients', color: '#c8a84e' },
+            { id: 'availability', icon: 'fa-calendar-check', label: canEdit ? 'Availability' : 'My Availability', color: '#5e8a7a' },
+            // Editor+ items
+            ...(canEdit ? [
+              { id: 'employees', icon: 'fa-id-badge', label: 'Employees', color: '#7c6f64' },
+              { id: 'clients', icon: 'fa-building', label: 'Clients', color: '#c8a84e' },
+            ] : []),
             { id: 'notifications', icon: 'fa-cog', label: 'Settings', color: '#6b7568' },
-          ] : [
-            { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', color: '#c8a84e' },
-            { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', color: '#b85c4a' },
-            { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability', color: '#5e8a7a' },
-            { id: 'notifications', icon: 'fa-cog', label: 'Settings', color: '#6b7568' },
-          ]).map(item => (
+          ].map(item => (
             <div key={item.id} className="dd-item" style={{ margin: '0 4px' }}
               onClick={() => { setPage(item.id); setShowMobileMore(false); }}>
               <div className="dd-icon" style={{ background: item.color + '18', color: item.color }}>
