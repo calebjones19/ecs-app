@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -214,9 +215,10 @@
   .picker-cat-section { display: flex; flex-direction: column; flex-shrink: 0; }
   .picker-cat-section .emoji-cat-label { font-size: 10px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 2px 4px; white-space: nowrap; }
   .picker-cat-section .emoji-row { display: grid; grid-template-rows: repeat(4, 34px); grid-auto-flow: column; grid-auto-columns: 34px; gap: 2px; }
-  .gif-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 8px; max-height: 240px; overflow-y: auto; }
-  .gif-item { border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--bg); height: 90px; display: flex; align-items: center; justify-content: center; font-size: 32px; transition: transform 0.1s; }
+  .gif-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 8px; max-height: 300px; overflow-y: auto; }
+  .gif-item { border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--bg); display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
   .gif-item:hover { transform: scale(1.03); }
+  .gif-item img { display: block; }
   .mention-list { max-height: 200px; overflow-y: auto; padding: 4px; }
   .mention-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: background 0.1s; }
   .mention-item:hover { background: var(--bg); }
@@ -265,7 +267,7 @@
   /* More menu dropdown */
   .more-menu { position: absolute; bottom: 100%; right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 150px; z-index: 20; margin-bottom: 4px; }
   @media (max-width: 768px) {
-    .more-menu { position: fixed; bottom: 0; left: 0; right: 0; top: auto; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 8px; min-width: auto; z-index: 300; margin-bottom: 0; }
+    .more-menu { position: fixed; bottom: 60px; left: 0; right: 0; top: auto; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 8px 16px; min-width: auto; z-index: 300; margin-bottom: 0; }
   }
   .more-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.1s; }
   .more-menu-item:hover { background: var(--bg); }
@@ -564,9 +566,14 @@
     .msg-text { font-size: 13px; }
     .msg-file { max-width: 100%; }
     .msg-poll { max-width: 100%; }
-    .chat-composer { padding: 10px 12px 14px; }
-    .composer-input { font-size: 16px; padding: 8px 10px; }
+    .chat-composer { padding: 4px 10px 2px; }
+    .composer-toolbar { margin-bottom: 2px; gap: 2px; }
+    .composer-toolbar button { padding: 4px 8px; font-size: 13px; }
+    .composer-input { font-size: 16px; padding: 6px 10px; min-height: 36px; }
+    .composer-send { width: 36px; height: 36px; font-size: 14px; }
     .thread-panel { width: 100%; position: fixed; top: 0; left: 0; right: 0; bottom: 60px; z-index: 200; }
+    .thread-composer { padding: 4px 10px 2px; }
+    .thread-composer textarea { padding: 6px 10px; font-size: 16px; min-height: 36px; }
     @keyframes slideInThread { from { transform: translateX(100%); } to { transform: translateX(0); } }
     .chat-header { padding: 10px 12px; }
     .channel-list { max-height: none; flex: 1; }
@@ -622,7 +629,7 @@
     .swap-card { overflow: hidden; }
 
     /* Picker popups */
-    .picker-popup { position: fixed; bottom: 70px; left: 8px; right: 8px; max-width: none; z-index: 250; }
+    .picker-popup { position: fixed; bottom: 62px; left: 8px; right: 8px; max-width: none; z-index: 350; max-height: 55vh; }
 
     /* Checklist */
     .checklist-item { padding: 10px; }
@@ -721,6 +728,7 @@ const firebaseAuth = firebase.auth();
 firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 const db = firebase.firestore();
+const storage = firebase.storage();
 // Enable Firestore offline persistence so reads work on reload even if offline
 db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 
@@ -1084,6 +1092,8 @@ function Chat({ role, authedUser }) {
   const messagesEndRef = useRef(null);
   const threadEndRef = useRef(null);
   const composerRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const EMOJI_FAVORITES = ['😀','😂','😍','🥳','👍','👏','🔥','❤️','✅','🎉','💯','🙌','😎','🤔','👀','😅','🙏','💪','⭐','🚀','😊','🤣','😁','💬','📌','⚡','🎯','💡','🛠️','📋'];
   const EMOJI_CATEGORIES = {
@@ -1093,16 +1103,45 @@ function Chat({ role, authedUser }) {
     'Objects': ['🔥','⭐','✨','💫','🎉','🎊','🎯','🏆','🥇','📌','📎','✏️','📝','📋','📁','🗂️','📊','📈','💼','🛠️','🔧','⚙️','💡','🔑','🔒','📞','💻','⌨️','🖥️','📱'],
     'Nature': ['🌟','🌈','☀️','🌙','⛅','🌊','🍀','🌺','🌻','🌸','🌷','🌹','🐕','🐈','🦋','🐝','🌲','🌴','🍎','🍕'],
   };
-  const MOCK_GIFS = [
-    { id: 1, emoji: '👍', label: 'Thumbs Up' }, { id: 2, emoji: '🎉', label: 'Celebrate' },
-    { id: 3, emoji: '😂', label: 'Laughing' }, { id: 4, emoji: '🔥', label: 'Fire' },
-    { id: 5, emoji: '👏', label: 'Clapping' }, { id: 6, emoji: '🤦', label: 'Facepalm' },
-    { id: 7, emoji: '💪', label: 'Strong' }, { id: 8, emoji: '🙌', label: 'Praise' },
-    { id: 9, emoji: '😍', label: 'Heart Eyes' }, { id: 10, emoji: '🤣', label: 'ROFL' },
-    { id: 11, emoji: '👋', label: 'Wave' }, { id: 12, emoji: '🥳', label: 'Party' },
-  ];
+  const GIPHY_API_KEY = 'GlVGYHkr3WSBnllca54iNt0yFbjz7L65'; // public beta key
+  const [giphyResults, setGiphyResults] = useState([]);
+  const [giphyLoading, setGiphyLoading] = useState(false);
+  const gifSearchTimeout = useRef(null);
 
-  const closeAllPickers = () => { setShowEmojiPicker(false); setShowGifPicker(false); setShowMentionPicker(false); setShowAttachMenu(false); };
+  // Load trending GIFs when picker opens
+  useEffect(() => {
+    if (showGifPicker && giphyResults.length === 0 && !gifSearch) {
+      setGiphyLoading(true);
+      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`)
+        .then(r => r.json())
+        .then(data => { setGiphyResults(data.data || []); setGiphyLoading(false); })
+        .catch(() => setGiphyLoading(false));
+    }
+  }, [showGifPicker]);
+
+  // Search GIFs with debounce
+  useEffect(() => {
+    if (!showGifPicker) return;
+    if (gifSearchTimeout.current) clearTimeout(gifSearchTimeout.current);
+    if (!gifSearch.trim()) {
+      // Load trending when search cleared
+      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`)
+        .then(r => r.json())
+        .then(data => setGiphyResults(data.data || []))
+        .catch(() => {});
+      return;
+    }
+    gifSearchTimeout.current = setTimeout(() => {
+      setGiphyLoading(true);
+      fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(gifSearch)}&limit=20&rating=g`)
+        .then(r => r.json())
+        .then(data => { setGiphyResults(data.data || []); setGiphyLoading(false); })
+        .catch(() => setGiphyLoading(false));
+    }, 400);
+    return () => clearTimeout(gifSearchTimeout.current);
+  }, [gifSearch, showGifPicker]);
+
+  const closeAllPickers = () => { setShowEmojiPicker(false); setShowGifPicker(false); setShowMentionPicker(false); setShowAttachMenu(false); setGifSearch(''); setGiphyResults([]); };
   const togglePicker = (picker) => {
     const wasOpen = picker === 'emoji' ? showEmojiPicker : picker === 'gif' ? showGifPicker : showMentionPicker;
     closeAllPickers();
@@ -1142,13 +1181,18 @@ function Chat({ role, authedUser }) {
   };
   const insertGif = (gif) => {
     if (!activeChannel || !authedUser) return;
+    const gifUrl = gif.images?.fixed_height?.url || gif.images?.original?.url || '';
+    const gifTitle = gif.title || '';
     db.collection('channels').doc(activeChannel).collection('messages').add({
       userId: authedUser.id,
-      text: gif.emoji + ' ' + gif.label,
+      text: '',
+      gif: { url: gifUrl, title: gifTitle, id: gif.id },
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       reactions: [],
     });
     setShowGifPicker(false);
+    setGifSearch('');
+    setGiphyResults([]);
   };
   const insertMention = (emp) => {
     composerRef.current?.focus();
@@ -1186,14 +1230,57 @@ function Chat({ role, authedUser }) {
       underline: document.queryCommandState('underline'),
     });
   };
-  const handleFileAttach = () => {
-    const fakeFiles = [
-      { name: 'cleaning-checklist.pdf', size: '245 KB', icon: 'fa-file-pdf', color: '#b85c4a' },
-      { name: 'supply-order.xlsx', size: '128 KB', icon: 'fa-file-excel', color: '#40916c' },
-      { name: 'site-photo.jpg', size: '1.2 MB', icon: 'fa-file-image', color: '#7c6f64' },
-      { name: 'training-manual.docx', size: '892 KB', icon: 'fa-file-word', color: '#2d6a4f' },
-    ];
-    setAttachedFile(fakeFiles[Math.floor(Math.random() * fakeFiles.length)]);
+  const getFileIcon = (name) => {
+    const ext = name.split('.').pop().toLowerCase();
+    if (['jpg','jpeg','png','gif','webp','svg','heic'].includes(ext)) return { icon: 'fa-file-image', color: '#7c6f64' };
+    if (['pdf'].includes(ext)) return { icon: 'fa-file-pdf', color: '#b85c4a' };
+    if (['doc','docx'].includes(ext)) return { icon: 'fa-file-word', color: '#2d6a4f' };
+    if (['xls','xlsx','csv'].includes(ext)) return { icon: 'fa-file-excel', color: '#40916c' };
+    if (['mp4','mov','avi','webm'].includes(ext)) return { icon: 'fa-file-video', color: '#6d597a' };
+    if (['mp3','wav','m4a'].includes(ext)) return { icon: 'fa-file-audio', color: '#b56576' };
+    if (['zip','rar','7z'].includes(ext)) return { icon: 'fa-file-zipper', color: '#8d6e63' };
+    return { icon: 'fa-file', color: '#78909c' };
+  };
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+  const handleFileAttach = (accept) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = accept || '';
+      fileInputRef.current.click();
+    }
+  };
+  const onFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const { icon, color } = getFileIcon(file.name);
+    // For images, create a preview
+    let preview = null;
+    if (file.type.startsWith('image/')) {
+      preview = URL.createObjectURL(file);
+    }
+    setAttachedFile({ name: file.name, size: formatFileSize(file.size), icon, color, file, preview, uploading: false, url: null });
+  };
+  const uploadAndSendFile = async (fileObj) => {
+    if (!fileObj?.file || !activeChannel || !authedUser) return null;
+    setUploadingFile(true);
+    try {
+      const ts = Date.now();
+      const safeName = fileObj.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `chat-files/${activeChannel}/${ts}_${safeName}`;
+      const ref = storage.ref(path);
+      await ref.put(fileObj.file);
+      const url = await ref.getDownloadURL();
+      setUploadingFile(false);
+      return { name: fileObj.name, size: fileObj.size, url, type: fileObj.file.type, path };
+    } catch (err) {
+      console.error('File upload failed:', err);
+      setUploadingFile(false);
+      return null;
+    }
   };
 
   const QUICK_REACTS = ['👍','❤️','😂','🎉','🔥','👀'];
@@ -1289,7 +1376,7 @@ function Chat({ role, authedUser }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const editorEl = composerRef.current;
     const html = editorEl ? editorEl.innerHTML : '';
     const text = editorEl ? editorEl.textContent.trim() : '';
@@ -1300,7 +1387,18 @@ function Chat({ role, authedUser }) {
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       reactions: [],
     };
-    if (attachedFile) msgData.file = { name: attachedFile.name, size: attachedFile.size };
+    if (attachedFile) {
+      if (attachedFile.file) {
+        const uploaded = await uploadAndSendFile(attachedFile);
+        if (uploaded) {
+          msgData.file = uploaded;
+        } else {
+          return; // upload failed
+        }
+      } else {
+        msgData.file = { name: attachedFile.name, size: attachedFile.size };
+      }
+    }
     db.collection('channels').doc(activeChannel).collection('messages').add(msgData);
     if (editorEl) editorEl.innerHTML = '';
     setMessage('');
@@ -1457,14 +1555,14 @@ function Chat({ role, authedUser }) {
             <span className="msg-time">{msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : (msg.time || 'Just now')}{msg.edited && <span className="msg-edited">(edited)</span>}</span>
             {!compact && (
               <div className={`msg-hover-actions mobile-show`} style={{ position: 'relative', ...(moreOpen ? { display: 'inline-flex', alignItems: 'center', gap: 2 } : {}) }}>
-                <button className="mobile-hide" title="Reply in thread" onClick={() => setOpenThread({ channelId: activeChannel, msgId: msg.id })}><i className="fas fa-comment-dots" /></button>
+                <button className="mobile-hide" title="Reply in thread" onClick={() => { closeAllPickers(); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /></button>
                 <button className="mobile-hide" title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
                 <button className="mobile-hide" title="Pin"><i className="fas fa-thumbtack" /></button>
                 <button title="More" onClick={() => setMoreMenuMsg(moreOpen ? null : msg.id)}><i className="fas fa-ellipsis-h" /></button>
                 {moreOpen && (<>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => { setMoreMenuMsg(null); setConfirmUnsend(null); }} />
                   <div className="more-menu">
-                    <div style={{ textAlign: 'center', marginBottom: 4, display: 'none' }} className="mobile-only-handle">
+                    <div style={{ textAlign: 'center', marginBottom: 4 }} className="mobile-only">
                       <div style={{ width: 32, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto' }} />
                     </div>
                     {confirmUnsend && confirmUnsend.msgId === msg.id ? (<>
@@ -1474,7 +1572,7 @@ function Chat({ role, authedUser }) {
                     </>) : (<>
                       {isOwnMsg && <div className="more-menu-item" onClick={() => startEdit(chId || activeChannel, msg, parentMsgId)}><i className="fas fa-pen" /> Edit message</div>}
                       <div className="more-menu-item" onClick={() => { navigator.clipboard?.writeText(msg.text.replace(/<[^>]+>/g, '')); setMoreMenuMsg(null); }}><i className="fas fa-copy" /> Copy text</div>
-                      <div className="more-menu-item" onClick={() => setOpenThread({ channelId: activeChannel, msgId: msg.id })}><i className="fas fa-comment-dots" /> Reply in thread</div>
+                      <div className="more-menu-item" onClick={() => { closeAllPickers(); setMoreMenuMsg(null); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /> Reply in thread</div>
                       <div className="more-menu-item"><i className="fas fa-thumbtack" /> Pin message</div>
                       {isOwnMsg && <div className="more-menu-item danger" onClick={() => setConfirmUnsend({ channelId: chId || activeChannel, msgId: msg.id, parentMsgId })}><i className="fas fa-trash-alt" /> Unsend</div>}
                     </>)}
@@ -1502,12 +1600,29 @@ function Chat({ role, authedUser }) {
             }} />
           ) : null}
           {msg.file && (
-            <div className="msg-file">
-              <i className="fas fa-file-excel" />
-              <div className="msg-file-info">
-                <div className="file-name">{msg.file.name}</div>
-                <div className="file-size">{msg.file.size}</div>
+            msg.file.type && msg.file.type.startsWith('image/') && msg.file.url ? (
+              <div style={{ marginTop: 6 }}>
+                <a href={msg.file.url} target="_blank" rel="noopener noreferrer">
+                  <img src={msg.file.url} alt={msg.file.name} style={{ maxWidth: 320, maxHeight: 240, borderRadius: 8, cursor: 'pointer' }} />
+                </a>
+                <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>{msg.file.name} · {msg.file.size}</div>
               </div>
+            ) : (
+              <a href={msg.file.url || '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div className="msg-file">
+                  <i className={`fas ${msg.file.url ? 'fa-download' : 'fa-file'}`} />
+                  <div className="msg-file-info">
+                    <div className="file-name">{msg.file.name}</div>
+                    <div className="file-size">{msg.file.size}</div>
+                  </div>
+                </div>
+              </a>
+            )
+          )}
+          {msg.gif && (
+            <div style={{ marginTop: 6 }}>
+              <img src={msg.gif.url} alt={msg.gif.title || 'GIF'} style={{ maxWidth: 280, maxHeight: 200, borderRadius: 8 }} />
+              <div style={{ fontSize: 9, color: 'var(--text-light)', marginTop: 2 }}>via GIPHY</div>
             </div>
           )}
           {msg.poll && (
@@ -1567,7 +1682,7 @@ function Chat({ role, authedUser }) {
           )}
           {/* Thread reply preview (collapsed) */}
           {showThreadPreview && replies.length > 0 && (
-            <div className="reply-preview" onClick={() => setOpenThread({ channelId: activeChannel, msgId: msg.id })}
+            <div className="reply-preview" onClick={() => { closeAllPickers(); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}
               style={isThreadOpen ? { background: 'var(--primary-light)' } : {}}>
               <div className="reply-avatars">
                 {replyUsers.slice(0, 3).map((u, i) => (
@@ -1725,8 +1840,8 @@ function Chat({ role, authedUser }) {
 
         {canSend ? (
           <div className="chat-composer" style={{ position: 'relative' }}>
-            {/* Picker popups */}
-            {showEmojiPicker && (
+            {/* Emoji picker rendered via portal so it sits above everything including thread panel */}
+            {showEmojiPicker && ReactDOM.createPortal(
               <div className="picker-popup" style={{ width: 380 }}>
                 <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
                   <input placeholder="Search emojis..." value={emojiSearch} onChange={e => setEmojiSearch(e.target.value)} />
@@ -1755,43 +1870,51 @@ function Chat({ role, authedUser }) {
                     );
                   })}
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
+            <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={onFileSelected} />
             {showAttachMenu && !showGifPicker && (
               <div className="attach-menu">
-                <div className="attach-menu-item" onClick={() => { handleFileAttach(); setShowAttachMenu(false); }}>
+                <div className="attach-menu-item" onClick={() => { handleFileAttach(''); setShowAttachMenu(false); }}>
                   <i className="fas fa-file" style={{ color: 'var(--primary)' }} />
                   <span>File</span>
                 </div>
-                <div className="attach-menu-item" onClick={() => { handleFileAttach(); setShowAttachMenu(false); }}>
+                <div className="attach-menu-item" onClick={() => { handleFileAttach('image/*'); setShowAttachMenu(false); }}>
                   <i className="fas fa-camera" style={{ color: 'var(--success)' }} />
                   <span>Photo</span>
                 </div>
-                <div className="attach-menu-item" onClick={() => { handleFileAttach(); setShowAttachMenu(false); }}>
+                <div className="attach-menu-item" onClick={() => { handleFileAttach('video/*'); setShowAttachMenu(false); }}>
                   <i className="fas fa-video" style={{ color: 'var(--purple)' }} />
                   <span>Video</span>
                 </div>
-                <div className="attach-menu-item" onClick={() => { setShowAttachMenu(false); setShowGifPicker(true); }}>
+                <div className="attach-menu-item" onClick={() => { setShowAttachMenu(false); togglePicker('gif'); }}>
                   <i className="fas fa-images" style={{ color: 'var(--warning)' }} />
                   <span>GIF</span>
                 </div>
               </div>
             )}
-            {showGifPicker && (
-              <div className="picker-popup" style={{ width: 320 }}>
+            {showGifPicker && ReactDOM.createPortal(
+              <div className="picker-popup" style={{ width: 340 }}>
                 <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
-                  <input placeholder="Search GIFs..." value={gifSearch} onChange={e => setGifSearch(e.target.value)} />
+                  <input placeholder="Search GIFs..." value={gifSearch} onChange={e => setGifSearch(e.target.value)} autoFocus />
                 </div>
-                <div className="gif-grid">
-                  {MOCK_GIFS.filter(g => !gifSearch || g.label.toLowerCase().includes(gifSearch.toLowerCase())).map(g => (
-                    <div key={g.id} className="gif-item" onClick={() => insertGif(g)} title={g.label}>
-                      <span style={{ fontSize: 40 }}>{g.emoji}</span>
+                <div className="gif-grid" style={{ maxHeight: 300 }}>
+                  {giphyLoading && <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 20, color: 'var(--text-light)' }}><i className="fas fa-spinner fa-spin" /> Loading...</div>}
+                  {!giphyLoading && giphyResults.length === 0 && <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 20, color: 'var(--text-light)' }}>No GIFs found</div>}
+                  {giphyResults.map(g => (
+                    <div key={g.id} className="gif-item" onClick={() => insertGif(g)} title={g.title} style={{ height: 'auto', aspectRatio: '1' }}>
+                      <img src={g.images?.fixed_height_small?.url || g.images?.preview_gif?.url} alt={g.title} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} loading="lazy" />
                     </div>
                   ))}
                 </div>
-              </div>
+                <div style={{ textAlign: 'center', padding: '4px 0', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
+                  <img src="https://media.giphy.com/attribution/poweredby-dark-horz.png" alt="Powered by GIPHY" style={{ height: 14, opacity: 0.6 }} />
+                </div>
+              </div>,
+              document.body
             )}
-            {showMentionPicker && (
+            {showMentionPicker && ReactDOM.createPortal(
               <div className="picker-popup" style={{ width: 260 }}>
                 <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
                   <input placeholder="Search people..." value={mentionSearch} onChange={e => setMentionSearch(e.target.value)} autoFocus />
@@ -1807,7 +1930,8 @@ function Chat({ role, authedUser }) {
                     </div>
                   ))}
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
             <div className="composer-toolbar">
               <button title="Title" onMouseDown={e => { e.preventDefault(); toggleTitle(); }} style={activeFormats.title ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-heading" /></button>
@@ -1821,12 +1945,17 @@ function Chat({ role, authedUser }) {
             </div>
             {attachedFile && (
               <div className="file-attachment-preview">
-                <i className={`fas ${attachedFile.icon}`} style={{ fontSize: 20, color: attachedFile.color }} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{attachedFile.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{attachedFile.size}</div>
+                {attachedFile.preview ? (
+                  <img src={attachedFile.preview} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
+                ) : (
+                  <i className={`fas ${attachedFile.icon}`} style={{ fontSize: 20, color: attachedFile.color }} />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachedFile.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{attachedFile.size}{uploadingFile ? ' — Uploading...' : ''}</div>
                 </div>
-                <button className="file-remove" onClick={() => setAttachedFile(null)} title="Remove"><i className="fas fa-times" /></button>
+                {!uploadingFile && <button className="file-remove" onClick={() => { if (attachedFile.preview) URL.revokeObjectURL(attachedFile.preview); setAttachedFile(null); }} title="Remove"><i className="fas fa-times" /></button>}
+                {uploadingFile && <i className="fas fa-spinner fa-spin" style={{ color: 'var(--primary)' }} />}
               </div>
             )}
             <div className="composer-input-wrap">
