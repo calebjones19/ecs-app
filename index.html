@@ -3448,6 +3448,8 @@ function EmployeeProfiles({ role, perm }) {
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState({});
   const [editDirty, setEditDirty] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '' });
 
   // Sync editData when selectedEmp changes
@@ -3526,14 +3528,18 @@ function EmployeeProfiles({ role, perm }) {
     setSaving(false);
   };
 
-  const handleDeleteEmployee = async (empId) => {
-    if (!confirm('Remove this employee? They will no longer be able to sign in.')) return;
+  const handleDeleteEmployee = async () => {
+    if (!selectedEmp?.id) return;
+    setSaving(true);
     try {
-      await db.collection('employees').doc(empId).delete();
+      await db.collection('employees').doc(selectedEmp.id).delete();
       setSelectedEmp(null);
+      setShowDeleteConfirm(false);
+      setDeleteConfirmName('');
     } catch (err) {
       alert('Error removing employee: ' + err.message);
     }
+    setSaving(false);
   };
 
   const filtered = EMPLOYEES.filter(e => {
@@ -3542,24 +3548,19 @@ function EmployeeProfiles({ role, perm }) {
     return matchSearch && matchFilter;
   });
 
+  const PERM_LABELS = { admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' };
+  const PERM_DESCS = {
+    viewer: 'Can clock in/out, use chat, view confirmed schedules, respond to qualified shift swaps, complete assigned checklists, and set their own availability.',
+    scheduler: 'Everything a Schedule Viewer can do, plus: create/edit shifts, manage swap requests, and clock in for administrative work.',
+    editor: 'Everything a Scheduler can do, plus: create/edit employee profiles, client records, and change permissions (except Admin).',
+    admin: 'Full access to everything. Can grant Admin permission to others, export timesheets, access payroll, and delete records.',
+  };
+
+  const profileTabs = ['info', 'tax', 'schedule', 'timesheets'];
+  if (isAdmin) profileTabs.push('permission');
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div className="search-bar" style={{ flex: 1, minWidth: 180 }}>
-          <i className="fas fa-search" />
-          <input placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <select className="form-input" style={{ width: 'auto', minWidth: 120, maxWidth: 160 }} value={filter} onChange={e => setFilter(e.target.value)}>
-          <option value="all">All</option>
-          <option value="employee">Employees</option>
-          <option value="contractor">Contractors</option>
-          <option value="active">Active Only</option>
-        </select>
-        {canEdit && (
-          <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add</button>
-        )}
-      </div>
-
       {/* Add Employee Modal */}
       <Modal show={showAdd} onClose={() => setShowAdd(false)} title="Add Employee">
         <div className="form-group">
@@ -3623,8 +3624,47 @@ function EmployeeProfiles({ role, perm }) {
         </div>
       </Modal>
 
+      {/* Delete confirmation modal */}
+      <Modal show={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setDeleteConfirmName(''); }} title="Remove Employee">
+        <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <i className="fas fa-exclamation-triangle" style={{ fontSize: 24, color: 'var(--danger)' }} />
+          </div>
+          <p style={{ fontSize: 15, marginBottom: 4 }}>Are you sure you want to remove <strong>{selectedEmp?.name}</strong>?</p>
+          <p style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 16 }}>They will no longer be able to sign in. This cannot be undone.</p>
+          <div className="form-group" style={{ textAlign: 'left' }}>
+            <label className="form-label">Type <strong>{selectedEmp?.name}</strong> to confirm</label>
+            <input className="form-input" placeholder={selectedEmp?.name || ''} value={deleteConfirmName} onChange={e => setDeleteConfirmName(e.target.value)} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button className="topbar-btn" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmName(''); }}>Cancel</button>
+          <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)', opacity: deleteConfirmName.trim() === (selectedEmp?.name || '').trim() ? 1 : 0.4 }}
+            disabled={deleteConfirmName.trim() !== (selectedEmp?.name || '').trim() || saving}
+            onClick={handleDeleteEmployee}>
+            {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Removing...</> : <><i className="fas fa-trash" /> Remove Employee</>}
+          </button>
+        </div>
+      </Modal>
+
       {!selectedEmp ? (
         <>
+        {/* Search & filter — only on list view */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+          <div className="search-bar" style={{ flex: 1, minWidth: 180 }}>
+            <i className="fas fa-search" />
+            <input placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <select className="form-input" style={{ width: 'auto', minWidth: 120, maxWidth: 160 }} value={filter} onChange={e => setFilter(e.target.value)}>
+            <option value="all">All</option>
+            <option value="employee">Employees</option>
+            <option value="contractor">Contractors</option>
+            <option value="active">Active Only</option>
+          </select>
+          {canEdit && (
+            <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add</button>
+          )}
+        </div>
         {/* Desktop table */}
         <div className="card desktop-only" style={{ padding: 0 }}>
           <div className="table-wrap">
@@ -3654,7 +3694,7 @@ function EmployeeProfiles({ role, perm }) {
                       </div>
                     </td>
                     <td>{e.role}</td>
-                    <td><span className="badge" style={{ background: '#e8f0e6', color: '#4a6741', fontSize: 11 }}>{({ admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Viewer' })[e.permission || 'viewer']}</span></td>
+                    <td><span className="badge" style={{ background: '#e8f0e6', color: '#4a6741', fontSize: 11 }}>{PERM_LABELS[e.permission || 'viewer']}</span></td>
                     <td><span className={`badge ${e.type === 'employee' ? 'blue' : 'purple'}`}>{e.type}</span></td>
                     <td><span className={`badge ${e.status === 'active' ? 'green' : e.status === 'on-leave' ? 'yellow' : 'red'}`}>{e.status}</span></td>
                     <td>{e.startDate}</td>
@@ -3668,14 +3708,17 @@ function EmployeeProfiles({ role, perm }) {
             </table>
           </div>
         </div>
-        {/* Mobile list — name + avatar only, tap to view */}
+        {/* Mobile list */}
         <div className="mobile-only">
           {filtered.map(e => (
             <div key={e.id} className="card" onClick={() => { setSelectedEmp(e); setProfileTab('info'); }}
               style={{ padding: '12px 16px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div className="avatar" style={{ background: e.color, width: 36, height: 36, fontSize: 13 }}>{e.avatar}</div>
-                <div style={{ fontWeight: 600, fontSize: 15 }}>{e.name}</div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{e.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{e.role} · {PERM_LABELS[e.permission || 'viewer']}</div>
+                </div>
               </div>
               <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
             </div>
@@ -3684,34 +3727,29 @@ function EmployeeProfiles({ role, perm }) {
         </>
       ) : (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <button className="topbar-btn" onClick={() => setSelectedEmp(null)}>
-              <i className="fas fa-arrow-left" /> Back to List
-            </button>
-            {canEdit && (
-              <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => handleDeleteEmployee(selectedEmp.id)}>
-                <i className="fas fa-trash" /> Remove
-              </button>
-            )}
-          </div>
+          {/* Profile detail — back button only, no search */}
+          <button className="topbar-btn" onClick={() => { setSelectedEmp(null); setSearch(''); }} style={{ marginBottom: 16 }}>
+            <i className="fas fa-arrow-left" /> Back to Employees
+          </button>
+
           <div className="card">
             <div className="profile-header">
               <div className="profile-avatar" style={{ background: selectedEmp.color }}>{selectedEmp.avatar}</div>
               <div className="profile-info">
-                <h2>{selectedEmp.name}</h2>
-                <p>{selectedEmp.role} · {selectedEmp.type} · Started {selectedEmp.startDate}</p>
+                <h2 style={{ marginBottom: 2 }}>{selectedEmp.name}</h2>
+                <p style={{ margin: 0 }}>{selectedEmp.role} · {selectedEmp.type} · Started {selectedEmp.startDate}</p>
                 <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                   <span className={`badge ${selectedEmp.status === 'active' ? 'green' : 'yellow'}`}>{selectedEmp.status}</span>
-                  <span className="badge" style={{ background: '#e8f0e6', color: '#4a6741' }}>{({ admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' })[selectedEmp.permission || 'viewer']}</span>
+                  <span className="badge" style={{ background: '#e8f0e6', color: '#4a6741' }}>{PERM_LABELS[selectedEmp.permission || 'viewer']}</span>
                   {selectedEmp.clockedIn && <span className="badge green">● Clocked In</span>}
                 </div>
               </div>
             </div>
 
-            <div className="tabs">
-              {['info', 'tax', 'schedule', 'timesheets'].map(t => (
-                <div key={t} className={`tab ${profileTab === t ? 'active' : ''}`} onClick={() => setProfileTab(t)}>
-                  {t === 'info' ? 'Personal Info' : t === 'tax' ? 'Tax & Pay' : t === 'schedule' ? 'Schedule' : 'Timesheets'}
+            <div className="tabs" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              {profileTabs.map(t => (
+                <div key={t} className={`tab ${profileTab === t ? 'active' : ''}`} onClick={() => setProfileTab(t)} style={{ whiteSpace: 'nowrap' }}>
+                  {t === 'info' ? 'Personal Info' : t === 'tax' ? 'Tax & Pay' : t === 'schedule' ? 'Schedule' : t === 'timesheets' ? 'Timesheets' : 'Permission'}
                 </div>
               ))}
             </div>
@@ -3761,15 +3799,6 @@ function EmployeeProfiles({ role, perm }) {
                       <option>Account Manager</option>
                     </select>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Permission Level</label>
-                    <select className="form-input" value={editData.permission || 'viewer'} onChange={e => handleEditField('permission', e.target.value)}>
-                      <option value="viewer">Schedule Viewer</option>
-                      <option value="scheduler">Scheduler</option>
-                      <option value="editor">Editor</option>
-                      {isAdmin && <option value="admin">Admin</option>}
-                    </select>
-                  </div>
                   <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
@@ -3782,7 +3811,55 @@ function EmployeeProfiles({ role, perm }) {
             )}
             {profileTab === 'schedule' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's schedule in the Schedule tab.</p>}
             {profileTab === 'timesheets' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's timesheets in the Timesheets tab.</p>}
+            {profileTab === 'permission' && isAdmin && (
+              <div style={{ padding: '4px 0' }}>
+                <div style={{ marginBottom: 20 }}>
+                  <label className="form-label">Permission Level</label>
+                  <select className="form-input" value={editData.permission || 'viewer'} onChange={e => handleEditField('permission', e.target.value)}
+                    style={{ maxWidth: 280 }}>
+                    <option value="viewer">Schedule Viewer</option>
+                    <option value="scheduler">Scheduler</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                {/* Permission descriptions */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                  {['viewer', 'scheduler', 'editor', 'admin'].map(p => (
+                    <div key={p} style={{ padding: '12px 14px', borderRadius: 10, background: (editData.permission || 'viewer') === p ? '#f0f7ee' : 'var(--bg)', border: (editData.permission || 'viewer') === p ? '2px solid var(--primary)' : '1px solid var(--border)' }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: (editData.permission || 'viewer') === p ? 'var(--primary)' : 'var(--text)' }}>
+                        {(editData.permission || 'viewer') === p && <i className="fas fa-check-circle" style={{ marginRight: 6 }} />}
+                        {PERM_LABELS[p]}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-light)', lineHeight: 1.4 }}>{PERM_DESCS[p]}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                  <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
+                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save Permission</>}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Danger zone — at bottom of profile */}
+          {isAdmin && (
+            <div style={{ marginTop: 24, padding: '16px', borderRadius: 12, border: '1px solid #fecaca', background: '#fef2f2' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--danger)' }}>Danger Zone</div>
+                  <div style={{ fontSize: 13, color: '#991b1b' }}>Permanently remove this employee from the system.</div>
+                </div>
+                <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                  onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmName(''); }}>
+                  <i className="fas fa-trash" /> Remove Employee
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
