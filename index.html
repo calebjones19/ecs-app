@@ -487,12 +487,13 @@
     .desktop-only { display: none !important; }
     /* CRITICAL: prevent all horizontal scroll / wiggle */
     html, body { overflow: hidden !important; width: 100%; max-width: 100vw; }
-    .app { height: 100dvh; height: 100vh; overflow: hidden; width: 100%; max-width: 100vw; }
+    .app { height: 100dvh; height: 100vh; overflow: hidden; width: 100%; max-width: 100vw; padding-top: env(safe-area-inset-top, 0px); }
     /* When keyboard open: hide nav, reclaim its space */
     body.keyboard-open .mobile-bottom-nav { display: none !important; }
     body.keyboard-open .app { padding-bottom: 0 !important; }
+    body.keyboard-open .app { padding-top: 0 !important; }
     body.keyboard-open .chat-layout { height: 100dvh; height: 100vh; }
-    body.keyboard-open .thread-panel { bottom: 0; height: 100dvh; height: 100vh; }
+    body.keyboard-open .thread-panel { bottom: 0; top: 0; height: 100dvh; height: 100vh; }
     .main { overflow-x: hidden; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .content { padding: 12px; overflow-x: hidden; overflow-y: auto; width: 100%; max-width: 100vw; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
 
