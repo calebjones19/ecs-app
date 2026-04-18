@@ -566,14 +566,17 @@
     .msg-text { font-size: 13px; }
     .msg-file { max-width: 100%; }
     .msg-poll { max-width: 100%; }
-    .chat-composer { padding: 4px 10px 2px; }
-    .composer-toolbar { margin-bottom: 2px; gap: 2px; }
-    .composer-toolbar button { padding: 4px 8px; font-size: 13px; }
-    .composer-input { font-size: 16px; padding: 6px 10px; min-height: 36px; }
-    .composer-send { width: 36px; height: 36px; font-size: 14px; }
+    .chat-composer { padding: 6px 10px 4px; }
+    .composer-toolbar { margin-bottom: 4px; gap: 4px; }
+    .composer-toolbar button { padding: 6px 10px; font-size: 15px; }
+    .composer-input { font-size: 16px; padding: 8px 10px; min-height: 36px; }
+    .composer-send { width: 38px; height: 38px; font-size: 15px; }
     .thread-panel { width: 100%; position: fixed; top: 0; left: 0; right: 0; bottom: 60px; z-index: 200; }
-    .thread-composer { padding: 4px 10px 2px; }
+    .thread-composer { padding: 6px 10px 4px; }
     .thread-composer textarea { padding: 6px 10px; font-size: 16px; min-height: 36px; }
+
+    /* When keyboard is open, reclaim nav space */
+    body.keyboard-open .thread-panel { bottom: 0; }
     @keyframes slideInThread { from { transform: translateX(100%); } to { transform: translateX(0); } }
     .chat-header { padding: 10px 12px; }
     .channel-list { max-height: none; flex: 1; }
@@ -628,8 +631,8 @@
     .swap-details { flex-direction: column; gap: 4px; }
     .swap-card { overflow: hidden; }
 
-    /* Picker popups */
-    .picker-popup { position: fixed; bottom: 62px; left: 8px; right: 8px; max-width: none; z-index: 350; max-height: 55vh; }
+    /* Picker popups — bottom sheet on mobile */
+    .picker-popup { position: fixed; bottom: 0; left: 0; right: 0; max-width: none; z-index: 350; max-height: 50vh; margin: 0; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); }
 
     /* Checklist */
     .checklist-item { padding: 10px; }
@@ -678,19 +681,25 @@
 <body>
 <div id="root"></div>
 <script>
-// Hide bottom nav when keyboard opens on iOS/mobile
+// Hide bottom nav + reclaim space when keyboard opens on iOS/mobile
 (function() {
   const isTouch = 'ontouchstart' in window;
   if (!isTouch) return;
 
-  function hideNav() {
+  function onKeyboardShow() {
     const nav = document.querySelector('.mobile-bottom-nav');
-    if (nav) nav.style.transform = 'translateY(100%)';
+    const layout = document.querySelector('.chat-layout');
+    if (nav) { nav.style.transform = 'translateY(100%)'; nav.style.pointerEvents = 'none'; }
+    if (layout) layout.style.height = '100vh';
+    document.body.classList.add('keyboard-open');
   }
-  function showNav() {
+  function onKeyboardHide() {
     setTimeout(() => {
       const nav = document.querySelector('.mobile-bottom-nav');
-      if (nav) nav.style.transform = '';
+      const layout = document.querySelector('.chat-layout');
+      if (nav) { nav.style.transform = ''; nav.style.pointerEvents = ''; }
+      if (layout) layout.style.height = '';
+      document.body.classList.remove('keyboard-open');
     }, 100);
   }
 
@@ -698,14 +707,14 @@
     const tag = e.target.tagName;
     const editable = e.target.getAttribute('contenteditable');
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || editable === 'true') {
-      hideNav();
+      onKeyboardShow();
     }
   });
   document.addEventListener('focusout', (e) => {
     const tag = e.target.tagName;
     const editable = e.target.getAttribute('contenteditable');
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || editable === 'true') {
-      showNav();
+      onKeyboardHide();
     }
   });
 })();
@@ -1840,8 +1849,12 @@ function Chat({ role, authedUser }) {
 
         {canSend ? (
           <div className="chat-composer" style={{ position: 'relative' }}>
-            {/* Emoji picker rendered via portal so it sits above everything including thread panel */}
-            {showEmojiPicker && ReactDOM.createPortal(
+            {/* Picker backdrop for mobile */}
+            {(showEmojiPicker || showGifPicker || showMentionPicker) && (
+              <div className="picker-backdrop mobile-only" onClick={closeAllPickers} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 340 }} />
+            )}
+            {/* Emoji picker */}
+            {showEmojiPicker && (
               <div className="picker-popup" style={{ width: 380 }}>
                 <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
                   <input placeholder="Search emojis..." value={emojiSearch} onChange={e => setEmojiSearch(e.target.value)} />
@@ -1870,8 +1883,7 @@ function Chat({ role, authedUser }) {
                     );
                   })}
                 </div>
-              </div>,
-              document.body
+              </div>
             )}
             <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={onFileSelected} />
             {showAttachMenu && !showGifPicker && (
@@ -1894,7 +1906,7 @@ function Chat({ role, authedUser }) {
                 </div>
               </div>
             )}
-            {showGifPicker && ReactDOM.createPortal(
+            {showGifPicker && (
               <div className="picker-popup" style={{ width: 340 }}>
                 <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
                   <input placeholder="Search GIFs..." value={gifSearch} onChange={e => setGifSearch(e.target.value)} autoFocus />
@@ -1911,10 +1923,9 @@ function Chat({ role, authedUser }) {
                 <div style={{ textAlign: 'center', padding: '4px 0', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
                   <img src="https://media.giphy.com/attribution/poweredby-dark-horz.png" alt="Powered by GIPHY" style={{ height: 14, opacity: 0.6 }} />
                 </div>
-              </div>,
-              document.body
+              </div>
             )}
-            {showMentionPicker && ReactDOM.createPortal(
+            {showMentionPicker && (
               <div className="picker-popup" style={{ width: 260 }}>
                 <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
                   <input placeholder="Search people..." value={mentionSearch} onChange={e => setMentionSearch(e.target.value)} autoFocus />
@@ -1930,8 +1941,7 @@ function Chat({ role, authedUser }) {
                     </div>
                   ))}
                 </div>
-              </div>,
-              document.body
+              </div>
             )}
             <div className="composer-toolbar">
               <button title="Title" onMouseDown={e => { e.preventDefault(); toggleTitle(); }} style={activeFormats.title ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-heading" /></button>
@@ -3669,6 +3679,87 @@ function Timesheets({ role }) {
   );
 }
 
+// ─── App Update Button ─────────────────────────────────────────
+function AppUpdateButton() {
+  const [checking, setChecking] = useState(false);
+  const [status, setStatus] = useState(null); // null, 'updating', 'up-to-date', 'updated'
+
+  const checkForUpdates = async () => {
+    setChecking(true);
+    setStatus(null);
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          // Force the SW to check the server for a new version
+          await reg.update();
+          // If a new worker is waiting, activate it
+          if (reg.waiting) {
+            setStatus('updating');
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            // Reload once the new SW takes over
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              if (!refreshing) { refreshing = true; window.location.reload(); }
+            });
+            // Fallback reload after 2s
+            setTimeout(() => { if (!refreshing) window.location.reload(); }, 2000);
+            return;
+          }
+          // If there's an installing worker, wait for it
+          if (reg.installing) {
+            setStatus('updating');
+            reg.installing.addEventListener('statechange', (e) => {
+              if (e.target.state === 'installed') {
+                if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                setTimeout(() => window.location.reload(), 500);
+              }
+            });
+            return;
+          }
+        }
+        // No new SW found — clear all caches and hard reload
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        setStatus('updated');
+        setTimeout(() => window.location.reload(), 800);
+      } else {
+        // No SW support, just clear caches and reload
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        setStatus('updated');
+        setTimeout(() => window.location.reload(), 800);
+      }
+    } catch (err) {
+      console.error('Update check failed:', err);
+      // Fallback: clear caches and reload
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      } catch(e) {}
+      setStatus('updated');
+      setTimeout(() => window.location.reload(), 800);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <i className="fas fa-sync-alt" style={{ color: 'var(--primary)', fontSize: 16 }} />
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>Check for Updates</div>
+          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>
+            {status === 'updating' ? 'Installing update...' : status === 'updated' ? 'Reloading...' : 'Pull the latest version of the app'}
+          </div>
+        </div>
+      </div>
+      <button className="topbar-btn primary" onClick={checkForUpdates} disabled={checking} style={{ minWidth: 80 }}>
+        {checking ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-download" /> Update</>}
+      </button>
+    </div>
+  );
+}
+
 // ─── Notification Settings ─────────────────────────────────────
 function NotificationSettings({ userId }) {
   const defaults = {
@@ -3840,6 +3931,12 @@ function NotificationSettings({ userId }) {
         </Section>
 
         {loaded && <p style={{ fontSize: 11, color: 'var(--text-light)', textAlign: 'center', marginTop: 8 }}>Settings save automatically</p>}
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <Section title="App">
+          <AppUpdateButton />
+        </Section>
       </div>
     </div>
   );
