@@ -1003,85 +1003,233 @@ function Modal({ show, onClose, title, children }) {
 }
 
 // ─── Dashboard ─────────────────────────────────────────────────
-function Dashboard({ role, perm }) {
-  const activeEmps = EMPLOYEES.filter(e => e.status === 'active').length;
-  const clockedIn = EMPLOYEES.filter(e => e.clockedIn).length;
-  const activeClients = CLIENTS.filter(c => c.status === 'active').length;
+function Dashboard({ role, perm, authedUser }) {
+  const canSchedule = perm?.canSchedule || role === 'admin';
+  const canEdit = perm?.canEdit || role === 'admin';
+  const isAdmin = perm?.isAdmin || role === 'admin';
+  const [selectedAccount, setSelectedAccount] = useState('');
+
+  // ── Data helpers ──
+  const parseShiftHours = (timeStr) => {
+    const match = timeStr.match(/(\d+)(a|p)-(\d+)(a|p)/);
+    if (!match) return 4;
+    let start = parseInt(match[1]);
+    if (match[2] === 'p' && start !== 12) start += 12;
+    if (match[2] === 'a' && start === 12) start = 0;
+    let end = parseInt(match[3]);
+    if (match[4] === 'p' && end !== 12) end += 12;
+    if (match[4] === 'a' && end === 12) end = 0;
+    return end > start ? end - start : (24 - start + end);
+  };
+
+  // Get all shifts for a given employee id (all days this week)
+  const getEmpShifts = (empId) => SCHEDULE_DATA[empId] || [];
+
+  // Get my shifts
+  const myShifts = authedUser?.id ? getEmpShifts(authedUser.id) : [];
+
+  // Calculate hours from shifts array
+  const calcHours = (shifts) => shifts.reduce((sum, s) => sum + parseShiftHours(s.time), 0);
+
+  // My hours
+  const myTotalHours = calcHours(myShifts);
+  // For now, treat all shifts as confirmed (shift confirmation system can be added later)
+  const myConfirmedHours = myTotalHours;
+  const myUnconfirmedHours = 0;
+
+  // All shifts across all employees
+  const allShifts = Object.entries(SCHEDULE_DATA).flatMap(([empId, shifts]) =>
+    shifts.map(s => ({ ...s, empId }))
+  );
+
+  // Shifts grouped by client
+  const shiftsByClient = {};
+  allShifts.forEach(s => {
+    if (!shiftsByClient[s.client]) shiftsByClient[s.client] = [];
+    shiftsByClient[s.client].push(s);
+  });
+
+  // Total scheduled hours across all accounts
+  const totalScheduledHours = calcHours(allShifts);
+  const totalBudgetedHours = CLIENTS.filter(c => c.status === 'active').reduce((sum, c) => sum + (parseFloat(c.budgetedHours) || 0), 0);
+
+  // Active clients for dropdown
+  const activeClients = CLIENTS.filter(c => c.status === 'active');
+
+  // Selected account stats
+  const selectedClientObj = activeClients.find(c => c.name === selectedAccount);
+  const selectedAccountScheduled = selectedAccount ? calcHours(shiftsByClient[selectedAccount] || []) : 0;
+  const selectedAccountBudgeted = selectedClientObj ? (parseFloat(selectedClientObj.budgetedHours) || 0) : 0;
+
+  // Scheduler: get accounts they manage (clients they have shifts assigned to their team)
+  // For now, schedulers see all accounts they have shifts for
+  const schedulerAccountShifts = {};
+  if (canSchedule && !canEdit) {
+    allShifts.forEach(s => {
+      if (!schedulerAccountShifts[s.client]) schedulerAccountShifts[s.client] = [];
+      schedulerAccountShifts[s.client].push(s);
+    });
+  }
+  const schedulerTotalScheduled = canSchedule && !canEdit ? calcHours(Object.values(schedulerAccountShifts).flat()) : 0;
+  const schedulerTotalBudgeted = canSchedule && !canEdit ? activeClients.reduce((sum, c) => sum + (parseFloat(c.budgetedHours) || 0), 0) : 0;
+
   const pendingSwaps = SHIFT_SWAPS.filter(s => s.status === 'pending' || s.status === 'open').length;
+
+  // Color helper: red if over budget, black otherwise
+  const budgetColor = (scheduled, budgeted) => {
+    if (!budgeted || budgeted === 0) return 'var(--text)';
+    return scheduled > budgeted ? 'var(--danger)' : 'var(--text)';
+  };
+
+  // Big stat card component
+  const StatCard = ({ value, label, sublabel, color, icon }) => (
+    <div className="card" style={{ textAlign: 'center', padding: '20px 16px' }}>
+      {icon && <div style={{ marginBottom: 8 }}><i className={`fas ${icon}`} style={{ fontSize: 18, color: 'var(--text-light)', opacity: 0.5 }} /></div>}
+      <div style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: color || 'var(--text)', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>{value}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-light)', marginTop: 6 }}>{label}</div>
+      {sublabel && <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2, opacity: 0.7 }}>{sublabel}</div>}
+    </div>
+  );
+
+  // Day names for shift display
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
     <div>
-      <div className="grid-4" style={{ marginBottom: 24 }}>
-        <div className="stat-card">
-          <div className="stat-value">{activeEmps}</div>
-          <div className="stat-label">Active Employees</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: 'var(--success)' }}>{clockedIn}</div>
-          <div className="stat-label">Currently Clocked In</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{activeClients}</div>
-          <div className="stat-label">Active Clients</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: pendingSwaps > 0 ? 'var(--warning)' : 'var(--text)' }}>{pendingSwaps}</div>
-          <div className="stat-label">Pending Swap Requests</div>
-        </div>
-      </div>
-
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title"><i className="fas fa-clock" style={{ marginRight: 8, color: 'var(--primary)' }} />Today's Activity</span>
+      {/* ── Schedule Viewer & Scheduler: My Shifts ── */}
+      {(!canEdit || canSchedule) && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h3 style={{ margin: 0, fontSize: 16 }}><i className="fas fa-calendar-check" style={{ marginRight: 8, color: 'var(--primary)' }} />My Shifts This Week</h3>
           </div>
-          {TIMESHEET_DATA.length === 0 ? (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-light)', fontSize: 13 }}>
-              <i className="fas fa-clock" style={{ fontSize: 24, opacity: 0.3, marginBottom: 8, display: 'block' }} />
-              No activity yet today
+          {myShifts.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-light)' }}>
+              <i className="fas fa-calendar-times" style={{ fontSize: 28, opacity: 0.2, marginBottom: 8, display: 'block' }} />
+              No shifts scheduled this week
             </div>
-          ) : TIMESHEET_DATA.slice(0, 4).map(t => (
-            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="avatar sm" style={{ background: EMPLOYEES.find(e => e.name === t.emp)?.color || '#999' }}>
-                  {EMPLOYEES.find(e => e.name === t.emp)?.avatar || '?'}
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {myShifts.sort((a, b) => a.day - b.day).map((shift, i) => (
+                <div key={i} className="card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+                      {dayNames[shift.day]}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15 }}>{shift.client}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-light)' }}>{shift.time} · {parseShiftHours(shift.time)}h</div>
+                    </div>
+                  </div>
+                  <span className="badge green"><i className="fas fa-check" style={{ marginRight: 4 }} /> Confirmed</span>
                 </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t.emp}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{t.client}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Schedule Viewer & Scheduler: Hours Scheduled ── */}
+      {(!canEdit || canSchedule) && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}><i className="fas fa-clock" style={{ marginRight: 8, color: 'var(--primary)' }} />My Hours This Week</h3>
+          <div className="grid-3" style={{ marginBottom: 0 }}>
+            <StatCard value={`${myTotalHours}h`} label="Total Scheduled" icon="fa-calendar-alt" />
+            <StatCard value={`${myConfirmedHours}h`} label="Confirmed" color="var(--success)" icon="fa-check-circle" />
+            <StatCard value={`${myUnconfirmedHours}h`} label="Unconfirmed" color={myUnconfirmedHours > 0 ? 'var(--warning)' : 'var(--text-light)'} icon="fa-question-circle" />
+          </div>
+        </div>
+      )}
+
+      {/* ── Scheduler: Account Hours Overview ── */}
+      {canSchedule && !canEdit && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}><i className="fas fa-building" style={{ marginRight: 8, color: 'var(--primary)' }} />My Accounts — Hours Overview</h3>
+          <div className="grid-2" style={{ marginBottom: 16 }}>
+            <StatCard value={`${schedulerTotalBudgeted}h`} label="Total Budgeted" icon="fa-bullseye" />
+            <StatCard value={`${schedulerTotalScheduled}h`} label="Total Scheduled" color={budgetColor(schedulerTotalScheduled, schedulerTotalBudgeted)} icon="fa-calendar-check" />
+          </div>
+          <div className="card" style={{ padding: '16px' }}>
+            <label className="form-label" style={{ marginBottom: 8 }}>View Account</label>
+            <select className="form-input" value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)} style={{ marginBottom: selectedAccount ? 16 : 0 }}>
+              <option value="">Select an account...</option>
+              {activeClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+            {selectedAccount && (
+              <div className="grid-2" style={{ marginTop: 12 }}>
+                <div style={{ textAlign: 'center', padding: 12, background: 'var(--bg)', borderRadius: 12 }}>
+                  <div style={{ fontSize: 28, fontWeight: 800 }}>{selectedAccountBudgeted}h</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Budgeted</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: 12, background: 'var(--bg)', borderRadius: 12 }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: budgetColor(selectedAccountScheduled, selectedAccountBudgeted) }}>{selectedAccountScheduled}h</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Scheduled</div>
                 </div>
               </div>
-              <span className={`badge ${t.status === 'clocked-in' ? 'green' : 'gray'}`}>
-                {t.status === 'clocked-in' ? '● Clocked In' : `${t.hours}h`}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title"><i className="fas fa-exchange-alt" style={{ marginRight: 8, color: 'var(--warning)' }} />Shift Swap Requests</span>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* ── Admin/Editor: All Accounts Hours Overview ── */}
+      {canEdit && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}><i className="fas fa-chart-bar" style={{ marginRight: 8, color: 'var(--primary)' }} />All Accounts — Hours Overview</h3>
+          <div className="grid-2" style={{ marginBottom: 16 }}>
+            <StatCard value={`${totalBudgetedHours}h`} label="Total Budgeted" sublabel={`${activeClients.length} active accounts`} icon="fa-bullseye" />
+            <StatCard value={`${totalScheduledHours}h`} label="Total Scheduled" color={budgetColor(totalScheduledHours, totalBudgetedHours)} icon="fa-calendar-check" />
+          </div>
+          <div className="card" style={{ padding: '16px' }}>
+            <label className="form-label" style={{ marginBottom: 8 }}>View Account</label>
+            <select className="form-input" value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)} style={{ marginBottom: selectedAccount ? 16 : 0 }}>
+              <option value="">Select an account...</option>
+              {activeClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+            {selectedAccount && (
+              <div className="grid-2" style={{ marginTop: 12 }}>
+                <div style={{ textAlign: 'center', padding: 16, background: 'var(--bg)', borderRadius: 12 }}>
+                  <div style={{ fontSize: 32, fontWeight: 800 }}>{selectedAccountBudgeted}h</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Budgeted</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: 16, background: 'var(--bg)', borderRadius: 12 }}>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: budgetColor(selectedAccountScheduled, selectedAccountBudgeted) }}>{selectedAccountScheduled}h</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Scheduled</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Shift Swap Requests (Viewer & Scheduler) ── */}
+      {(!canEdit || canSchedule) && (
+        <div>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>
+            <i className="fas fa-exchange-alt" style={{ marginRight: 8, color: 'var(--warning)' }} />
+            Shift Swap Requests
+            {pendingSwaps > 0 && <span className="badge yellow" style={{ marginLeft: 8 }}>{pendingSwaps}</span>}
+          </h3>
           {SHIFT_SWAPS.length === 0 ? (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-light)', fontSize: 13 }}>
-              <i className="fas fa-exchange-alt" style={{ fontSize: 24, opacity: 0.3, marginBottom: 8, display: 'block' }} />
-              No pending requests
+            <div className="card" style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-light)' }}>
+              <i className="fas fa-exchange-alt" style={{ fontSize: 28, opacity: 0.2, marginBottom: 8, display: 'block' }} />
+              No swap requests
             </div>
-          ) : SHIFT_SWAPS.map(s => (
-            <div key={s.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{s.requestor}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{s.shift}</div>
+          ) : (
+            <div className="card" style={{ padding: 0 }}>
+              {SHIFT_SWAPS.map(s => (
+                <div key={s.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{s.requestor}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{s.shift}</div>
+                  </div>
+                  <span className={`badge ${s.status === 'approved' ? 'green' : s.status === 'pending' ? 'yellow' : 'blue'}`}>
+                    {s.status}
+                  </span>
                 </div>
-                <span className={`badge ${s.status === 'approved' ? 'green' : s.status === 'pending' ? 'yellow' : 'blue'}`}>
-                  {s.status}
-                </span>
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -3154,7 +3302,7 @@ function ClientList({ role, perm }) {
   const [editClientDirty, setEditClientDirty] = useState(false);
   const [editClientMode, setEditClientMode] = useState(false);
   const [showDeleteClientConfirm, setShowDeleteClientConfirm] = useState(false);
-  const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Commercial', frequency:'Weekly', rate:'', notes:'' });
+  const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Commercial', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
 
   // Sync edit state when selected client changes
   useEffect(() => {
@@ -3184,6 +3332,7 @@ function ClientList({ role, perm }) {
         type: editClient.type || 'Commercial',
         frequency: editClient.frequency || 'Weekly',
         rate: parseFloat(editClient.rate) || 0,
+        budgetedHours: parseFloat(editClient.budgetedHours) || 0,
         notes: (editClient.notes || '').trim(),
         status: editClient.status || 'active',
       });
@@ -3214,11 +3363,12 @@ function ClientList({ role, perm }) {
         ...newClient,
         name: newClient.name.trim(),
         rate: parseFloat(newClient.rate) || 0,
+        budgetedHours: parseFloat(newClient.budgetedHours) || 0,
         status: 'active',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       setShowAdd(false);
-      setNewClient({ name:'', contact:'', phone:'', email:'', address:'', type:'Commercial', frequency:'Weekly', rate:'', notes:'' });
+      setNewClient({ name:'', contact:'', phone:'', email:'', address:'', type:'Commercial', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
     } catch (err) {
       alert('Error adding client: ' + err.message);
     }
@@ -3327,6 +3477,7 @@ function ClientList({ role, perm }) {
                 <div className="grid-2">
                   {[['Type', selectedClient.type], ['Frequency', selectedClient.frequency],
                     ['Rate', selectedClient.rate ? `$${selectedClient.rate}` : '—'],
+                    ['Budgeted Hours/Week', selectedClient.budgetedHours ? `${selectedClient.budgetedHours}h` : '—'],
                     ['Status', (selectedClient.status || 'active').charAt(0).toUpperCase() + (selectedClient.status || 'active').slice(1)]
                   ].map(([label, val]) => (
                     <div key={label} className="form-group">
@@ -3396,6 +3547,12 @@ function ClientList({ role, perm }) {
                     <label className="form-label">Rate ($)</label>
                     <input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} />
                   </div>
+                  <div className="form-group">
+                    <label className="form-label">Budgeted Hours/Week</label>
+                    <input className="form-input" type="number" value={editClient.budgetedHours || ''} onChange={e => handleEditClientField('budgetedHours', e.target.value)} placeholder="0" />
+                  </div>
+                </div>
+                <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label">Status</label>
                     <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
@@ -3490,9 +3647,15 @@ function ClientList({ role, perm }) {
             </select>
           </div>
         </div>
-        <div className="form-group">
-          <label className="form-label">Rate ($)</label>
-          <input className="form-input" type="number" placeholder="0.00" value={newClient.rate} onChange={e => setNewClient({...newClient, rate: e.target.value})} />
+        <div className="grid-2">
+          <div className="form-group">
+            <label className="form-label">Rate ($)</label>
+            <input className="form-input" type="number" placeholder="0.00" value={newClient.rate} onChange={e => setNewClient({...newClient, rate: e.target.value})} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Budgeted Hours/Week</label>
+            <input className="form-input" type="number" placeholder="0" value={newClient.budgetedHours} onChange={e => setNewClient({...newClient, budgetedHours: e.target.value})} />
+          </div>
         </div>
         <div className="form-group">
           <label className="form-label">Notes</label>
@@ -5805,7 +5968,7 @@ function App() {
   const renderPage = () => {
     const perm = { role, isAdmin, canEdit, canSchedule, permLevel };
     switch (page) {
-      case 'dashboard': return <Dashboard role={role} perm={perm} />;
+      case 'dashboard': return <Dashboard role={role} perm={perm} authedUser={authedUser} />;
       case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm} />;
       case 'schedule': return <Schedule role={role} perm={perm} />;
       case 'timesheets': return <Timesheets role={role} authedUser={authedUser} perm={perm} />;
@@ -5815,7 +5978,7 @@ function App() {
       case 'availability': return <AvailabilityView role={role} perm={perm} />;
       case 'clients': return <ClientList role={role} perm={perm} />;
       case 'notifications': return <NotificationSettings userId={authedUser?.id} />;
-      default: return <Dashboard role={role} perm={perm} />;
+      default: return <Dashboard role={role} perm={perm} authedUser={authedUser} />;
     }
   };
 
