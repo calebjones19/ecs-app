@@ -409,7 +409,7 @@
   .modal-close:hover { background: var(--border); }
 
   /* Tabs */
-  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
   .tab { padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--text-light); transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
@@ -685,7 +685,7 @@
     .profile-header { flex-direction: column; text-align: center; gap: 12px; }
 
     /* Tabs */
-    .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+    .tabs { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
     .tab { padding: 8px 14px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
 
     /* Availability grid → scroll */
@@ -3152,6 +3152,8 @@ function ClientList({ role, perm }) {
   const [saving, setSaving] = useState(false);
   const [editClient, setEditClient] = useState({});
   const [editClientDirty, setEditClientDirty] = useState(false);
+  const [editClientMode, setEditClientMode] = useState(false);
+  const [showDeleteClientConfirm, setShowDeleteClientConfirm] = useState(false);
   const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Commercial', frequency:'Weekly', rate:'', notes:'' });
 
   // Sync edit state when selected client changes
@@ -3159,6 +3161,8 @@ function ClientList({ role, perm }) {
     if (selectedClient) {
       setEditClient({ ...selectedClient });
       setEditClientDirty(false);
+      setEditClientMode(false);
+      setShowDeleteClientConfirm(false);
     }
   }, [selectedClient?.id]);
 
@@ -3184,6 +3188,7 @@ function ClientList({ role, perm }) {
         status: editClient.status || 'active',
       });
       setEditClientDirty(false);
+      setEditClientMode(false);
       setSelectedClient({ ...selectedClient, ...editClient, rate: parseFloat(editClient.rate) || 0 });
     } catch (err) {
       alert('Error saving: ' + err.message);
@@ -3192,10 +3197,10 @@ function ClientList({ role, perm }) {
   };
 
   const handleDeleteClient = async (clientId) => {
-    if (!confirm('Remove this client? This cannot be undone.')) return;
     try {
       await db.collection('clients').doc(clientId).delete();
       setSelectedClient(null);
+      setShowDeleteClientConfirm(false);
     } catch (err) {
       alert('Error removing client: ' + err.message);
     }
@@ -3291,83 +3296,151 @@ function ClientList({ role, perm }) {
         ))}
       </div>
 
-      <Modal show={!!selectedClient} onClose={() => setSelectedClient(null)} title={editClient.name || selectedClient?.name || ''}>
+      <Modal show={!!selectedClient} onClose={() => setSelectedClient(null)} title={selectedClient?.name || ''}>
         {selectedClient && (
           <div>
-            <div className="grid-2">
-              <div className="form-group">
-                <label className="form-label">Client Name</label>
-                <input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} />
+            {!editClientMode ? (
+              <div>
+                {canEdit && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                    <button className="chat-icon-btn" title="Edit" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}>
+                      <i className="fas fa-pen" />
+                    </button>
+                  </div>
+                )}
+                <div className="grid-2">
+                  {[['Client Name', selectedClient.name], ['Contact Person', selectedClient.contact],
+                    ['Phone', selectedClient.phone], ['Email', selectedClient.email]
+                  ].map(([label, val]) => (
+                    <div key={label} className="form-group">
+                      <label className="form-label">{label}</label>
+                      <div style={{ fontSize: 14, padding: '8px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+                {[['Address', selectedClient.address]].map(([label, val]) => (
+                  <div key={label} className="form-group">
+                    <label className="form-label">{label}</label>
+                    <div style={{ fontSize: 14, padding: '8px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
+                  </div>
+                ))}
+                <div className="grid-2">
+                  {[['Type', selectedClient.type], ['Frequency', selectedClient.frequency],
+                    ['Rate', selectedClient.rate ? `$${selectedClient.rate}` : '—'],
+                    ['Status', (selectedClient.status || 'active').charAt(0).toUpperCase() + (selectedClient.status || 'active').slice(1)]
+                  ].map(([label, val]) => (
+                    <div key={label} className="form-group">
+                      <label className="form-label">{label}</label>
+                      <div style={{ fontSize: 14, padding: '8px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+                {selectedClient.notes && (
+                  <div className="form-group">
+                    <label className="form-label">Notes</label>
+                    <div style={{ fontSize: 14, padding: '8px 0', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{selectedClient.notes}</div>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button className="topbar-btn" onClick={() => setSelectedClient(null)}>Close</button>
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Contact Person</label>
-                <input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} />
+            ) : (
+              <div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Client Name</label>
+                    <input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Contact Person</label>
+                    <input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Phone</label>
+                    <input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Address</label>
+                  <input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} />
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Type</label>
+                    <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
+                      <option>Commercial</option>
+                      <option>Residential</option>
+                      <option>Medical</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Frequency</label>
+                    <select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}>
+                      <option>Daily</option>
+                      <option>Weekly</option>
+                      <option>Bi-weekly</option>
+                      <option>Monthly</option>
+                      <option>On-demand</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Rate ($)</label>
+                    <input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Status</label>
+                    <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Notes</label>
+                  <textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                  <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
+                  <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
+                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+                  </button>
+                </div>
+                {/* Danger zone */}
+                {canEdit && (
+                  <div style={{ marginTop: 20, padding: 14, borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2' }}>
+                    {!showDeleteClientConfirm ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <div style={{ fontSize: 13, color: '#991b1b' }}>Permanently remove this client</div>
+                        <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 12 }}
+                          onClick={() => setShowDeleteClientConfirm(true)}>
+                          <i className="fas fa-trash" style={{marginRight:4}} /> Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 8 }}>Are you sure? This cannot be undone.</div>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                          <button className="topbar-btn" onClick={() => setShowDeleteClientConfirm(false)}>Cancel</button>
+                          <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)' }}
+                            onClick={() => handleDeleteClient(selectedClient.id)}>
+                            <i className="fas fa-trash" style={{marginRight:4}} /> Yes, Remove Client
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="grid-2">
-              <div className="form-group">
-                <label className="form-label">Phone</label>
-                <input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} />
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Address</label>
-              <input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} />
-            </div>
-            <div className="grid-2">
-              <div className="form-group">
-                <label className="form-label">Type</label>
-                <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
-                  <option>Commercial</option>
-                  <option>Residential</option>
-                  <option>Medical</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Frequency</label>
-                <select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}>
-                  <option>Daily</option>
-                  <option>Weekly</option>
-                  <option>Bi-weekly</option>
-                  <option>Monthly</option>
-                  <option>On-demand</option>
-                </select>
-              </div>
-            </div>
-            <div className="grid-2">
-              <div className="form-group">
-                <label className="form-label">Rate ($)</label>
-                <input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Status</label>
-                <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Notes</label>
-              <textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 12 }}>
-              {canEdit && (
-                <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClient(selectedClient.id)}>
-                  <i className="fas fa-trash" /> Delete
-                </button>
-              )}
-              <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-                <button className="topbar-btn" onClick={() => setSelectedClient(null)}>Cancel</button>
-                <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
-                  {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save</>}
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </Modal>
@@ -3450,6 +3523,7 @@ function EmployeeProfiles({ role, perm }) {
   const [editDirty, setEditDirty] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [editMode, setEditMode] = useState(false);
   const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '' });
 
   // Sync editData when selectedEmp changes
@@ -3457,6 +3531,7 @@ function EmployeeProfiles({ role, perm }) {
     if (selectedEmp) {
       setEditData({ ...selectedEmp });
       setEditDirty(false);
+      setEditMode(false);
     }
   }, [selectedEmp?.id]);
 
@@ -3486,7 +3561,8 @@ function EmployeeProfiles({ role, perm }) {
         status: editData.status || selectedEmp.status,
       });
       setEditDirty(false);
-      // Update local selectedEmp to reflect saved data
+      setEditMode(false);
+      // Update local selectedEmp to reflect saved data immediately
       setSelectedEmp({ ...selectedEmp, ...editData, phoneNormalized: phoneDigits, avatar: initials || selectedEmp.avatar });
     } catch (err) {
       alert('Error saving: ' + err.message);
@@ -3748,92 +3824,168 @@ function EmployeeProfiles({ role, perm }) {
 
             <div className="tabs" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {profileTabs.map(t => (
-                <div key={t} className={`tab ${profileTab === t ? 'active' : ''}`} onClick={() => setProfileTab(t)} style={{ whiteSpace: 'nowrap' }}>
+                <div key={t} className={`tab ${profileTab === t ? 'active' : ''}`} onClick={() => { setProfileTab(t); setEditMode(false); setEditData({ ...selectedEmp }); setEditDirty(false); }} style={{ whiteSpace: 'nowrap' }}>
                   {t === 'info' ? 'Personal Info' : t === 'tax' ? 'Tax & Pay' : t === 'schedule' ? 'Schedule' : t === 'timesheets' ? 'Timesheets' : 'Permission'}
                 </div>
               ))}
             </div>
 
+            {/* ── Personal Info Tab ── */}
             {profileTab === 'info' && (
               <div>
-                <div className="grid-2">
-                  <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={editData.name || ''} onChange={e => handleEditField('name', e.target.value)} /></div>
-                  <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editData.phone || ''} onChange={e => handleEditField('phone', e.target.value)} /></div>
-                  <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editData.email || ''} onChange={e => handleEditField('email', e.target.value)} /></div>
-                  <div className="form-group"><label className="form-label">Address</label><input className="form-input" value={editData.address || ''} onChange={e => handleEditField('address', e.target.value)} /></div>
-                  <div className="form-group"><label className="form-label">Emergency Contact</label><input className="form-input" value={editData.emergencyContact || ''} onChange={e => handleEditField('emergencyContact', e.target.value)} /></div>
-                  <div className="form-group">
-                    <label className="form-label">Status</label>
-                    <select className="form-input" value={editData.status || 'active'} onChange={e => handleEditField('status', e.target.value)}>
-                      <option value="active">Active</option>
-                      <option value="on-leave">On Leave</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
+                {!editMode ? (
+                  <div>
+                    {canEdit && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                        <button className="chat-icon-btn" title="Edit" onClick={() => setEditMode(true)} style={{ fontSize: 14 }}>
+                          <i className="fas fa-pen" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid-2">
+                      {[['Name', selectedEmp.name], ['Phone', selectedEmp.phone], ['Email', selectedEmp.email],
+                        ['Address', selectedEmp.address], ['Emergency Contact', selectedEmp.emergencyContact],
+                        ['Status', (selectedEmp.status || 'active').charAt(0).toUpperCase() + (selectedEmp.status || 'active').slice(1)]
+                      ].map(([label, val]) => (
+                        <div key={label} className="form-group">
+                          <label className="form-label">{label}</label>
+                          <div style={{ fontSize: 14, padding: '8px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                  <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
-                  <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
-                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save</>}
-                  </button>
-                </div>
+                ) : (
+                  <div>
+                    <div className="grid-2">
+                      <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={editData.name || ''} onChange={e => handleEditField('name', e.target.value)} /></div>
+                      <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editData.phone || ''} onChange={e => handleEditField('phone', e.target.value)} /></div>
+                      <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editData.email || ''} onChange={e => handleEditField('email', e.target.value)} /></div>
+                      <div className="form-group"><label className="form-label">Address</label><input className="form-input" value={editData.address || ''} onChange={e => handleEditField('address', e.target.value)} /></div>
+                      <div className="form-group"><label className="form-label">Emergency Contact</label><input className="form-input" value={editData.emergencyContact || ''} onChange={e => handleEditField('emergencyContact', e.target.value)} /></div>
+                      <div className="form-group">
+                        <label className="form-label">Status</label>
+                        <select className="form-input" value={editData.status || 'active'} onChange={e => handleEditField('status', e.target.value)}>
+                          <option value="active">Active</option>
+                          <option value="on-leave">On Leave</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                      <button className="topbar-btn" onClick={() => { setEditMode(false); setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                      <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
+                        {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
+
+            {/* ── Tax & Pay Tab ── */}
             {profileTab === 'tax' && (
               <div>
-                <div className="grid-2">
-                  <div className="form-group"><label className="form-label">Pay Rate ($/hr)</label><input className="form-input" type="number" value={editData.payRate || ''} onChange={e => handleEditField('payRate', e.target.value)} /></div>
-                  <div className="form-group">
-                    <label className="form-label">Employment Type</label>
-                    <select className="form-input" value={editData.type || 'employee'} onChange={e => handleEditField('type', e.target.value)}>
-                      <option value="employee">W-2 Employee</option>
-                      <option value="contractor">1099 Contractor</option>
-                    </select>
+                {!editMode ? (
+                  <div>
+                    {canEdit && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                        <button className="chat-icon-btn" title="Edit" onClick={() => setEditMode(true)} style={{ fontSize: 14 }}>
+                          <i className="fas fa-pen" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid-2">
+                      {[['Pay Rate', selectedEmp.payRate ? `$${selectedEmp.payRate}/hr` : '—'],
+                        ['Employment Type', selectedEmp.type === 'contractor' ? '1099 Contractor' : 'W-2 Employee'],
+                        ['Job Title', selectedEmp.role || '—'],
+                        ['Start Date', selectedEmp.startDate || '—']
+                      ].map(([label, val]) => (
+                        <div key={label} className="form-group">
+                          <label className="form-label">{label}</label>
+                          <div style={{ fontSize: 14, padding: '8px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Job Title</label>
-                    <select className="form-input" value={editData.role || 'Cleaner'} onChange={e => handleEditField('role', e.target.value)}>
-                      <option>Cleaner</option>
-                      <option>Team Lead</option>
-                      <option>Supervisor</option>
-                      <option>Account Manager</option>
-                    </select>
+                ) : (
+                  <div>
+                    <div className="grid-2">
+                      <div className="form-group"><label className="form-label">Pay Rate ($/hr)</label><input className="form-input" type="number" value={editData.payRate || ''} onChange={e => handleEditField('payRate', e.target.value)} /></div>
+                      <div className="form-group">
+                        <label className="form-label">Employment Type</label>
+                        <select className="form-input" value={editData.type || 'employee'} onChange={e => handleEditField('type', e.target.value)}>
+                          <option value="employee">W-2 Employee</option>
+                          <option value="contractor">1099 Contractor</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Job Title</label>
+                        <select className="form-input" value={editData.role || 'Cleaner'} onChange={e => handleEditField('role', e.target.value)}>
+                          <option>Cleaner</option>
+                          <option>Team Lead</option>
+                          <option>Supervisor</option>
+                          <option>Account Manager</option>
+                        </select>
+                      </div>
+                      <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                      <button className="topbar-btn" onClick={() => { setEditMode(false); setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                      <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
+                        {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+                      </button>
+                    </div>
                   </div>
-                  <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                  <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
-                  <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
-                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" /> Save</>}
-                  </button>
-                </div>
+                )}
               </div>
             )}
+
             {profileTab === 'schedule' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's schedule in the Schedule tab.</p>}
             {profileTab === 'timesheets' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's timesheets in the Timesheets tab.</p>}
+
+            {/* ── Permission Tab ── */}
             {profileTab === 'permission' && isAdmin && (
               <div style={{ padding: '4px 0' }}>
-                <div style={{ marginBottom: 20 }}>
-                  <label className="form-label">Permission Level</label>
-                  <select className="form-input" value={editData.permission || 'viewer'} onChange={e => handleEditField('permission', e.target.value)}
-                    style={{ maxWidth: 280 }}>
-                    <option value="viewer">Schedule Viewer</option>
-                    <option value="scheduler">Scheduler</option>
-                    <option value="editor">Editor</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                {/* Save / Cancel */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 20, padding: '12px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
-                  <button className="topbar-btn" onClick={() => { setEditData({ ...selectedEmp }); setEditDirty(false); }} disabled={!editDirty}>Cancel</button>
-                  <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
-                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save Permission</>}
-                  </button>
-                </div>
-                {/* Permission descriptions — read-only reference */}
+                {!editMode ? (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                      <button className="chat-icon-btn" title="Edit" onClick={() => setEditMode(true)} style={{ fontSize: 14 }}>
+                        <i className="fas fa-pen" />
+                      </button>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 20 }}>
+                      <label className="form-label">Current Permission</label>
+                      <div style={{ fontSize: 15, fontWeight: 600, padding: '8px 0', color: 'var(--primary)' }}>
+                        <i className="fas fa-shield-alt" style={{ marginRight: 6 }} />
+                        {PERM_LABELS[selectedEmp.permission || 'viewer']}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ marginBottom: 16 }}>
+                      <label className="form-label">Permission Level</label>
+                      <select className="form-input" value={editData.permission || 'viewer'} onChange={e => handleEditField('permission', e.target.value)}
+                        style={{ maxWidth: 280 }}>
+                        <option value="viewer">Schedule Viewer</option>
+                        <option value="scheduler">Scheduler</option>
+                        <option value="editor">Editor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 20 }}>
+                      <button className="topbar-btn" onClick={() => { setEditMode(false); setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
+                      <button className="topbar-btn primary" onClick={handleSaveProfile} disabled={saving || !editDirty}>
+                        {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Permission descriptions — always visible as reference */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {['viewer', 'scheduler', 'editor', 'admin'].map(p => {
-                    const isSelected = (editData.permission || 'viewer') === p;
+                    const current = editMode ? (editData.permission || 'viewer') : (selectedEmp.permission || 'viewer');
+                    const isSelected = current === p;
                     return (
                       <div key={p} style={{ padding: '12px 14px', borderRadius: 10,
                         background: isSelected ? '#f0f7ee' : 'var(--bg)',
@@ -4427,13 +4579,18 @@ function Timesheets({ role, authedUser, perm }) {
       if (isNaN(ciDate) || isNaN(coDate)) { alert('Invalid date/time'); return; }
       const hours = ((coDate - ciDate) / (1000 * 60 * 60)).toFixed(2);
       if (parseFloat(hours) <= 0) { alert('Clock out must be after clock in'); return; }
+      // Optimistically update local state
+      setTimesheetEntries(prev => prev.map(t => t.id === editingEntry.id
+        ? { ...t, clockIn: ciDate, clockOut: coDate, hours, label: editingEntry.label }
+        : t
+      ));
+      setEditingEntry(null);
       await db.collection('timeEntries').doc(editingEntry.id).update({
         clockIn: firebase.firestore.Timestamp.fromDate(ciDate),
         clockOut: firebase.firestore.Timestamp.fromDate(coDate),
         hours: hours,
         label: editingEntry.label,
       });
-      setEditingEntry(null);
     } catch (err) {
       alert('Error saving: ' + err.message);
     }
@@ -4442,8 +4599,10 @@ function Timesheets({ role, authedUser, perm }) {
   // Admin: delete timesheet entry
   const deleteEntry = async (entryId) => {
     try {
-      await db.collection('timeEntries').doc(entryId).delete();
+      // Optimistically remove from local state immediately
+      setTimesheetEntries(prev => prev.filter(t => t.id !== entryId));
       setDeleteConfirmId(null);
+      await db.collection('timeEntries').doc(entryId).delete();
     } catch (err) {
       alert('Error deleting: ' + err.message);
     }
