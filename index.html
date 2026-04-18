@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
 <title>Essence Cleaning - Team Portal</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -50,7 +50,7 @@
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100dvh; height: 100vh; overflow: hidden; position: fixed; width: 100%; }
 
   /* Thin auto-hiding scrollbars */
   * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
@@ -468,8 +468,8 @@
     .mobile-only { display: block; }
     .desktop-only { display: none !important; }
     /* CRITICAL: prevent all horizontal scroll / wiggle */
-    html, body { overflow-x: hidden !important; width: 100%; max-width: 100vw; }
-    .app { height: 100vh; overflow-x: hidden; width: 100%; max-width: 100vw; }
+    html, body { overflow: hidden !important; width: 100%; max-width: 100vw; position: fixed; }
+    .app { height: 100%; overflow: hidden; width: 100%; max-width: 100vw; }
     .main { overflow-x: hidden; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .content { padding: 12px; overflow-x: hidden; overflow-y: auto; width: 100%; max-width: 100vw; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
 
@@ -575,8 +575,6 @@
     .thread-composer { padding: 6px 10px 4px; }
     .thread-composer textarea { padding: 6px 10px; font-size: 16px; min-height: 36px; }
 
-    /* When keyboard is open, reclaim nav space */
-    body.keyboard-open .thread-panel { bottom: 0; }
     @keyframes slideInThread { from { transform: translateX(100%); } to { transform: translateX(0); } }
     .chat-header { padding: 10px 12px; }
     .channel-list { max-height: none; flex: 1; }
@@ -681,41 +679,67 @@
 <body>
 <div id="root"></div>
 <script>
-// Hide bottom nav + reclaim space when keyboard opens on iOS/mobile
+// iOS keyboard handling — use visualViewport to resize layout precisely
 (function() {
   const isTouch = 'ontouchstart' in window;
   if (!isTouch) return;
 
-  function onKeyboardShow() {
+  let keyboardOpen = false;
+
+  function resizeLayout() {
     const nav = document.querySelector('.mobile-bottom-nav');
     const layout = document.querySelector('.chat-layout');
-    if (nav) { nav.style.transform = 'translateY(100%)'; nav.style.pointerEvents = 'none'; }
-    if (layout) layout.style.height = '100vh';
-    document.body.classList.add('keyboard-open');
-  }
-  function onKeyboardHide() {
-    setTimeout(() => {
-      const nav = document.querySelector('.mobile-bottom-nav');
-      const layout = document.querySelector('.chat-layout');
-      if (nav) { nav.style.transform = ''; nav.style.pointerEvents = ''; }
-      if (layout) layout.style.height = '';
+    const thread = document.querySelector('.thread-panel');
+    const app = document.querySelector('.app');
+
+    if (keyboardOpen) {
+      // Use visualViewport for exact visible height (accounts for keyboard)
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      if (nav) { nav.style.display = 'none'; }
+      if (app) { app.style.paddingBottom = '0'; app.style.height = vh + 'px'; }
+      if (layout) { layout.style.height = '100%'; }
+      if (thread) { thread.style.bottom = '0'; thread.style.height = vh + 'px'; thread.style.top = 'auto'; }
+      document.body.classList.add('keyboard-open');
+      document.body.style.height = vh + 'px';
+    } else {
+      if (nav) { nav.style.display = ''; }
+      if (app) { app.style.paddingBottom = ''; app.style.height = ''; }
+      if (layout) { layout.style.height = ''; }
+      if (thread) { thread.style.bottom = ''; thread.style.height = ''; thread.style.top = ''; }
       document.body.classList.remove('keyboard-open');
-    }, 100);
+      document.body.style.height = '';
+    }
+  }
+
+  // Listen to visualViewport resize (fires when keyboard opens/closes on iOS)
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (keyboardOpen) resizeLayout();
+    });
   }
 
   document.addEventListener('focusin', (e) => {
     const tag = e.target.tagName;
     const editable = e.target.getAttribute('contenteditable');
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || editable === 'true') {
-      onKeyboardShow();
+      keyboardOpen = true;
+      // Small delay to let iOS report the correct viewport size
+      setTimeout(resizeLayout, 50);
+      setTimeout(resizeLayout, 300);
     }
   });
   document.addEventListener('focusout', (e) => {
-    const tag = e.target.tagName;
-    const editable = e.target.getAttribute('contenteditable');
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || editable === 'true') {
-      onKeyboardHide();
-    }
+    // Don't close if focus is moving to another input (e.g. emoji search)
+    setTimeout(() => {
+      const active = document.activeElement;
+      const activeTag = active?.tagName;
+      const activeEditable = active?.getAttribute('contenteditable');
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT' || activeEditable === 'true') {
+        return; // focus moved to another input, keyboard still open
+      }
+      keyboardOpen = false;
+      resizeLayout();
+    }, 100);
   });
 })();
 </script>
