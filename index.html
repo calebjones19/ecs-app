@@ -264,6 +264,9 @@
 
   /* More menu dropdown */
   .more-menu { position: absolute; bottom: 100%; right: 0; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 150px; z-index: 20; margin-bottom: 4px; }
+  @media (max-width: 768px) {
+    .more-menu { position: fixed; bottom: 0; left: 0; right: 0; top: auto; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 8px; min-width: auto; z-index: 300; margin-bottom: 0; }
+  }
   .more-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.1s; }
   .more-menu-item:hover { background: var(--bg); }
   .more-menu-item.danger { color: var(--danger); }
@@ -272,11 +275,10 @@
 
   /* Inline edit */
   .msg-edit-wrap { margin-top: 4px; }
-  .msg-edit-input { width: 100%; border: 1px solid var(--primary); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: inherit; resize: none; outline: none; min-height: 36px; line-height: 1.5; }
-  .msg-edit-actions { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
-  .msg-edit-actions button { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: white; font-size: 12px; cursor: pointer; font-weight: 500; }
+  .msg-edit-input { width: 100%; border: 2px solid var(--primary); border-radius: 8px; padding: 8px 12px; font-size: 15px; font-family: inherit; resize: none; outline: none; min-height: 44px; line-height: 1.5; background: #fafff8; }
+  .msg-edit-actions { display: flex; gap: 8px; margin-top: 6px; align-items: center; }
+  .msg-edit-actions button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 14px; cursor: pointer; font-weight: 600; }
   .msg-edit-actions button.primary { background: var(--primary); color: white; border-color: var(--primary); }
-  .msg-edit-actions span { font-size: 11px; color: var(--text-light); }
   .msg-edited { font-size: 11px; color: var(--text-light); font-style: italic; margin-left: 4px; }
 
   /* Schedule View */
@@ -1459,21 +1461,25 @@ function Chat({ role, authedUser }) {
                 <button className="mobile-hide" title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
                 <button className="mobile-hide" title="Pin"><i className="fas fa-thumbtack" /></button>
                 <button title="More" onClick={() => setMoreMenuMsg(moreOpen ? null : msg.id)}><i className="fas fa-ellipsis-h" /></button>
-                {moreOpen && (
+                {moreOpen && (<>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => { setMoreMenuMsg(null); setConfirmUnsend(null); }} />
                   <div className="more-menu">
+                    <div style={{ textAlign: 'center', marginBottom: 4, display: 'none' }} className="mobile-only-handle">
+                      <div style={{ width: 32, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto' }} />
+                    </div>
                     {confirmUnsend && confirmUnsend.msgId === msg.id ? (<>
-                      <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 600, color: 'var(--danger)' }}>Are you sure?</div>
+                      <div style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>Are you sure you want to unsend?</div>
                       <div className="more-menu-item danger" onClick={() => { unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); setConfirmUnsend(null); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
                       <div className="more-menu-item" onClick={() => { setConfirmUnsend(null); setMoreMenuMsg(null); }}><i className="fas fa-times" /> Cancel</div>
                     </>) : (<>
                       {isOwnMsg && <div className="more-menu-item" onClick={() => startEdit(chId || activeChannel, msg, parentMsgId)}><i className="fas fa-pen" /> Edit message</div>}
                       <div className="more-menu-item" onClick={() => { navigator.clipboard?.writeText(msg.text.replace(/<[^>]+>/g, '')); setMoreMenuMsg(null); }}><i className="fas fa-copy" /> Copy text</div>
+                      <div className="more-menu-item" onClick={() => setOpenThread({ channelId: activeChannel, msgId: msg.id })}><i className="fas fa-comment-dots" /> Reply in thread</div>
                       <div className="more-menu-item"><i className="fas fa-thumbtack" /> Pin message</div>
-                      <div className="more-menu-item"><i className="fas fa-bookmark" /> Save message</div>
                       {isOwnMsg && <div className="more-menu-item danger" onClick={() => setConfirmUnsend({ channelId: chId || activeChannel, msgId: msg.id, parentMsgId })}><i className="fas fa-trash-alt" /> Unsend</div>}
                     </>)}
                   </div>
-                )}
+                </>)}
               </div>
             )}
           </div>
@@ -1481,11 +1487,11 @@ function Chat({ role, authedUser }) {
             <div className="msg-edit-wrap">
               <textarea className="msg-edit-input" value={editText} onChange={e => setEditText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                autoFocus rows={Math.min(Math.max(1, (editText.match(/\n/g) || []).length + 1), 6)} />
+                ref={el => { if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200); } }}
+                rows={Math.min(Math.max(2, (editText.match(/\n/g) || []).length + 1), 6)} />
               <div className="msg-edit-actions">
                 <button onClick={cancelEdit}>Cancel</button>
                 <button className="primary" onClick={saveEdit}>Save</button>
-                <span>Enter to save · Esc to cancel</span>
               </div>
             </div>
           ) : msg.text ? (
