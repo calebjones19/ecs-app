@@ -3461,7 +3461,7 @@ function NotificationSettings({ userId }) {
     newClient: false,
     clockReminder: true,
     weeklyReport: true,
-    pushEnabled: false,
+    pushEnabled: (typeof Notification !== 'undefined' && Notification.permission === 'granted'),
     emailEnabled: false,
     soundEnabled: true,
     quietStart: '22:00',
@@ -3478,9 +3478,10 @@ function NotificationSettings({ userId }) {
   useEffect(() => {
     if (!userId) return;
     db.collection('employees').doc(userId).get().then((doc) => {
-      if (doc.exists && doc.data().notificationSettings) {
-        setSettings({ ...defaults, ...doc.data().notificationSettings });
-      }
+      const saved = (doc.exists && doc.data().notificationSettings) ? doc.data().notificationSettings : {};
+      // Always reflect actual browser permission for pushEnabled
+      const browserGranted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+      setSettings({ ...defaults, ...saved, pushEnabled: browserGranted });
       setLoaded(true);
     }).catch(() => setLoaded(true));
   }, [userId]);
