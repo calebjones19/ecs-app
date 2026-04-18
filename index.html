@@ -50,7 +50,8 @@
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100dvh; height: 100vh; overflow: hidden; position: fixed; width: 100%; }
+  html { height: 100%; overflow: hidden; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); height: var(--app-height, 100vh); overflow: hidden; position: fixed; width: 100%; top: 0; left: 0; }
 
   /* Thin auto-hiding scrollbars */
   * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
@@ -62,7 +63,7 @@
   *::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.35); }
 
   /* Layout */
-  .app { display: flex; flex-direction: column; height: 100vh; }
+  .app { display: flex; flex-direction: column; height: var(--app-height, 100vh); }
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .content { flex: 1; overflow-y: auto; padding: 24px; }
 
@@ -468,8 +469,8 @@
     .mobile-only { display: block; }
     .desktop-only { display: none !important; }
     /* CRITICAL: prevent all horizontal scroll / wiggle */
-    html, body { overflow: hidden !important; width: 100%; max-width: 100vw; position: fixed; }
-    .app { height: 100%; overflow: hidden; width: 100%; max-width: 100vw; }
+    html, body { overflow: hidden !important; width: 100%; max-width: 100vw; }
+    .app { height: var(--app-height, 100vh); overflow: hidden; width: 100%; max-width: 100vw; }
     .main { overflow-x: hidden; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .content { padding: 12px; overflow-x: hidden; overflow-y: auto; width: 100%; max-width: 100vw; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
 
@@ -554,7 +555,7 @@
     .card { padding: 14px; margin-bottom: 12px; overflow-x: hidden; }
 
     /* Chat layout → full width, toggle between channels and messages */
-    .chat-layout { flex-direction: column; height: calc(100vh - 60px); }
+    .chat-layout { flex-direction: column; height: calc(var(--app-height, 100vh) - 60px); }
     .chat-channels { width: 100%; border-right: none; border-bottom: 1px solid var(--border); flex: 1; }
     .chat-channels.hidden-mobile { display: none; }
     .chat-main { width: 100%; flex: 1; min-height: 0; }
@@ -679,66 +680,101 @@
 <body>
 <div id="root"></div>
 <script>
-// iOS keyboard handling — use visualViewport to resize layout precisely
+// iOS keyboard handling — use visualViewport to resize everything precisely
 (function() {
-  const isTouch = 'ontouchstart' in window;
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   if (!isTouch) return;
 
   let keyboardOpen = false;
+  let rafId = null;
 
-  function resizeLayout() {
-    const nav = document.querySelector('.mobile-bottom-nav');
-    const layout = document.querySelector('.chat-layout');
-    const thread = document.querySelector('.thread-panel');
+  function getVisibleHeight() {
+    if (window.visualViewport) return window.visualViewport.height;
+    return window.innerHeight;
+  }
+
+  function applyHeight() {
+    const vh = getVisibleHeight();
+    const root = document.documentElement;
+    // Set a CSS custom property so all elements can use it
+    root.style.setProperty('--app-height', vh + 'px');
+    document.body.style.height = vh + 'px';
+
     const app = document.querySelector('.app');
+    if (app) { app.style.height = vh + 'px'; app.style.paddingBottom = keyboardOpen ? '0' : ''; }
+
+    const nav = document.querySelector('.mobile-bottom-nav');
+    if (nav) nav.style.display = keyboardOpen ? 'none' : '';
+
+    const layout = document.querySelector('.chat-layout');
+    if (layout) layout.style.height = keyboardOpen ? '100%' : '';
+
+    const thread = document.querySelector('.thread-panel');
+    if (thread && keyboardOpen) {
+      thread.style.position = 'fixed';
+      thread.style.top = '0';
+      thread.style.bottom = 'auto';
+      thread.style.height = vh + 'px';
+    } else if (thread) {
+      thread.style.height = '';
+      thread.style.top = '';
+      thread.style.bottom = '';
+    }
 
     if (keyboardOpen) {
-      // Use visualViewport for exact visible height (accounts for keyboard)
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      if (nav) { nav.style.display = 'none'; }
-      if (app) { app.style.paddingBottom = '0'; app.style.height = vh + 'px'; }
-      if (layout) { layout.style.height = '100%'; }
-      if (thread) { thread.style.bottom = '0'; thread.style.height = vh + 'px'; thread.style.top = 'auto'; }
       document.body.classList.add('keyboard-open');
-      document.body.style.height = vh + 'px';
+      // Scroll the focused element into view
+      const focused = document.activeElement;
+      if (focused && focused !== document.body) {
+        setTimeout(() => focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+      }
     } else {
-      if (nav) { nav.style.display = ''; }
-      if (app) { app.style.paddingBottom = ''; app.style.height = ''; }
-      if (layout) { layout.style.height = ''; }
-      if (thread) { thread.style.bottom = ''; thread.style.height = ''; thread.style.top = ''; }
       document.body.classList.remove('keyboard-open');
-      document.body.style.height = '';
     }
   }
 
-  // Listen to visualViewport resize (fires when keyboard opens/closes on iOS)
+  // Continuously update on visualViewport resize (keyboard animation)
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
-      if (keyboardOpen) resizeLayout();
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(applyHeight);
+    });
+    window.visualViewport.addEventListener('scroll', () => {
+      if (keyboardOpen) {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(applyHeight);
+      }
     });
   }
+
+  // Also set height on load and orientation change
+  window.addEventListener('load', applyHeight);
+  window.addEventListener('orientationchange', () => setTimeout(applyHeight, 200));
 
   document.addEventListener('focusin', (e) => {
     const tag = e.target.tagName;
     const editable = e.target.getAttribute('contenteditable');
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || editable === 'true') {
       keyboardOpen = true;
-      // Small delay to let iOS report the correct viewport size
-      setTimeout(resizeLayout, 50);
-      setTimeout(resizeLayout, 300);
+      // Fire multiple times as keyboard animates open
+      applyHeight();
+      setTimeout(applyHeight, 100);
+      setTimeout(applyHeight, 300);
+      setTimeout(applyHeight, 500);
     }
   });
+
   document.addEventListener('focusout', (e) => {
-    // Don't close if focus is moving to another input (e.g. emoji search)
+    // Don't close if focus is moving to another input
     setTimeout(() => {
       const active = document.activeElement;
       const activeTag = active?.tagName;
       const activeEditable = active?.getAttribute('contenteditable');
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT' || activeEditable === 'true') {
-        return; // focus moved to another input, keyboard still open
+        return;
       }
       keyboardOpen = false;
-      resizeLayout();
+      applyHeight();
     }, 100);
   });
 })();
