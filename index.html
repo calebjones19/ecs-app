@@ -255,6 +255,11 @@
   .msg-hover-actions button { width: 20px; height: 20px; border: none; background: none; cursor: pointer; border-radius: 4px; font-size: 12px; color: var(--text-light); display: inline-flex; align-items: center; justify-content: center; padding: 0; }
   .msg-hover-actions button:hover { background: var(--bg); color: var(--text); }
   .message-group:hover .msg-hover-actions { display: inline-flex; align-items: center; gap: 2px; }
+  /* On mobile, show a small "..." button always on each message */
+  @media (max-width: 768px) {
+    .msg-hover-actions.mobile-show { display: inline-flex; align-items: center; gap: 2px; }
+    .msg-hover-actions .mobile-hide { display: none; }
+  }
   .thread-messages .message-group { padding: 8px 12px; }
 
   /* More menu dropdown */
@@ -662,6 +667,19 @@
 </head>
 <body>
 <div id="root"></div>
+<script>
+// Hide bottom nav when iOS keyboard is open
+if (window.visualViewport) {
+  const THRESHOLD = 150;
+  window.visualViewport.addEventListener('resize', () => {
+    const nav = document.querySelector('.mobile-bottom-nav');
+    const moreOverlay = document.querySelector('[data-more-menu]');
+    if (!nav) return;
+    const keyboardOpen = (window.innerHeight - window.visualViewport.height) > THRESHOLD;
+    nav.style.display = keyboardOpen ? 'none' : '';
+  });
+}
+</script>
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
@@ -775,22 +793,38 @@ async function requestNotificationPermission(userId) {
   }
 }
 
+// Track unread badge count globally
+let _badgeCount = 0;
+// Track which channel is currently being viewed (set by Chat component)
+window.__ecsActiveChannel = null;
+window.__ecsActivePage = null;
+
 // Handle foreground messages (when the app is open and visible)
 if (messaging) messaging.onMessage((payload) => {
   console.log('[FCM] Foreground message:', payload);
   const { title, body } = payload.notification || {};
+  const msgChannelId = payload.data?.channelId || '';
 
-  // Play the chime (unless user disabled sound)
-  // Check localStorage for quick sound preference (Firestore settings are loaded in component)
+  // If user is currently viewing this exact channel, suppress notification entirely
+  if (window.__ecsActivePage === 'chat' && window.__ecsActiveChannel === msgChannelId) {
+    console.log('[FCM] Suppressed — user is viewing this channel');
+    return;
+  }
+
+  // Play the chime
   playNotificationSound();
 
   // Update app badge count
+  _badgeCount++;
   if ('setAppBadge' in navigator) {
-    // Increment badge (we'll track count in-app)
-    navigator.setAppBadge().catch(() => {});
+    navigator.setAppBadge(_badgeCount).catch(() => {});
   }
 
-  // Show an in-app toast notification (dispatched as a custom event)
+  // Increment unread count for the chat nav badge
+  window.__ecsChatUnread = (window.__ecsChatUnread || 0) + 1;
+  window.dispatchEvent(new CustomEvent('ecs-unread-update'));
+
+  // Show an in-app toast notification
   window.dispatchEvent(new CustomEvent('essence-notification', {
     detail: {
       title: title || payload.data?.title || 'New notification',
@@ -992,6 +1026,12 @@ function Chat({ role, authedUser }) {
     return () => unsub();
   }, [authedUser]);
 
+  // Sync active channel to global so foreground notification handler knows
+  useEffect(() => {
+    window.__ecsActiveChannel = activeChannel;
+    return () => { window.__ecsActiveChannel = null; };
+  }, [activeChannel]);
+
   // Load messages for active channel from Firestore (realtime)
   useEffect(() => {
     if (!activeChannel) return;
@@ -1049,9 +1089,33 @@ function Chat({ role, authedUser }) {
       else if (picker === 'mention') setShowMentionPicker(true);
     }
   };
+  const savedSelection = useRef(null);
+
+  // Save cursor position whenever composer is focused
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0 && composerRef.current?.contains(sel.anchorNode)) {
+      savedSelection.current = sel.getRangeAt(0).cloneRange();
+    }
+  };
+
   const insertEmoji = (emoji) => {
-    composerRef.current?.focus();
-    document.execCommand('insertText', false, emoji);
+    const el = composerRef.current;
+    if (!el) return;
+    el.focus();
+    // Restore saved selection if available
+    if (savedSelection.current) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedSelection.current);
+    }
+    // Try execCommand first, fall back to appending
+    if (!document.execCommand('insertText', false, emoji)) {
+      el.textContent += emoji;
+    }
+    // Save new position
+    saveSelection();
+    setShowEmojiPicker(false);
   };
   const insertGif = (gif) => {
     if (!activeChannel || !authedUser) return;
@@ -1369,10 +1433,10 @@ function Chat({ role, authedUser }) {
             <span className="msg-name" style={compact ? { fontSize: 13 } : {}}>{msgUser.name}</span>
             <span className="msg-time">{msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : (msg.time || 'Just now')}{msg.edited && <span className="msg-edited">(edited)</span>}</span>
             {!compact && (
-              <div className="msg-hover-actions" style={{ position: 'relative', ...(moreOpen ? { display: 'inline-flex', alignItems: 'center', gap: 2 } : {}) }}>
-                <button title="Reply in thread" onClick={() => setOpenThread({ channelId: activeChannel, msgId: msg.id })}><i className="fas fa-comment-dots" /></button>
-                <button title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
-                <button title="Pin"><i className="fas fa-thumbtack" /></button>
+              <div className={`msg-hover-actions mobile-show`} style={{ position: 'relative', ...(moreOpen ? { display: 'inline-flex', alignItems: 'center', gap: 2 } : {}) }}>
+                <button className="mobile-hide" title="Reply in thread" onClick={() => setOpenThread({ channelId: activeChannel, msgId: msg.id })}><i className="fas fa-comment-dots" /></button>
+                <button className="mobile-hide" title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
+                <button className="mobile-hide" title="Pin"><i className="fas fa-thumbtack" /></button>
                 <button title="More" onClick={() => setMoreMenuMsg(moreOpen ? null : msg.id)}><i className="fas fa-ellipsis-h" /></button>
                 {moreOpen && (
                   <div className="more-menu">
@@ -1645,7 +1709,7 @@ function Chat({ role, authedUser }) {
                     <div className="emoji-cat-label">Favorites</div>
                     <div className="emoji-row">
                       {EMOJI_FAVORITES.filter(e => !emojiSearch || e.includes(emojiSearch)).map((e, i) => (
-                        <button key={i} className="emoji-btn" onClick={() => insertEmoji(e)}>{e}</button>
+                        <button key={i} className="emoji-btn" onMouseDown={e2 => e2.preventDefault()} onClick={() => insertEmoji(e)}>{e}</button>
                       ))}
                     </div>
                   </div>
@@ -1657,7 +1721,7 @@ function Chat({ role, authedUser }) {
                         <div className="emoji-cat-label">{cat}</div>
                         <div className="emoji-row">
                           {filtered.map((e, i) => (
-                            <button key={i} className="emoji-btn" onClick={() => insertEmoji(e)}>{e}</button>
+                            <button key={i} className="emoji-btn" onMouseDown={e2 => e2.preventDefault()} onClick={() => insertEmoji(e)}>{e}</button>
                           ))}
                         </div>
                       </div>
@@ -1741,6 +1805,7 @@ function Chat({ role, authedUser }) {
             <div className="composer-input-wrap">
               <div ref={composerRef} className="composer-input" contentEditable={true}
                 data-placeholder={`Message ${channel?.visibility === 'dm' ? getDmName(channel) : (channel?.visibility === 'private' ? '🔒 ' : '#') + (channel?.name || '')}...`}
+                onMouseUp={saveSelection} onKeyUp={saveSelection} onFocus={saveSelection}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                 onKeyUp={updateActiveFormats}
                 onMouseUp={updateActiveFormats}
@@ -4024,6 +4089,26 @@ function App() {
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
   const userMenuRef = useRef(null);
+  const [chatUnread, setChatUnread] = useState(0);
+
+  // Sync active page to global for notification suppression
+  useEffect(() => {
+    window.__ecsActivePage = page;
+    // Clear chat unread when entering chat
+    if (page === 'chat') {
+      setChatUnread(0);
+      window.__ecsChatUnread = 0;
+      _badgeCount = 0;
+      if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
+    }
+  }, [page]);
+
+  // Listen for unread count updates from foreground notification handler
+  useEffect(() => {
+    const handler = () => setChatUnread(window.__ecsChatUnread || 0);
+    window.addEventListener('ecs-unread-update', handler);
+    return () => window.removeEventListener('ecs-unread-update', handler);
+  }, []);
 
   // Request push notification permission after successful login
   useEffect(() => {
@@ -4152,7 +4237,7 @@ function App() {
   // Navigation structure — top-level items with dropdown children
   const navItems = role === 'admin' ? [
     { id: 'dashboard', label: 'Home', icon: 'fa-th-large', desc: 'Overview & stats', color: '#4a6741', singlePage: true },
-    { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: 8, singlePage: true },
+    { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: chatUnread || 0, singlePage: true },
     { id: 'operations', label: 'Operations', icon: 'fa-briefcase', children: [
       { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule', desc: 'Assign shifts & manage the calendar', color: '#4a6741' },
       { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets', desc: 'Clock in/out records & payroll hours', color: '#5a8a4a' },
@@ -4167,7 +4252,7 @@ function App() {
     { id: 'notifications', label: 'Settings', icon: 'fa-cog', desc: 'Notification preferences', color: '#6b7568', singlePage: true },
   ] : [
     { id: 'dashboard', label: 'Home', icon: 'fa-th-large', desc: 'Overview & stats', color: '#4a6741', singlePage: true },
-    { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: 8, singlePage: true },
+    { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: chatUnread || 0, singlePage: true },
     { id: 'mywork', label: 'My Work', icon: 'fa-briefcase', children: [
       { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule', desc: 'View your upcoming shifts', color: '#4a6741' },
       { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out', desc: 'Track your hours', color: '#5a8a4a' },
@@ -4405,7 +4490,14 @@ function App() {
                 setShowMobileMore(false);
               }
             }}>
-            <i className={`fas ${item.icon}`} />
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <i className={`fas ${item.icon}`} />
+              {item.id === 'chat' && chatUnread > 0 && (
+                <span style={{ position: 'absolute', top: -6, right: -8, background: 'var(--danger)', color: '#fff', fontSize: 9, fontWeight: 700, borderRadius: 10, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+                  {chatUnread > 99 ? '99+' : chatUnread}
+                </span>
+              )}
+            </div>
             <span>{item.label}</span>
           </button>
         ))}
