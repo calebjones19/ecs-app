@@ -256,24 +256,37 @@
   .reply-preview .reply-count { font-weight: 700; }
   .reply-preview .reply-last { color: var(--text-light); margin-left: 4px; }
 
-  /* Msg hover actions bar – inline with header */
+  /* Msg hover actions bar – desktop only */
   .msg-hover-actions { display: none; margin-left: 4px; }
   .msg-hover-actions button { width: 20px; height: 20px; border: none; background: none; cursor: pointer; border-radius: 4px; font-size: 12px; color: var(--text-light); display: inline-flex; align-items: center; justify-content: center; padding: 0; }
   .msg-hover-actions button:hover { background: var(--bg); color: var(--text); }
   .message-group:hover .msg-hover-actions { display: inline-flex; align-items: center; gap: 2px; }
-  /* On mobile, show a small "..." button always on each message */
   @media (max-width: 768px) {
-    .msg-hover-actions.mobile-show { display: inline-flex; align-items: center; gap: 2px; }
-    .msg-hover-actions .mobile-hide { display: none; }
+    .msg-hover-actions { display: none !important; }
+    .message-group.long-press-active { background: var(--primary-light); transition: background 0.2s; }
   }
   .thread-messages .message-group { padding: 8px 12px; }
 
-  /* More menu dropdown — portaled to body, always fixed */
+  /* Long-press action sheet (Slack-style) */
+  .action-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 400; animation: fadeIn 0.15s ease; }
+  .action-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,0.2); z-index: 401; animation: slideUp 0.2s ease; padding-bottom: env(safe-area-inset-bottom, 0px); max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .action-sheet-handle { width: 36px; height: 4px; background: #d0d0d0; border-radius: 2px; margin: 10px auto 6px; }
+  .action-sheet-msg-preview { padding: 8px 16px 12px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .action-sheet-reactions { display: flex; gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--border); justify-content: flex-start; overflow-x: auto; }
+  .action-sheet-reactions button { width: 48px; height: 48px; border-radius: 50%; border: none; background: var(--bg); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s, background 0.1s; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
+  .action-sheet-reactions button:active { transform: scale(0.9); background: var(--primary-light); }
+  .action-sheet-actions { padding: 6px 8px; }
+  .action-sheet-item { display: flex; align-items: center; gap: 12px; padding: 12px 12px; border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 500; color: var(--text); -webkit-tap-highlight-color: transparent; }
+  .action-sheet-item:active { background: var(--bg); }
+  .action-sheet-item i { width: 22px; text-align: center; font-size: 16px; color: var(--text-light); }
+  .action-sheet-item.danger { color: var(--danger); }
+  .action-sheet-item.danger i { color: var(--danger); }
+  .action-sheet-divider { height: 1px; background: var(--border); margin: 4px 12px; }
+
+  /* Desktop more menu (kept for hover actions) */
   .more-menu { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: white; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); padding: 6px; min-width: 200px; z-index: 300; }
-  @media (max-width: 768px) {
-    .more-menu { left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); top: auto; transform: none; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); padding: 12px 8px 16px; min-width: auto; }
-    body.keyboard-open .more-menu { bottom: 0; }
-  }
   .more-menu-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.1s; }
   .more-menu-item:hover { background: var(--bg); }
   .more-menu-item.danger { color: var(--danger); }
@@ -584,11 +597,18 @@
     .msg-text { font-size: 13px; }
     .msg-file { max-width: 100%; }
     .msg-poll { max-width: 100%; }
-    .chat-composer { padding: 6px 10px 4px; }
-    .composer-toolbar { margin-bottom: 4px; gap: 4px; }
-    .composer-toolbar button { padding: 6px 10px; font-size: 15px; }
-    .composer-input { font-size: 16px; padding: 8px 10px; min-height: 36px; }
-    .composer-send { width: 38px; height: 38px; font-size: 15px; }
+    .chat-composer { padding: 8px 10px 6px; }
+    .chat-composer .composer-card {
+      display: flex; flex-direction: column; background: white; border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden;
+    }
+    .chat-composer .composer-card:focus-within { border-color: var(--primary); }
+    .chat-composer .composer-input { border: none; border-radius: 0; padding: 10px 14px 6px; font-size: 16px; min-height: 36px; }
+    .chat-composer .composer-input:focus { border-color: transparent; }
+    .chat-composer .composer-toolbar { margin: 0; padding: 4px 8px 6px; gap: 2px; align-items: center; border-top: none; }
+    .chat-composer .composer-toolbar button { padding: 8px 10px; font-size: 16px; }
+    .chat-composer .composer-send { width: 34px; height: 34px; font-size: 14px; margin-left: auto; border-radius: 50%; }
+    .chat-composer .composer-input-wrap { display: contents; }
+    .chat-composer .send-later-dropdown { display: contents; }
     .thread-panel { width: 100%; position: fixed; top: 0; left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); z-index: 200; }
     .thread-composer { padding: 6px 10px 4px; }
     .thread-composer textarea { padding: 6px 10px; font-size: 16px; min-height: 36px; }
@@ -1092,6 +1112,7 @@ function Chat({ role, authedUser }) {
   const [mentionSearch, setMentionSearch] = useState('');
   const [attachedFile, setAttachedFile] = useState(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showFormatBar, setShowFormatBar] = useState(false);
   const [mobileShowMessages, setMobileShowMessages] = useState(false);
   const [activeFormats, setActiveFormats] = useState({});
   const messagesEndRef = useRef(null);
@@ -1371,7 +1392,7 @@ function Chat({ role, authedUser }) {
   // Close pickers on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (!e.target.closest('.picker-popup') && !e.target.closest('.attach-menu') && !e.target.closest('.composer-toolbar') && !e.target.closest('.msg-reactions') && !e.target.closest('.msg-hover-actions') && !e.target.closest('.more-menu') && !e.target.closest('.msg-edit-wrap')) {
+      if (!e.target.closest('.picker-popup') && !e.target.closest('.attach-menu') && !e.target.closest('.composer-toolbar') && !e.target.closest('.msg-reactions') && !e.target.closest('.msg-hover-actions') && !e.target.closest('.more-menu') && !e.target.closest('.msg-edit-wrap') && !e.target.closest('.action-sheet') && !e.target.closest('.action-sheet-backdrop')) {
         closeAllPickers();
         setQuickReactMsg(null);
         setMoreMenuMsg(null);
@@ -1485,10 +1506,38 @@ function Chat({ role, authedUser }) {
   };
 
   // Message actions state
-  const [moreMenuMsg, setMoreMenuMsg] = useState(null);
+  const [moreMenuMsg, setMoreMenuMsg] = useState(null); // desktop only
   const [confirmUnsend, setConfirmUnsend] = useState(null); // { channelId, msgId, parentMsgId }
+  const [actionSheetMsg, setActionSheetMsg] = useState(null); // mobile long-press: { msg, chId, parentMsgId }
   const [editingMsg, setEditingMsg] = useState(null);
   const [editText, setEditText] = useState('');
+  const longPressTimer = useRef(null);
+  const longPressTouchPos = useRef(null);
+
+  const openActionSheet = (msg, chId, parentMsgId) => {
+    if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(10);
+    setActionSheetMsg({ msg, chId: chId || activeChannel, parentMsgId });
+  };
+  const closeActionSheet = () => { setActionSheetMsg(null); setConfirmUnsend(null); };
+
+  const handleLongPressStart = (e, msg, chId, parentMsgId) => {
+    if (window.innerWidth > 768) return; // desktop: use hover actions
+    const touch = e.touches ? e.touches[0] : e;
+    longPressTouchPos.current = { x: touch.clientX, y: touch.clientY };
+    longPressTimer.current = setTimeout(() => {
+      openActionSheet(msg, chId, parentMsgId);
+    }, 500);
+  };
+  const handleLongPressMove = (e) => {
+    if (!longPressTimer.current) return;
+    const touch = e.touches ? e.touches[0] : e;
+    const dx = Math.abs(touch.clientX - (longPressTouchPos.current?.x || 0));
+    const dy = Math.abs(touch.clientY - (longPressTouchPos.current?.y || 0));
+    if (dx > 10 || dy > 10) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  };
+  const handleLongPressEnd = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  };
 
   const unsendMessage = (channelId, msgId, parentMsgId) => {
     if (!channelId) return;
@@ -1557,24 +1606,26 @@ function Chat({ role, authedUser }) {
     const moreOpen = moreMenuMsg === msg.id;
 
     return (
-      <div className="message-group" key={msg.id}>
+      <div className="message-group" key={msg.id}
+        onTouchStart={(e) => handleLongPressStart(e, msg, chId, parentMsgId)}
+        onTouchMove={handleLongPressMove}
+        onTouchEnd={handleLongPressEnd}
+        onTouchCancel={handleLongPressEnd}
+      >
         <div className="msg-avatar" style={{ background: msgUser.color, borderRadius: 8, width: compact ? 28 : 36, height: compact ? 28 : 36, fontSize: compact ? 11 : 14 }}>{msgUser.avatar}</div>
         <div className="msg-content">
           <div className="msg-header">
             <span className="msg-name" style={compact ? { fontSize: 13 } : {}}>{msgUser.name}</span>
             <span className="msg-time">{msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : (msg.time || 'Just now')}{msg.edited && <span className="msg-edited">(edited)</span>}</span>
             {!compact && (
-              <div className={`msg-hover-actions mobile-show`} style={{ position: 'relative', ...(moreOpen ? { display: 'inline-flex', alignItems: 'center', gap: 2 } : {}) }}>
-                <button className="mobile-hide" title="Reply in thread" onClick={() => { closeAllPickers(); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /></button>
-                <button className="mobile-hide" title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
-                <button className="mobile-hide" title="Pin"><i className="fas fa-thumbtack" /></button>
+              <div className="msg-hover-actions" style={{ position: 'relative', ...(moreOpen ? { display: 'inline-flex', alignItems: 'center', gap: 2 } : {}) }}>
+                <button title="Reply in thread" onClick={() => { closeAllPickers(); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /></button>
+                <button title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
+                <button title="Pin"><i className="fas fa-thumbtack" /></button>
                 <button title="More" onClick={() => setMoreMenuMsg(moreOpen ? null : msg.id)}><i className="fas fa-ellipsis-h" /></button>
                 {moreOpen && ReactDOM.createPortal(<>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => { setMoreMenuMsg(null); setConfirmUnsend(null); }} />
                   <div className="more-menu">
-                    <div style={{ textAlign: 'center', marginBottom: 4 }} className="mobile-only">
-                      <div style={{ width: 32, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto' }} />
-                    </div>
                     {confirmUnsend && confirmUnsend.msgId === msg.id ? (<>
                       <div style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>Are you sure you want to unsend?</div>
                       <div className="more-menu-item danger" onClick={(e) => { e.stopPropagation(); unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); setConfirmUnsend(null); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
@@ -1944,16 +1995,6 @@ function Chat({ role, authedUser }) {
                 </div>
               </div>
             )}
-            <div className="composer-toolbar">
-              <button title="Title" onMouseDown={e => { e.preventDefault(); toggleTitle(); }} style={activeFormats.title ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-heading" /></button>
-              <button title="Bold" onMouseDown={e => { e.preventDefault(); execFormat('bold'); }} style={activeFormats.bold ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-bold" /></button>
-              <button title="Italic" onMouseDown={e => { e.preventDefault(); execFormat('italic'); }} style={activeFormats.italic ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-italic" /></button>
-              <button title="Underline" onMouseDown={e => { e.preventDefault(); execFormat('underline'); }} style={activeFormats.underline ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-underline" /></button>
-              <button title="Attach" onClick={() => { closeAllPickers(); setShowAttachMenu(!showAttachMenu); }} style={showAttachMenu || showGifPicker || attachedFile ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-paperclip" /></button>
-              <button title="Emoji" onClick={() => togglePicker('emoji')} style={showEmojiPicker ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-smile" /></button>
-              <button title="Create poll" onClick={() => { closeAllPickers(); setShowPollModal(true); }}><i className="fas fa-poll" /></button>
-              <button title="Mention" onClick={() => togglePicker('mention')} style={showMentionPicker ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-at" /></button>
-            </div>
             {attachedFile && (
               <div className="file-attachment-preview">
                 {attachedFile.preview ? (
@@ -1969,6 +2010,7 @@ function Chat({ role, authedUser }) {
                 {uploadingFile && <i className="fas fa-spinner fa-spin" style={{ color: 'var(--primary)' }} />}
               </div>
             )}
+            <div className="composer-card">
             <div className="composer-input-wrap">
               <div ref={composerRef} className="composer-input" contentEditable={true}
                 data-placeholder={`Message ${channel?.visibility === 'dm' ? getDmName(channel) : (channel?.visibility === 'private' ? '🔒 ' : '#') + (channel?.name || '')}...`}
@@ -1977,6 +2019,13 @@ function Chat({ role, authedUser }) {
                 onKeyUp={updateActiveFormats}
                 onMouseUp={updateActiveFormats}
               />
+            </div>
+            <div className="composer-toolbar">
+              <button title="Attach" onClick={() => { closeAllPickers(); setShowAttachMenu(!showAttachMenu); }} style={showAttachMenu || showGifPicker || attachedFile ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-plus" /></button>
+              <button title="Formatting" onMouseDown={e => { e.preventDefault(); }} onClick={() => setShowFormatBar(!showFormatBar)} style={showFormatBar ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><span style={{ fontWeight: 700, fontSize: 15 }}>Aa</span></button>
+              <button title="Emoji" onClick={() => togglePicker('emoji')} style={showEmojiPicker ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-smile" /></button>
+              <button title="Mention" onClick={() => togglePicker('mention')} style={showMentionPicker ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-at" /></button>
+              <button title="Create poll" onClick={() => { closeAllPickers(); setShowPollModal(true); }}><i className="fas fa-poll" /></button>
               <div className="send-later-dropdown">
                 <button className="composer-send" onClick={sendMessage}
                   onContextMenu={e => { e.preventDefault(); setShowSendLater(!showSendLater); }} title="Send (right-click for schedule)">
@@ -1994,6 +2043,15 @@ function Chat({ role, authedUser }) {
                 )}
               </div>
             </div>
+            </div>{/* close composer-card */}
+            {showFormatBar && (
+              <div className="format-bar" style={{ display: 'flex', gap: 2, padding: '4px 8px', marginTop: 4 }}>
+                <button style={{ padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer', borderRadius: 4, color: activeFormats.bold ? 'var(--primary)' : 'var(--text-light)', fontSize: 14 }} onMouseDown={e => { e.preventDefault(); execFormat('bold'); }}><i className="fas fa-bold" /></button>
+                <button style={{ padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer', borderRadius: 4, color: activeFormats.italic ? 'var(--primary)' : 'var(--text-light)', fontSize: 14 }} onMouseDown={e => { e.preventDefault(); execFormat('italic'); }}><i className="fas fa-italic" /></button>
+                <button style={{ padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer', borderRadius: 4, color: activeFormats.underline ? 'var(--primary)' : 'var(--text-light)', fontSize: 14 }} onMouseDown={e => { e.preventDefault(); execFormat('underline'); }}><i className="fas fa-underline" /></button>
+                <button style={{ padding: '6px 10px', border: 'none', background: 'none', cursor: 'pointer', borderRadius: 4, color: activeFormats.title ? 'var(--primary)' : 'var(--text-light)', fontSize: 14 }} onMouseDown={e => { e.preventDefault(); toggleTitle(); }}><i className="fas fa-heading" /></button>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', background: '#f7f6f3', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
@@ -4725,6 +4783,44 @@ function App() {
           </div>
         </div>
       </nav>
+
+      {/* ── Mobile Long-Press Action Sheet (Slack-style) ── */}
+      {actionSheetMsg && ReactDOM.createPortal(
+        <>
+          <div className="action-sheet-backdrop" onClick={closeActionSheet} />
+          <div className="action-sheet">
+            <div className="action-sheet-handle" />
+            {actionSheetMsg.msg.text && (
+              <div className="action-sheet-msg-preview">
+                {actionSheetMsg.msg.text.replace(/<[^>]+>/g, '').substring(0, 80)}{actionSheetMsg.msg.text.replace(/<[^>]+>/g, '').length > 80 ? '...' : ''}
+              </div>
+            )}
+            <div className="action-sheet-reactions">
+              {['👍','❤️','😂','🔥','👀','🙏'].map(emoji => (
+                <button key={emoji} onClick={() => { toggleReaction(actionSheetMsg.chId, actionSheetMsg.msg.id, emoji, !!actionSheetMsg.parentMsgId, actionSheetMsg.parentMsgId); closeActionSheet(); }}>{emoji}</button>
+              ))}
+              <button onClick={() => { closeActionSheet(); setTimeout(() => setQuickReactMsg(actionSheetMsg.msg.id), 100); }} style={{ fontSize: 16 }}><i className="fas fa-plus" style={{ color: 'var(--text-light)' }} /></button>
+            </div>
+            <div className="action-sheet-actions">
+              {confirmUnsend && confirmUnsend.msgId === actionSheetMsg.msg.id ? (<>
+                <div style={{ padding: '8px 12px', fontSize: 14, fontWeight: 600, color: 'var(--danger)' }}>Are you sure you want to unsend?</div>
+                <div className="action-sheet-item danger" onClick={() => { unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); closeActionSheet(); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
+                <div className="action-sheet-item" onClick={closeActionSheet}><i className="fas fa-times" /> Cancel</div>
+              </>) : (<>
+                <div className="action-sheet-item" onClick={() => { closeActionSheet(); closeAllPickers(); setOpenThread({ channelId: actionSheetMsg.chId, msgId: actionSheetMsg.msg.id }); }}><i className="fas fa-comment-dots" /> Reply in thread</div>
+                <div className="action-sheet-item" onClick={() => { navigator.clipboard?.writeText(actionSheetMsg.msg.text?.replace(/<[^>]+>/g, '') || ''); closeActionSheet(); }}><i className="fas fa-copy" /> Copy text</div>
+                <div className="action-sheet-item" onClick={closeActionSheet}><i className="fas fa-thumbtack" /> Pin message</div>
+                {actionSheetMsg.msg.userId === uid && (<>
+                  <div className="action-sheet-divider" />
+                  <div className="action-sheet-item" onClick={() => { startEdit(actionSheetMsg.chId, actionSheetMsg.msg, actionSheetMsg.parentMsgId); closeActionSheet(); }}><i className="fas fa-pen" /> Edit message</div>
+                  <div className="action-sheet-item danger" onClick={() => setConfirmUnsend({ channelId: actionSheetMsg.chId, msgId: actionSheetMsg.msg.id, parentMsgId: actionSheetMsg.parentMsgId })}><i className="fas fa-trash-alt" /> Unsend</div>
+                </>)}
+              </>)}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
 
       {/* ── Mobile Bottom Nav ── */}
       <div className="mobile-bottom-nav">
