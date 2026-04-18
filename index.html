@@ -4358,56 +4358,76 @@ function Timesheets({ role, authedUser, perm }) {
         )}
       </div>
 
-      {/* Clock-in modal */}
-      <Modal show={showClockInModal} onClose={() => setShowClockInModal(false)} title="Clock In">
-        {/* Scheduled Jobs */}
-        {todayJobs.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-              <i className="fas fa-calendar-check" style={{ marginRight: 6 }} /> Today's Scheduled Jobs
+      {/* Clock-in full-page picker */}
+      {showClockInModal && ReactDOM.createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'white', zIndex: 500, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* Header */}
+          <div style={{ position: 'sticky', top: 0, zIndex: 2, background: 'white', borderBottom: '1px solid var(--border)', padding: '0 16px', paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 48 }}>
+              <button onClick={() => setShowClockInModal(false)} style={{ background: 'none', border: 'none', fontSize: 15, color: 'var(--primary)', fontWeight: 600, cursor: 'pointer', padding: '8px 0' }}>
+                <i className="fas fa-arrow-left" style={{ marginRight: 6 }} /> Back
+              </button>
+              <span style={{ fontWeight: 700, fontSize: 17 }}>Clock In</span>
+              <div style={{ width: 60 }} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {todayJobs.map((shift, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--bg)', borderRadius: 10, cursor: 'pointer', border: '1px solid var(--border)' }}
-                  onClick={() => clockIn('job', shift.client)}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{shift.client}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{shift.time}</div>
-                  </div>
-                  <i className="fas fa-play" style={{ color: 'var(--primary)', fontSize: 14 }} />
+          </div>
+
+          <div style={{ padding: '20px 16px', paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))' }}>
+            {/* Scheduled Jobs */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+                <i className="fas fa-calendar-check" style={{ marginRight: 6 }} /> Today's Scheduled Jobs
+              </div>
+              {todayJobs.length === 0 ? (
+                <div style={{ padding: '20px 16px', color: 'var(--text-light)', fontSize: 14, textAlign: 'center', background: 'var(--bg)', borderRadius: 12 }}>
+                  <i className="fas fa-calendar-times" style={{ fontSize: 22, opacity: 0.3, marginBottom: 8, display: 'block' }} />
+                  No jobs scheduled for today
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {todayJobs.length === 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-              <i className="fas fa-calendar-check" style={{ marginRight: 6 }} /> Today's Scheduled Jobs
-            </div>
-            <div style={{ padding: '14px', color: 'var(--text-light)', fontSize: 13, textAlign: 'center', background: 'var(--bg)', borderRadius: 10 }}>
-              No jobs scheduled for today
-            </div>
-          </div>
-        )}
-        {/* Administrative Work — Scheduler+ only */}
-        {canSchedule && (
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-              <i className="fas fa-briefcase" style={{ marginRight: 6 }} /> Administrative
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
-              {ADMIN_CATEGORIES.map(cat => (
-                <div key={cat.id} style={{ padding: '14px 10px', cursor: 'pointer', textAlign: 'center', background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border)' }}
-                  onClick={() => clockIn('admin', cat.label)}>
-                  <i className={`fas ${cat.icon}`} style={{ fontSize: 20, color: 'var(--primary)', marginBottom: 6, display: 'block' }} />
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{cat.label}</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {todayJobs.map((shift, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--bg)', borderRadius: 12, cursor: 'pointer', border: '1px solid var(--border)' }}
+                      onClick={() => clockIn('job', shift.client)}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className="fas fa-building" style={{ fontSize: 16 }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15 }}>{shift.client}</div>
+                        <div style={{ fontSize: 13, color: 'var(--text-light)' }}>{shift.time}</div>
+                      </div>
+                      <i className="fas fa-chevron-right" style={{ color: 'var(--text-light)', fontSize: 13 }} />
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
+
+            {/* Administrative Work — Scheduler+ only */}
+            {canSchedule && (
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+                  <i className="fas fa-briefcase" style={{ marginRight: 6 }} /> Administrative
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {ADMIN_CATEGORIES.map(cat => (
+                    <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--bg)', borderRadius: 12, cursor: 'pointer', border: '1px solid var(--border)' }}
+                      onClick={() => clockIn('admin', cat.label)}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f0ebe6', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className={`fas ${cat.icon}`} style={{ fontSize: 16 }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 15 }}>{cat.label}</div>
+                      </div>
+                      <i className="fas fa-chevron-right" style={{ color: 'var(--text-light)', fontSize: 13 }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </Modal>
+        </div>,
+        document.body
+      )}
 
       {/* Today's Timesheets */}
       <div className="card" style={{ padding: 0 }}>
@@ -4808,7 +4828,7 @@ function LoginScreen({ onLogin, onNotFound }) {
       const empDoc = empSnap.docs[0];
       const emp = { id: empDoc.id, ...empDoc.data() };
       // Auto-migrate permission field
-      if (emp.role === 'Admin' && (!emp.permission || emp.permission === 'viewer')) {
+      if ((emp.role || '').toLowerCase() === 'admin' && (!emp.permission || emp.permission === 'viewer')) {
         emp.permission = 'admin';
         db.collection('employees').doc(empDoc.id).update({ permission: 'admin' }).catch(() => {});
       }
@@ -4911,7 +4931,7 @@ function LoginScreen({ onLogin, onNotFound }) {
         const empDoc = empSnap.docs[0];
         const emp = { id: empDoc.id, ...empDoc.data() };
         // Auto-migrate permission field
-        if (emp.role === 'Admin' && (!emp.permission || emp.permission === 'viewer')) {
+        if ((emp.role || '').toLowerCase() === 'admin' && (!emp.permission || emp.permission === 'viewer')) {
           emp.permission = 'admin';
           db.collection('employees').doc(empDoc.id).update({ permission: 'admin' }).catch(() => {});
         }
@@ -5217,11 +5237,21 @@ function App() {
   // Listen for Firebase auth state — check phone against Firestore employees
   useEffect(() => {
     // Try to restore cached employee data immediately (avoids flash of login screen)
+    // Also apply permission migration to cached data so UI is correct instantly
     try {
       const cached = sessionStorage.getItem('ecs_employee');
       if (cached) {
         const emp = JSON.parse(cached);
+        if ((emp.role || '').toLowerCase() === 'admin' && (!emp.permission || emp.permission === 'viewer')) {
+          emp.permission = 'admin';
+        }
+        if (!emp.permission) emp.permission = 'viewer';
         setAuthedUser(emp);
+        // If permission was missing, update Firestore in background
+        if (emp.id && (emp.role || '').toLowerCase() === 'admin' && cached.indexOf('"permission"') === -1) {
+          db.collection('employees').doc(emp.id).update({ permission: 'admin' }).catch(() => {});
+          sessionStorage.setItem('ecs_employee', JSON.stringify(emp));
+        }
       }
     } catch (e) {}
 
@@ -5247,9 +5277,15 @@ function App() {
             const empDoc = snap.docs[0];
             const empData = { id: empDoc.id, ...empDoc.data() };
             // Auto-migrate: if role is 'Admin' but permission field is missing/viewer, upgrade to admin
-            if (empData.role === 'Admin' && (!empData.permission || empData.permission === 'viewer')) {
+            if ((empData.role || '').toLowerCase() === 'admin' && (!empData.permission || empData.permission === 'viewer')) {
               empData.permission = 'admin';
               db.collection('employees').doc(empDoc.id).update({ permission: 'admin' }).catch(e => console.warn('Permission migration error:', e));
+            }
+            // Seed admin by email — ensures Caleb always has admin access
+            const seedAdminEmails = ['caleb.jones@planningcenter.com'];
+            if (seedAdminEmails.includes((empData.email || '').toLowerCase()) && empData.permission !== 'admin') {
+              empData.permission = 'admin';
+              db.collection('employees').doc(empDoc.id).update({ permission: 'admin', role: 'Admin' }).catch(e => console.warn('Seed admin migration error:', e));
             }
             // Auto-migrate: ensure every employee record has a permission field
             if (!empData.permission) {
