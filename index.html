@@ -2571,7 +2571,7 @@ function Chat({ role, authedUser, perm }) {
 
 
         <div className="chat-messages"
-          onScroll={() => { if (document.activeElement && document.activeElement.tagName !== 'BODY') document.activeElement.blur(); }}
+          onScroll={() => { if (document.activeElement && document.activeElement.tagName !== 'BODY') document.activeElement.blur(); }}>
           {(channelMessages).map(msg => (
             <MessageBubble key={msg.id} msg={msg} compact={false} showThreadPreview={true} chId={activeChannel} />
           ))}
