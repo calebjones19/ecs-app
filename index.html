@@ -66,6 +66,8 @@
   .app { display: flex; flex-direction: column; height: 100dvh; height: 100vh; }
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .content { flex: 1; overflow-y: auto; padding: 24px; overscroll-behavior: contain; }
+  @keyframes pageEnter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .page-enter { animation: pageEnter 0.22s ease-out both; }
 
   /* ── Top Navigation Bar ── */
   .topnav { background: var(--sidebar-bg); display: flex; align-items: center; height: 56px; padding: 0 20px; flex-shrink: 0; position: relative; z-index: 100; }
@@ -6868,7 +6870,7 @@ function App() {
             </div>
           </div>
         )}
-        <div className="content" style={page === 'chat' ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
+        <div key={page} className={`content page-enter`} style={page === 'chat' ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
           {renderPage()}
         </div>
       </div>
