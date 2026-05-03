@@ -781,6 +781,16 @@
     .mobile-nav-item { font-size: 9px; padding: 4px 4px; }
     .mobile-nav-item i { font-size: 16px; }
   }
+
+/* Admin panel full page */
+.admin-hub-list { display: flex; flex-direction: column; gap: 10px; padding: 0; }
+.admin-hub-item { display: flex; align-items: center; gap: 14px; background: white; border-radius: 12px; border: 1px solid var(--border); padding: 14px 16px; cursor: pointer; transition: background 0.12s; text-decoration: none; }
+.admin-hub-item:hover { background: var(--bg); }
+.admin-hub-item .hub-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.admin-hub-item .hub-text { flex: 1; }
+.admin-hub-item .hub-label { font-size: 15px; font-weight: 600; color: var(--text); }
+.admin-hub-item .hub-desc { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+.admin-back-btn { display: flex; align-items: center; gap: 6px; border: none; background: none; color: var(--primary); font-size: 15px; font-weight: 600; cursor: pointer; padding: 12px 0 8px; }
 </style>
 </head>
 <body>
@@ -3040,7 +3050,9 @@ function Chat({ role, authedUser, perm }) {
 // ─── Schedule ──────────────────────────────────────────────────
 function Schedule({ role, perm }) {
   const canSchedule = perm?.canSchedule || role === 'admin';
+  const canEdit = perm?.canEdit || role === 'admin' || role === 'editor';
   const isAdmin = perm?.isAdmin || role === 'admin';
+  const [scheduleTab, setScheduleTab] = useState('schedule');
   const [showAddShift, setShowAddShift] = useState(false);
   const [newShift, setNewShift] = useState({ employee: '', day: 0, startTime: '08:00', endTime: '12:00', client: '' });
   const [scheduleData, setScheduleData] = useState(SCHEDULE_DATA);
@@ -3537,6 +3549,38 @@ function Schedule({ role, perm }) {
     </div>
   );
 
+  // Non-editor/non-admin: show 3-tab view
+  if (!canEdit && !isAdmin) {
+    return (
+      <div>
+        <div className="tabs" style={{ marginBottom: 0, borderBottom: '2px solid var(--border)', display: 'flex', gap: 0 }}>
+          {[
+            { id: 'schedule', label: 'Schedule', icon: 'fa-calendar-alt' },
+            { id: 'availability', label: 'Availability', icon: 'fa-calendar-check' },
+            { id: 'timeoff', label: 'Time Off', icon: 'fa-calendar-times' },
+          ].map(tab => (
+            <button key={tab.id} onClick={() => setScheduleTab(tab.id)}
+              className={`tab ${scheduleTab === tab.id ? 'active' : ''}`}
+              style={{ flex: 1, padding: '10px 8px', border: 'none', background: 'none', fontWeight: scheduleTab === tab.id ? 700 : 500, fontSize: 13, cursor: 'pointer', color: scheduleTab === tab.id ? 'var(--primary)' : 'var(--text-light)', borderBottom: scheduleTab === tab.id ? '2px solid var(--primary)' : '2px solid transparent', marginBottom: -2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <i className={`fas ${tab.icon}`} />{tab.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ paddingTop: 16 }}>
+          {scheduleTab === 'availability' && <AvailabilityView role={role} perm={perm} />}
+          {scheduleTab === 'timeoff' && <EmployeeTimeOff authedUser={null} />}
+          {scheduleTab === 'schedule' && (
+            <div>
+              {/* Day view only for non-editors */}
+              <DayTabs />
+              {renderDayView()}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* ── Toolbar ── */}
@@ -3593,10 +3637,10 @@ function Schedule({ role, perm }) {
             </button>
           )}
 
-          {canSchedule && (
+          {(canEdit || isAdmin) && (
             <button className="topbar-btn primary" onClick={() => setShowAddShift(true)}><i className="fas fa-plus" />{isMobile ? '' : ' Add Shift'}</button>
           )}
-          {canSchedule && !isMobile && (
+          {(canEdit || isAdmin) && !isMobile && (
             <React.Fragment>
               <button className="topbar-btn"><i className="fas fa-bell" /> Notify All</button>
               <button className="topbar-btn"><i className="fas fa-download" /> Export</button>
@@ -6056,6 +6100,221 @@ function LoginScreen({ onLogin, onNotFound }) {
   );
 }
 
+// ── EmployeeTimeOff: employee time-off request form ──────────────────────────
+function EmployeeTimeOff({ authedUser }) {
+  const [form, setForm] = useState({ type: 'Vacation', startDate: '', endDate: '', reason: '' });
+  const [submitted, setSubmitted] = useState(false);
+  const [myRequests] = useState([
+    { id: 1, type: 'Vacation', startDate: '2026-04-01', endDate: '2026-04-03', days: 3, status: 'approved' },
+    { id: 2, type: 'Sick Time', startDate: '2026-03-15', endDate: '2026-03-15', days: 1, status: 'approved' },
+  ]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setSubmitted(true);
+  };
+
+  const statusColor = { approved: 'var(--success)', pending: 'var(--warning)', denied: 'var(--danger)' };
+
+  if (submitted) {
+    return (
+      <div style={{ padding: '24px 0' }}>
+        <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 12, padding: '20px 24px', textAlign: 'center', marginBottom: 24 }}>
+          <i className="fas fa-check-circle" style={{ fontSize: 28, color: 'var(--primary)', marginBottom: 10, display: 'block' }} />
+          <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--primary)', marginBottom: 4 }}>Request Submitted</div>
+          <div style={{ fontSize: 13, color: 'var(--text-light)' }}>Your request has been submitted and your manager will be notified.</div>
+        </div>
+        <button className="topbar-btn" onClick={() => setSubmitted(false)} style={{ width: '100%', justifyContent: 'center' }}>Submit Another Request</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header"><div className="card-title">Request Time Off</div></div>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Type</label>
+            <select className="form-input" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+              <option>Vacation</option>
+              <option>Sick Time</option>
+              <option>Personal Day</option>
+            </select>
+          </div>
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Start Date</label>
+              <input type="date" className="form-input" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">End Date</label>
+              <input type="date" className="form-input" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} required />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Reason (optional)</label>
+            <textarea className="form-input" rows={3} style={{ resize: 'vertical' }} value={form.reason} onChange={e => setForm({...form, reason: e.target.value})} placeholder="Briefly describe your reason..." />
+          </div>
+          <button type="submit" className="topbar-btn primary" style={{ width: '100%', justifyContent: 'center' }}>Submit Request</button>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="card-header"><div className="card-title">My Requests</div></div>
+        {myRequests.length === 0 ? (
+          <div className="empty-state"><i className="fas fa-calendar-times" /><p>No past requests</p></div>
+        ) : myRequests.map(r => (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{r.type}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{r.startDate} – {r.endDate} · {r.days} day{r.days !== 1 ? 's' : ''}</div>
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: statusColor[r.status], textTransform: 'capitalize' }}>{r.status}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── AdminTimeOff: admin view of pending time-off requests ─────────────────────
+const MOCK_TIME_OFF_REQUESTS = [
+  { id: 1, employee: 'Maria Garcia', type: 'Vacation', startDate: '2026-05-10', endDate: '2026-05-14', days: 5, reason: 'Family trip', status: 'pending', avatar: 'MG', color: '#7c6f64' },
+  { id: 2, employee: 'James Wilson', type: 'Sick Time', startDate: '2026-05-06', endDate: '2026-05-06', days: 1, reason: 'Not feeling well', status: 'pending', avatar: 'JW', color: '#4a6741' },
+  { id: 3, employee: 'Ashley Brown', type: 'Vacation', startDate: '2026-05-20', endDate: '2026-05-22', days: 3, reason: 'Long weekend', status: 'pending', avatar: 'AB', color: '#c8a84e' },
+];
+
+function AdminTimeOff({ role, perm, authedUser }) {
+  const [requests, setRequests] = useState(MOCK_TIME_OFF_REQUESTS);
+  const [activeTab, setActiveTab] = useState('pending');
+
+  const filtered = requests.filter(r => r.status === activeTab);
+  const tabs = ['pending', 'approved', 'denied'];
+  const typeBadgeColor = { Vacation: { bg: '#faf3e0', color: '#c8a84e' }, 'Sick Time': { bg: '#e8f0fe', color: '#4a70c4' }, 'Personal Day': { bg: '#f0f4ff', color: '#7c6f64' } };
+
+  const updateStatus = (id, status) => {
+    setRequests(prev => prev.map(r => r.id === id ? {...r, status} : r));
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 0, marginBottom: 16, background: 'var(--bg)', borderRadius: 10, padding: 4 }}>
+        {tabs.map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer', textTransform: 'capitalize',
+              background: activeTab === tab ? 'white' : 'transparent',
+              color: activeTab === tab ? 'var(--text)' : 'var(--text-light)',
+              boxShadow: activeTab === tab ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+            }}>
+            {tab} {requests.filter(r => r.status === tab).length > 0 && <span style={{ fontSize: 11, background: activeTab === tab ? 'var(--primary)' : 'var(--border)', color: activeTab === tab ? 'white' : 'var(--text-light)', borderRadius: 10, padding: '1px 6px', marginLeft: 4 }}>{requests.filter(r => r.status === tab).length}</span>}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--text-light)' }}>
+          <i className="fas fa-calendar-check" style={{ fontSize: 28, marginBottom: 8, display: 'block' }} />
+          <div>No {activeTab} requests</div>
+        </div>
+      ) : filtered.map(r => (
+        <div key={r.id} className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+            <div className="avatar" style={{ background: r.color, width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>{r.avatar}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{r.employee}</div>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: (typeBadgeColor[r.type] || {bg:'#eee',color:'#666'}).bg, color: (typeBadgeColor[r.type] || {bg:'#eee',color:'#666'}).color }}>{r.type}</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 4 }}>
+            <i className="fas fa-calendar-alt" style={{ marginRight: 6, color: 'var(--primary)' }} />
+            {r.startDate} – {r.endDate} · <strong>{r.days} day{r.days !== 1 ? 's' : ''}</strong>
+          </div>
+          {r.reason && <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10, fontStyle: 'italic' }}>"{r.reason}"</div>}
+          {activeTab === 'pending' && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => updateStatus(r.id, 'approved')} style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, background: '#e8f5e9', color: 'var(--success)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                <i className="fas fa-check" style={{ marginRight: 6 }} />Approve
+              </button>
+              <button onClick={() => updateStatus(r.id, 'denied')} style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, background: '#fce8e6', color: 'var(--danger)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                <i className="fas fa-times" style={{ marginRight: 6 }} />Deny
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── AdminSchedule: scheduling wrapper for admins ──────────────────────────────
+function AdminSchedule({ role, perm }) {
+  return <Schedule role={role} perm={perm} />;
+}
+
+// ── AdminPanel: full-page admin hub ──────────────────────────────────────────
+function AdminPanel({ role, perm, authedUser, setPage }) {
+  const [adminPage, setAdminPage] = useState(null);
+
+  useEffect(() => {
+    const handler = () => { if (adminPage) setAdminPage(null); };
+    window.addEventListener('ecs-back', handler);
+    return () => window.removeEventListener('ecs-back', handler);
+  }, [adminPage]);
+
+  const hubItems = [
+    ...(perm?.canEdit ? [
+      { id: 'employees', icon: 'fa-id-badge', label: 'Employees', desc: 'Profiles, pay rates & permissions', color: '#7c6f64' },
+      { id: 'clients', icon: 'fa-building', label: 'Clients', desc: 'Locations, contacts & rates', color: '#c8a84e' },
+    ] : []),
+    { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Pending swap requests', color: '#c8a84e' },
+    { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists', color: '#b85c4a' },
+    { id: 'admin-schedule', icon: 'fa-calendar-alt', label: 'Scheduling', desc: 'Create & manage team shifts', color: '#4a6741' },
+    { id: 'admin-timeoff', icon: 'fa-calendar-times', label: 'Time Off Requests', desc: 'Review pending requests', color: '#5e8a7a' },
+  ];
+
+  if (adminPage !== null) {
+    const renderAdminSub = () => {
+      switch (adminPage) {
+        case 'employees': return <EmployeeProfiles role={role} perm={perm} />;
+        case 'clients': return <ClientList role={role} perm={perm} />;
+        case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
+        case 'checklists': return <Checklists role={role} perm={perm} />;
+        case 'admin-schedule': return <AdminSchedule role={role} perm={perm} />;
+        case 'admin-timeoff': return <AdminTimeOff role={role} perm={perm} authedUser={authedUser} />;
+        default: return null;
+      }
+    };
+    return (
+      <div>
+        <button className="admin-back-btn" onClick={() => setAdminPage(null)}>
+          <i className="fas fa-chevron-left" /> Back
+        </button>
+        {renderAdminSub()}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="admin-hub-list">
+        {hubItems.map(item => (
+          <div key={item.id} className="admin-hub-item" onClick={() => setAdminPage(item.id)}>
+            <div className="hub-icon" style={{ background: item.color + '18', color: item.color }}>
+              <i className={`fas ${item.icon}`} />
+            </div>
+            <div className="hub-text">
+              <div className="hub-label">{item.label}</div>
+              <div className="hub-desc">{item.desc}</div>
+            </div>
+            <i className="fas fa-chevron-right" style={{ color: 'var(--text-light)', fontSize: 13 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [authedUser, setAuthedUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -6072,7 +6331,6 @@ function App() {
   const role = isAdmin ? 'admin' : canEdit ? 'editor' : canSchedule ? 'scheduler' : 'employee';
   const [page, setPage] = useState('dashboard');
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showMobileMore, setShowMobileMore] = useState(false);
   const [toast, setToast] = useState(null);
   const [notifPermission, setNotifPermission] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
@@ -6252,6 +6510,15 @@ function App() {
   }, []);
 
   const handleLogout = () => { firebaseAuth.signOut(); setAuthedUser(null); setShowUserMenu(false); try { sessionStorage.removeItem('ecs_employee'); } catch(e){} };
+  const handleUpdateApp = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(reg => reg.update());
+      });
+    }
+    // Force reload bypassing cache
+    window.location.reload(true);
+  };
 
   // Navigation structure — built dynamically based on permission level
   const buildNavItems = () => {
@@ -6340,6 +6607,7 @@ function App() {
     availability: 'Availability',
     clients: 'Clients',
     notifications: 'Notification Settings',
+    admin: 'Admin',
   };
 
   const renderPage = () => {
@@ -6355,6 +6623,7 @@ function App() {
       case 'availability': return <AvailabilityView role={role} perm={perm} />;
       case 'clients': return <ClientList role={role} perm={perm} />;
       case 'notifications': return <NotificationSettings userId={authedUser?.id} />;
+      case 'admin': return <AdminPanel role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       default: return <Dashboard role={role} perm={perm} authedUser={authedUser} />;
     }
   };
@@ -6501,7 +6770,11 @@ function App() {
                 </div>
                 <div className="dd-item" onClick={() => { setShowUserMenu(false); setPage('notifications'); }}>
                   <i className="fas fa-cog" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
-                  <span style={{ fontSize: 14 }}>Settings</span>
+                  <span style={{ fontSize: 14 }}>Notification Settings</span>
+                </div>
+                <div className="dd-item" onClick={() => { setShowUserMenu(false); handleUpdateApp(); }}>
+                  <i className="fas fa-sync-alt" style={{ width: 20, textAlign: 'center', color: 'var(--primary)' }} />
+                  <span style={{ fontSize: 14 }}>Update to Latest Version</span>
                 </div>
                 <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
                 <div className="dd-item" onClick={handleLogout} style={{ color: 'var(--danger)' }}>
@@ -6544,7 +6817,11 @@ function App() {
                 </div>
                 <div className="dd-item" onClick={() => { setShowUserMenu(false); setPage('notifications'); }}>
                   <i className="fas fa-cog" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
-                  <span style={{ fontSize: 14 }}>Settings</span>
+                  <span style={{ fontSize: 14 }}>Notification Settings</span>
+                </div>
+                <div className="dd-item" onClick={() => { setShowUserMenu(false); handleUpdateApp(); }}>
+                  <i className="fas fa-sync-alt" style={{ width: 20, textAlign: 'center', color: 'var(--primary)' }} />
+                  <span style={{ fontSize: 14 }}>Update to Latest Version</span>
                 </div>
                 <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
                 <div className="dd-item" onClick={handleLogout} style={{ color: 'var(--danger)' }}>
@@ -6563,16 +6840,11 @@ function App() {
           { id: 'dashboard', icon: 'fa-th-large', label: 'Home' },
           { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule' },
           { id: 'timesheets', icon: 'fa-clock', label: 'Time' },
-          { id: 'more', icon: 'fa-ellipsis-h', label: 'More' },
+          ...(canSchedule ? [{ id: 'admin', icon: 'fa-shield-alt', label: 'Admin' }] : []),
         ].map(item => (
-          <button key={item.id} className={`mobile-nav-item ${(item.id === 'more' ? ['employees','clients','shifts','checklists','availability','notifications'].includes(page) : page === item.id) ? 'active' : ''}`}
+          <button key={item.id} className={`mobile-nav-item ${(item.id === 'admin' ? ['employees','clients','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin'].includes(page) : page === item.id) ? 'active' : ''}`}
             onClick={() => {
-              if (item.id === 'more') {
-                setShowMobileMore(!showMobileMore);
-              } else {
-                setPage(item.id);
-                setShowMobileMore(false);
-              }
+              setPage(item.id);
             }}>
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <i className={`fas ${item.icon}`} />
@@ -6587,49 +6859,6 @@ function App() {
         ))}
       </div>
 
-      {/* Mobile "More" menu overlay */}
-      {showMobileMore && (
-        <div onClick={() => setShowMobileMore(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} />
-      )}
-      {showMobileMore && (
-        <div style={{ position: 'fixed', bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))', left: 0, right: 0, background: 'white', borderRadius: '16px 16px 0 0', boxShadow: '0 -4px 20px rgba(0,0,0,0.15)', padding: '12px 8px', zIndex: 201, maxHeight: '60vh', overflowY: 'auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 8 }}>
-            <div style={{ width: 32, height: 4, background: 'var(--border)', borderRadius: 2, margin: '0 auto' }} />
-          </div>
-          {/* Permission badge */}
-          <div style={{ textAlign: 'center', marginBottom: 12 }}>
-            <span className="badge green" style={{ fontSize: 11 }}>{({ admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' })[getUserPerm(authedUser)] || 'Schedule Viewer'}</span>
-          </div>
-          {[
-            // Base items everyone sees
-            { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', color: '#c8a84e' },
-            { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', color: '#b85c4a' },
-            { id: 'availability', icon: 'fa-calendar-check', label: canEdit ? 'Availability' : 'My Availability', color: '#5e8a7a' },
-            // Editor+ items
-            ...(canEdit ? [
-              { id: 'employees', icon: 'fa-id-badge', label: 'Employees', color: '#7c6f64' },
-              { id: 'clients', icon: 'fa-building', label: 'Clients', color: '#c8a84e' },
-            ] : []),
-            { id: 'notifications', icon: 'fa-cog', label: 'Settings', color: '#6b7568' },
-          ].map(item => (
-            <div key={item.id} className="dd-item" style={{ margin: '0 4px' }}
-              onClick={() => { setPage(item.id); setShowMobileMore(false); }}>
-              <div className="dd-icon" style={{ background: item.color + '18', color: item.color }}>
-                <i className={`fas ${item.icon}`} />
-              </div>
-              <div className="dd-text">
-                <div className="dd-label">{item.label}</div>
-              </div>
-            </div>
-          ))}
-          <div style={{ height: 1, background: 'var(--border)', margin: '8px 12px' }} />
-          <div className="dd-item" style={{ margin: '0 4px', color: 'var(--danger)' }} onClick={handleLogout}>
-            <i className="fas fa-sign-out-alt" style={{ width: 38, textAlign: 'center', fontSize: 16 }} />
-            <div className="dd-text"><div className="dd-label" style={{ color: 'var(--danger)' }}>Sign out</div></div>
-          </div>
-        </div>
-      )}
-
       {/* ── Main Content ── */}
       <div className="main">
         {page !== 'chat' && (
@@ -6639,7 +6868,7 @@ function App() {
             </div>
           </div>
         )}
-        <div className="content" style={page === 'chat' ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}} onScroll={() => setShowMobileMore(false)}>
+        <div className="content" style={page === 'chat' ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
           {renderPage()}
         </div>
       </div>
