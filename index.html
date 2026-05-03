@@ -645,11 +645,13 @@
     .auth-code-inputs input { width: 42px; height: 48px; font-size: 20px; }
 
     /* Grids → stack on mobile */
-    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .grid-2 { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { grid-template-columns: 1fr 1fr; gap: 10px; }
 
     /* Stat cards → 2 columns on mobile */
     .grid-4 { grid-template-columns: 1fr 1fr; gap: 10px; }
-    .stat-card { padding: 14px; }
+    .stat-card { padding: 12px 10px; }
+    .grid-2 .card, .grid-3 .card { padding: 14px 10px !important; }
     .stat-value { font-size: 22px; }
     .stat-label { font-size: 12px; }
     .stat-change { font-size: 11px; }
