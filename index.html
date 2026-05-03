@@ -565,8 +565,11 @@
       position: relative;
       z-index: 100;
     }
-    .mobile-header-logo { display: flex; align-items: center; flex: 1; cursor: pointer; }
-    .mobile-header-right { display: flex; align-items: center; gap: 10px; }
+    .mobile-header-left { display: flex; align-items: center; width: 72px; }
+    .mobile-header-center { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; pointer-events: none; }
+    .mobile-header-title { color: white; font-size: 20px; font-weight: 800; letter-spacing: 0.5px; }
+    .mobile-header-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+    .mobile-header-back { background: none; border: none; color: rgba(255,255,255,0.9); font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0; }
     body.keyboard-open .mobile-header { display: none !important; }
     .mobile-bottom-nav {
       display: flex;
@@ -6260,8 +6263,9 @@ function AdminSchedule({ role, perm }) {
 }
 
 // ── AdminPanel: full-page admin hub ──────────────────────────────────────────
-function AdminPanel({ role, perm, authedUser, setPage }) {
-  const [adminPage, setAdminPage] = useState(null);
+function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSubPage }) {
+  const adminPage = adminSubPage;
+  const setAdminPage = setAdminSubPage;
 
   useEffect(() => {
     const handler = () => { if (adminPage) setAdminPage(null); };
@@ -6294,9 +6298,6 @@ function AdminPanel({ role, perm, authedUser, setPage }) {
     };
     return (
       <div>
-        <button className="admin-back-btn" onClick={() => setAdminPage(null)}>
-          <i className="fas fa-chevron-left" /> Back
-        </button>
         {renderAdminSub()}
       </div>
     );
@@ -6337,6 +6338,7 @@ function App() {
   const isAdmin = permLevel >= 3;      // admin only
   const role = isAdmin ? 'admin' : canEdit ? 'editor' : canSchedule ? 'scheduler' : 'employee';
   const [page, setPage] = useState('dashboard');
+  const [adminSubPage, setAdminSubPage] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [toast, setToast] = useState(null);
   const [notifPermission, setNotifPermission] = useState(
@@ -6357,6 +6359,8 @@ function App() {
       _badgeCount = 0;
       if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {});
     }
+    // Reset admin sub-page when navigating away from admin
+    if (page !== 'admin') setAdminSubPage(null);
   }, [page]);
 
   // Listen for unread count updates from foreground notification handler
@@ -6631,7 +6635,7 @@ function App() {
       case 'availability': return <AvailabilityView role={role} perm={perm} />;
       case 'clients': return <ClientList role={role} perm={perm} />;
       case 'notifications': return <NotificationSettings userId={authedUser?.id} />;
-      case 'admin': return <AdminPanel role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
+      case 'admin': return <AdminPanel role={role} perm={perm} authedUser={authedUser} setPage={setPage} adminSubPage={adminSubPage} setAdminSubPage={setAdminSubPage} />;
       default: return <Dashboard role={role} perm={perm} authedUser={authedUser} />;
     }
   };
@@ -6796,7 +6800,17 @@ function App() {
 
       {/* ── Mobile Header ── */}
       <div className="mobile-header">
-        <div className="mobile-header-right" style={{ marginLeft: 'auto' }}>
+        <div className="mobile-header-left">
+          {page === 'admin' && adminSubPage && (
+            <button className="mobile-header-back" onClick={() => setAdminSubPage(null)}>
+              <i className="fas fa-chevron-left" /> Back
+            </button>
+          )}
+        </div>
+        <div className="mobile-header-center">
+          <span className="mobile-header-title">ECS</span>
+        </div>
+        <div className="mobile-header-right">
           <button className="topnav-icon-btn" onClick={() => setPage('chat')} style={{ position: 'relative' }}>
             <i className="fas fa-comments" />
             {chatUnread > 0 && (
