@@ -309,15 +309,12 @@
   .reply-preview .reply-last { color: var(--text-light); margin-left: 4px; }
 
   /* Msg hover actions bar – desktop only */
-  .msg-mobile-react { display: none; }
   .msg-hover-actions { display: none; margin-left: 4px; }
   .msg-hover-actions button { width: 20px; height: 20px; border: none; background: none; cursor: pointer; border-radius: 4px; font-size: 12px; color: var(--text-light); display: inline-flex; align-items: center; justify-content: center; padding: 0; }
   .msg-hover-actions button:hover { background: var(--bg); color: var(--text); }
   .message-group:hover .msg-hover-actions { display: inline-flex; align-items: center; gap: 2px; }
   @media (max-width: 768px) {
     .msg-hover-actions { display: none !important; }
-    .msg-mobile-react { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: none; background: #e5e5ea; font-size: 16px; cursor: pointer; flex-shrink: 0; align-self: flex-end; -webkit-tap-highlight-color: transparent; margin-bottom: 1px; }
-    .message-group { -webkit-user-select: none; user-select: none; }
     .message-group.long-press-active { background: var(--primary-light); transition: background 0.2s; }
   }
   .thread-messages .message-group { padding: 8px 12px; }
@@ -670,17 +667,9 @@
     .chat-main.hidden-mobile { display: none; }
     .chat-messages { padding: 12px; }
     .message-group { padding: 8px 12px; margin: 0 -12px; }
-    .msg-avatar { width: 30px; height: 30px; font-size: 12px; border-radius: 50% !important; align-self: flex-end; }
-    .message-group { align-items: flex-end !important; background: none !important; padding: 2px 12px; margin: 0 !important; }
-    .message-group:hover { background: none !important; }
-    .msg-header { display: none !important; }
-    .msg-bubble { display: inline-block; border-radius: 18px; padding: 9px 13px; position: relative; max-width: calc(100vw - 100px); word-break: break-word; background: #e9e9eb; margin-bottom: 14px; }
-    .msg-bubble.own { background: var(--primary); }
-    .msg-bubble.own .msg-text { color: white !important; font-size: 13px; }
-    .msg-bubble .msg-text { font-size: 13px; color: #1c1c1e; }
-    .msg-bubble-wrap { position: relative; display: inline-block; max-width: calc(100vw - 100px); }
-    .msg-mobile-react { position: absolute; bottom: -13px; right: -10px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: none; background: #e5e5ea; font-size: 14px; cursor: pointer; -webkit-tap-highlight-color: transparent; z-index: 3; }
+    .msg-avatar { width: 30px; height: 30px; font-size: 12px; }
     .msg-name { font-size: 13px; }
+    .msg-text { font-size: 13px; }
     .msg-file { max-width: 100%; }
     .msg-poll { max-width: 100%; }
     .chat-composer { padding: 8px 10px 6px; }
@@ -1971,7 +1960,7 @@ function Chat({ role, authedUser, perm }) {
       container.scrollTop = container.scrollHeight;
       setTimeout(() => {
         if (threadScrollRef.current) threadScrollRef.current.scrollTop = threadScrollRef.current.scrollHeight;
-      }, 220);
+      }, 250);
     } else {
       const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
       if (nearBottom) container.scrollTop = container.scrollHeight;
@@ -2315,21 +2304,11 @@ function Chat({ role, authedUser, perm }) {
               </div>
             </div>
           ) : msg.text ? (
-            <div className="msg-bubble-wrap">
-              <div className={`msg-bubble${isOwnMsg ? ' own' : ''}`}>
-                <div className="msg-text" style={compact ? { fontSize: 13 } : {}} dangerouslySetInnerHTML={{
-                  __html: msg.text
-                    .replace(/\n/g, '<br>')
-                    .replace(/@(\w+\s\w+)/g, '<span class="tag">@$1</span>')
-                }} />
-              </div>
-              {!compact && (
-                <button className="msg-mobile-react"
-                  onTouchEnd={(e) => { e.preventDefault(); setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id); setReactPickerTab('favorites'); setReactPickerSearch(''); }}>
-                  <span style={{ fontSize: 13 }}>😊</span><span style={{ fontSize: 9, lineHeight: 1, marginLeft: 1 }}>+</span>
-                </button>
-              )}
-            </div>
+            <div className="msg-text" style={compact ? { fontSize: 13 } : {}} dangerouslySetInnerHTML={{
+              __html: msg.text
+                .replace(/\n/g, '<br>')
+                .replace(/@(\w+\s\w+)/g, '<span class="tag">@$1</span>')
+            }} />
           ) : null}
           {msg.file && (
             msg.file.type && msg.file.type.startsWith('image/') && msg.file.url ? (
@@ -2378,6 +2357,7 @@ function Chat({ role, authedUser, perm }) {
               {msg.reactions.map((r, i) => (
                 <span className="reaction" key={i} onClick={() => toggleReaction(chId || activeChannel, msg.id, r.emoji, !!parentMsgId, parentMsgId)} style={r.myReact ? { background: '#dceee4', borderColor: 'var(--primary)' } : {}}>{r.emoji} {r.count}</span>
               ))}
+              <span className="reaction" style={{ opacity: 0.4, fontSize: 11 }} onClick={() => { setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id); setReactPickerTab('favorites'); setReactPickerSearch(''); }}>+</span>
               {quickReactMsg === msg.id && (
                 <div className="picker-popup" style={{ width: 340, position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, background: '#fff', color: 'var(--text)' }}>
                   <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
@@ -2744,6 +2724,7 @@ function Chat({ role, authedUser, perm }) {
             <div className="composer-toolbar">
               <button title="Attach" onClick={() => { closeAllPickers(); setShowAttachMenu(!showAttachMenu); }} style={showAttachMenu || showGifPicker || attachedFile ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-plus" /></button>
               <button title="Formatting" onMouseDown={e => { e.preventDefault(); }} onClick={() => setShowFormatBar(!showFormatBar)} style={showFormatBar ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><span style={{ fontWeight: 700, fontSize: 15 }}>Aa</span></button>
+              <button title="Emoji" onClick={() => togglePicker('emoji')} style={showEmojiPicker ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-smile" /></button>
               <button title="Mention" onClick={() => togglePicker('mention')} style={showMentionPicker ? { color: 'var(--primary)', background: 'var(--primary-light)' } : {}}><i className="fas fa-at" /></button>
               <button title="Create poll" onClick={() => { closeAllPickers(); setShowPollModal(true); }}><i className="fas fa-poll" /></button>
               <div className="send-later-dropdown">
