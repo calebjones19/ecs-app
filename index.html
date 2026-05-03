@@ -187,7 +187,7 @@
   .message-group { padding: 8px 20px; margin: 0 -20px; border-radius: 4px; }
   .message-group:hover { background: var(--chat-hover); }
   .msg-avatar { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: white; flex-shrink: 0; }
-  .msg-content { flex: 1; min-width: 0; }
+  .msg-content { flex: 1; min-width: 0; position: relative; }
   .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; height: 20px; }
   .msg-name { font-weight: 700; font-size: 14px; }
   .msg-time { font-size: 11px; color: var(--text-light); }
@@ -316,8 +316,8 @@
   .message-group:hover .msg-hover-actions { display: inline-flex; align-items: center; gap: 2px; }
   @media (max-width: 768px) {
     .msg-hover-actions { display: none !important; }
-    .msg-mobile-react { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--card); font-size: 14px; cursor: pointer; margin-top: 4px; -webkit-tap-highlight-color: transparent; }
-    .message-group { -webkit-user-select: none; user-select: none; }
+    .msg-mobile-react { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--card); font-size: 15px; cursor: pointer; position: absolute; bottom: -10px; right: -4px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); -webkit-tap-highlight-color: transparent; z-index: 2; }
+    .message-group { -webkit-user-select: none; user-select: none; padding-bottom: 8px; }
     .message-group.long-press-active { background: var(--primary-light); transition: background 0.2s; }
   }
   .thread-messages .message-group { padding: 8px 12px; }
@@ -1960,8 +1960,14 @@ function Chat({ role, authedUser, perm }) {
     const justOpened = openThread?.msgId !== prevThreadId.current;
     prevThreadId.current = openThread?.msgId ?? null;
     if (justOpened) {
-      // Direct assignment — no animation, works on all browsers including iOS Safari
-      container.scrollTop = container.scrollHeight;
+      // Double-rAF ensures the browser has fully painted the content before we scroll
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (threadScrollRef.current) {
+            threadScrollRef.current.scrollTop = threadScrollRef.current.scrollHeight;
+          }
+        });
+      });
     } else {
       threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
