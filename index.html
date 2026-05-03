@@ -1369,10 +1369,15 @@ function EmojiPickerSheet({ show, onSelect, onClose }) {
     if (!scrollRef.current || search) return;
     const container = scrollRef.current;
     const scrollTop = container.scrollTop;
+    const atBottom = scrollTop + container.clientHeight >= container.scrollHeight - 10;
     const sections = EMOJI_CATEGORY_TABS
       .filter(t => t.key !== 'recent' || recentEmoji.length > 0)
       .map(t => ({ key: t.key, top: sectionRefs.current[t.key]?.offsetTop || 0 }))
       .sort((a, b) => a.top - b.top);
+    if (atBottom && sections.length > 0) {
+      setActiveTab(sections[sections.length - 1].key);
+      return;
+    }
     for (let i = sections.length - 1; i >= 0; i--) {
       if (scrollTop >= sections[i].top - 20) {
         setActiveTab(sections[i].key);
@@ -2334,9 +2339,9 @@ function Chat({ role, authedUser, perm }) {
               ))}
               <span className="reaction" style={{ opacity: 0.4, fontSize: 11 }} onClick={() => { setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id); setReactPickerTab('favorites'); setReactPickerSearch(''); }}>+</span>
               {quickReactMsg === msg.id && (
-                <div className="picker-popup" style={{ width: 340, position: 'absolute', bottom: '100%', left: 0, marginBottom: 4 }}>
+                <div className="picker-popup" style={{ width: 340, position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, background: '#fff', color: 'var(--text)' }}>
                   <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <input placeholder="Search emojis..." value={reactPickerSearch} onChange={e => setReactPickerSearch(e.target.value)} />
+                    <input placeholder="Search emojis..." value={reactPickerSearch} onChange={e => setReactPickerSearch(e.target.value)} style={{ background: 'var(--bg)', color: 'var(--text)' }} />
                   </div>
                   <div className="picker-grid">
                     <div className="picker-cat-section">
@@ -2573,7 +2578,7 @@ function Chat({ role, authedUser, perm }) {
 
 
         <div className="chat-messages"
-          onScroll={() => { if (document.activeElement && document.activeElement.tagName !== 'BODY') document.activeElement.blur(); }}>
+          onTouchMove={() => { const el = document.activeElement; if (el && el !== document.body) el.blur(); }}>
           {(channelMessages).map(msg => (
             <MessageBubble key={msg.id} msg={msg} compact={false} showThreadPreview={true} chId={activeChannel} />
           ))}
@@ -6791,12 +6796,7 @@ function App() {
 
       {/* ── Mobile Header ── */}
       <div className="mobile-header">
-        <div className="mobile-header-logo" onClick={() => setPage('dashboard')}>
-          <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 6, padding: '3px 10px 2px', display: 'flex', alignItems: 'center' }}>
-            <img src={ESSENCE_LOGO} alt="Essence" style={{ height: 28, objectFit: 'contain' }} />
-          </div>
-        </div>
-        <div className="mobile-header-right">
+        <div className="mobile-header-right" style={{ marginLeft: 'auto' }}>
           <button className="topnav-icon-btn" onClick={() => setPage('chat')} style={{ position: 'relative' }}>
             <i className="fas fa-comments" />
             {chatUnread > 0 && (
@@ -6842,7 +6842,7 @@ function App() {
           { id: 'dashboard', icon: 'fa-th-large', label: 'Home' },
           { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule' },
           { id: 'timesheets', icon: 'fa-clock', label: 'Time' },
-          ...(canSchedule ? [{ id: 'admin', icon: 'fa-shield-alt', label: 'Admin' }] : []),
+          ...(canSchedule ? [{ id: 'admin', icon: 'fa-crown', label: 'Admin' }] : []),
         ].map(item => (
           <button key={item.id} className={`mobile-nav-item ${(item.id === 'admin' ? ['employees','clients','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin'].includes(page) : page === item.id) ? 'active' : ''}`}
             onClick={() => {
@@ -6863,7 +6863,7 @@ function App() {
 
       {/* ── Main Content ── */}
       <div className="main">
-        {page !== 'chat' && (
+        {page !== 'chat' && page !== 'admin' && (
           <div className="page-header">
             <div className="page-header-title">
               {pageTitles[page]}
