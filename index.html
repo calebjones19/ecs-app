@@ -6337,6 +6337,7 @@ function App() {
   );
   const userMenuRef = useRef(null);
   const mobileUserMenuRef = useRef(null);
+  const swipeRef = React.useRef(null);
   const [chatUnread, setChatUnread] = useState(0);
 
   // Sync active page to global for notification suppression
@@ -6641,7 +6642,6 @@ function App() {
   const initials = authedUser.name ? authedUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) : 'U';
 
   // Left-edge swipe to go back
-  const swipeRef = React.useRef(null);
   const handleAppTouchStart = (e) => {
     if (e.touches[0].clientX < 30) {
       swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
