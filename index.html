@@ -1660,6 +1660,7 @@ function Chat({ role, authedUser, perm }) {
   const [activeFormats, setActiveFormats] = useState({});
   const messagesEndRef = useRef(null);
   const threadEndRef = useRef(null);
+  const prevThreadId = useRef(null);
   const composerRef = useRef(null);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -1949,7 +1950,10 @@ function Chat({ role, authedUser, perm }) {
   }, [activeChannel, channelMessages]);
 
   useEffect(() => {
-    threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!threadEndRef.current) return;
+    const justOpened = openThread?.msgId !== prevThreadId.current;
+    prevThreadId.current = openThread?.msgId ?? null;
+    threadEndRef.current.scrollIntoView({ behavior: justOpened ? 'instant' : 'smooth' });
   }, [openThread, channelMessages]);
 
   // Close pickers on click outside
