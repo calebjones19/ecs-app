@@ -183,8 +183,9 @@
   .chat-icon-btn:hover { background: var(--bg); color: var(--text); }
 
   /* ── iMessage-style chat messages ── */
-  .chat-messages { flex: 1; overflow-y: auto; padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 2px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-  .message-group { display: flex; align-items: flex-end; gap: 8px; padding: 2px 0; }
+  .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 2px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; --swipe-x: 0px; }
+  .message-group { display: flex; align-items: flex-end; gap: 8px; padding: 10px 0 2px; position: relative; transform: translateX(calc(-1 * var(--swipe-x, 0px))); transition: transform 0.2s ease-out; }
+  .chat-swiping .message-group { transition: none; }
   .message-group.msg-own { flex-direction: row-reverse; }
   .message-group:hover { background: none; }
   .message-group.long-press-active { background: var(--primary-light); border-radius: 12px; transition: background 0.2s; }
@@ -199,9 +200,13 @@
   .msg-bubble { border-radius: 18px; padding: 6px 12px; font-size: 14px; line-height: 1.45; word-break: break-word; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
   .message-group.msg-own .msg-bubble { background: var(--msg-own); color: white; border-radius: 18px 18px 4px 18px; }
   .message-group.msg-other .msg-bubble { background: var(--msg-other); color: var(--text); border-radius: 18px 18px 18px 4px; }
-  .msg-bubble-time { font-size: 10px; margin-top: 2px; color: var(--text-light); }
-  .message-group.msg-own .msg-bubble-time { color: var(--text-light); text-align: right; }
-  .message-group.msg-other .msg-bubble-time { color: var(--text-light); }
+  /* Time hidden by default, revealed by left swipe */
+  .msg-bubble-time { position: absolute; right: -64px; bottom: 4px; width: 60px; text-align: right; font-size: 10px; color: var(--text-light); white-space: nowrap; pointer-events: none; padding-right: 4px; }
+  /* Reaction corner badges */
+  .msg-reaction-badges { position: absolute; top: 2px; right: -6px; display: flex; gap: 2px; z-index: 3; flex-direction: row-reverse; }
+  .message-group.msg-own .msg-reaction-badges { right: auto; left: -6px; flex-direction: row; }
+  .msg-reaction-badge { background: white; border: 1.5px solid #e0e0e0; border-radius: 10px; padding: 1px 5px; font-size: 13px; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); cursor: pointer; -webkit-user-select: none; user-select: none; }
+  .msg-reaction-badge .badge-count { font-size: 10px; font-weight: 700; color: #555; }
   .msg-text { font-size: 14px; line-height: 1.5; }
   .message-group.msg-own .msg-text .tag { background: rgba(255,255,255,0.25); color: white; padding: 1px 4px; border-radius: 3px; font-weight: 500; }
   .message-group.msg-other .msg-text .tag { background: var(--primary-light); color: var(--primary); padding: 1px 4px; border-radius: 3px; font-weight: 500; }
@@ -1682,6 +1687,9 @@ function Chat({ role, authedUser, perm }) {
   const threadScrollRef = useRef(null);
   const prevThreadId = useRef(null);
   const msgsTouchStartY = useRef(null);
+  const msgsTouchStartX = useRef(null);
+  const msgsSwipeDir = useRef(null);  // 'h' = horizontal, 'v' = vertical
+  const chatMessagesRef = useRef(null);
   const composerRef = useRef(null);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -2380,57 +2388,55 @@ function Chat({ role, authedUser, perm }) {
                 <div className="poll-votes">{msg.poll.totalVotes} total votes</div>
               </div>
             )}
-          </div>
-
-          {/* Timestamp below bubble */}
-          <div className="msg-bubble-time">
-            {msgTime}{msg.edited && <span style={{ marginLeft: 4 }}>(edited)</span>}
-          </div>
-
-          {/* Reactions (below bubble) */}
-          {msg.reactions && msg.reactions.length > 0 && (
-            <div className="msg-reactions">
-              {msg.reactions.map((r, i) => (
-                <span className={`reaction${r.myReact ? ' own-react' : ''}`} key={i}
-                  onClick={() => toggleReaction(chId || activeChannel, msg.id, r.emoji, !!parentMsgId, parentMsgId)}>
-                  {r.emoji} {r.count}
-                </span>
-              ))}
-              <span className="reaction" style={{ opacity: 0.4, fontSize: 11 }}
-                onClick={() => { setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id); setReactPickerTab('favorites'); setReactPickerSearch(''); }}>+</span>
-              {quickReactMsg === msg.id && (
-                <div className="picker-popup" style={{ width: 340, position: 'absolute', bottom: '100%', left: isOwnMsg ? 'auto' : 0, right: isOwnMsg ? 0 : 'auto', marginBottom: 4, background: '#fff', color: 'var(--text)' }}>
-                  <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <input placeholder="Search emojis..." value={reactPickerSearch} onChange={e => setReactPickerSearch(e.target.value)} style={{ background: 'var(--bg)', color: 'var(--text)' }} />
-                  </div>
-                  <div className="picker-grid">
-                    <div className="picker-cat-section">
-                      <div className="emoji-cat-label">Favorites</div>
-                      <div className="emoji-row">
-                        {EMOJI_FAVORITES.filter(e => !reactPickerSearch || e.includes(reactPickerSearch)).map((e, i) => (
-                          <button key={i} className="emoji-btn" onClick={() => { toggleReaction(chId || activeChannel, msg.id, e, !!parentMsgId, parentMsgId); setQuickReactMsg(null); }}>{e}</button>
-                        ))}
-                      </div>
+            {/* Reaction corner badges on the bubble */}
+            {msg.reactions && msg.reactions.length > 0 && (
+              <div className="msg-reaction-badges">
+                {msg.reactions.slice(0, 3).map((r, i) => (
+                  <span key={i} className={`msg-reaction-badge${r.myReact ? ' own-react' : ''}`}
+                    onClick={() => toggleReaction(chId || activeChannel, msg.id, r.emoji, !!parentMsgId, parentMsgId)}>
+                    {r.emoji}{r.count > 1 && <span className="badge-count">{r.count}</span>}
+                  </span>
+                ))}
+                {/* Add reaction picker */}
+                {quickReactMsg === msg.id && (
+                  <div className="picker-popup" style={{ width: 340, position: 'absolute', bottom: '100%', left: isOwnMsg ? 'auto' : 0, right: isOwnMsg ? 0 : 'auto', marginBottom: 4, background: '#fff', color: 'var(--text)' }}>
+                    <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
+                      <input placeholder="Search emojis..." value={reactPickerSearch} onChange={e => setReactPickerSearch(e.target.value)} style={{ background: 'var(--bg)', color: 'var(--text)' }} />
                     </div>
-                    {Object.entries(EMOJI_CATEGORIES).map(([cat, emojis]) => {
-                      const filtered = emojis.filter(e => !reactPickerSearch || e.includes(reactPickerSearch));
-                      if (filtered.length === 0) return null;
-                      return (
-                        <div key={cat} className="picker-cat-section">
-                          <div className="emoji-cat-label">{cat}</div>
-                          <div className="emoji-row">
-                            {filtered.map((e, i) => (
-                              <button key={i} className="emoji-btn" onClick={() => { toggleReaction(chId || activeChannel, msg.id, e, !!parentMsgId, parentMsgId); setQuickReactMsg(null); }}>{e}</button>
-                            ))}
-                          </div>
+                    <div className="picker-grid">
+                      <div className="picker-cat-section">
+                        <div className="emoji-cat-label">Favorites</div>
+                        <div className="emoji-row">
+                          {EMOJI_FAVORITES.filter(e => !reactPickerSearch || e.includes(reactPickerSearch)).map((e, i) => (
+                            <button key={i} className="emoji-btn" onClick={() => { toggleReaction(chId || activeChannel, msg.id, e, !!parentMsgId, parentMsgId); setQuickReactMsg(null); }}>{e}</button>
+                          ))}
                         </div>
-                      );
-                    })}
+                      </div>
+                      {Object.entries(EMOJI_CATEGORIES).map(([cat, emojis]) => {
+                        const filtered = emojis.filter(e => !reactPickerSearch || e.includes(reactPickerSearch));
+                        if (filtered.length === 0) return null;
+                        return (
+                          <div key={cat} className="picker-cat-section">
+                            <div className="emoji-cat-label">{cat}</div>
+                            <div className="emoji-row">
+                              {filtered.map((e, i) => (
+                                <button key={i} className="emoji-btn" onClick={() => { toggleReaction(chId || activeChannel, msg.id, e, !!parentMsgId, parentMsgId); setQuickReactMsg(null); }}>{e}</button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Timestamp — hidden; revealed by swiping left (positioned absolute off-screen right) */}
+          <div className="msg-bubble-time">
+            {msgTime}{msg.edited && <span style={{ marginLeft: 3 }}>(edited)</span>}
+          </div>
 
           {/* Thread reply preview */}
           {showThreadPreview && replies.length > 0 && (
@@ -2637,19 +2643,51 @@ function Chat({ role, authedUser, perm }) {
         </div>
 
 
-        <div className="chat-messages"
+        <div className="chat-messages" ref={chatMessagesRef}
           onContextMenu={(e) => e.preventDefault()}
-          onTouchStart={(e) => { msgsTouchStartY.current = e.touches[0].clientY; }}
+          onTouchStart={(e) => {
+            msgsTouchStartX.current = e.touches[0].clientX;
+            msgsTouchStartY.current = e.touches[0].clientY;
+            msgsSwipeDir.current = null;
+          }}
           onTouchMove={(e) => {
-            if (msgsTouchStartY.current === null) return;
-            const dy = msgsTouchStartY.current - e.touches[0].clientY;
-            if (dy > 30) { // scrolling down ≥30px → dismiss keyboard
-              const el = document.activeElement;
-              if (el && el !== document.body) el.blur();
-              msgsTouchStartY.current = null; // only fire once per gesture
+            if (msgsTouchStartX.current === null) return;
+            const dx = msgsTouchStartX.current - e.touches[0].clientX; // positive = left swipe
+            const dy = msgsTouchStartY.current - e.touches[0].clientY; // positive = up
+            // Determine gesture direction once we have enough signal
+            if (!msgsSwipeDir.current) {
+              if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) msgsSwipeDir.current = 'h';
+              else if (Math.abs(dy) > 8) msgsSwipeDir.current = 'v';
+            }
+            if (msgsSwipeDir.current === 'h' && dx > 0) {
+              // Left swipe → reveal times
+              const el = chatMessagesRef.current;
+              if (el) {
+                const offset = Math.min(64, dx);
+                el.style.setProperty('--swipe-x', offset + 'px');
+                el.classList.add('chat-swiping');
+              }
+            } else if (msgsSwipeDir.current === 'v' && dy > 30) {
+              // Upward scroll → dismiss keyboard
+              const focused = document.activeElement;
+              if (focused && focused !== document.body) focused.blur();
+              msgsTouchStartY.current = null;
             }
           }}
-          onTouchEnd={() => { msgsTouchStartY.current = null; }}>
+          onTouchEnd={() => {
+            const el = chatMessagesRef.current;
+            if (el) { el.style.setProperty('--swipe-x', '0px'); el.classList.remove('chat-swiping'); }
+            msgsTouchStartX.current = null;
+            msgsTouchStartY.current = null;
+            msgsSwipeDir.current = null;
+          }}
+          onTouchCancel={() => {
+            const el = chatMessagesRef.current;
+            if (el) { el.style.setProperty('--swipe-x', '0px'); el.classList.remove('chat-swiping'); }
+            msgsTouchStartX.current = null;
+            msgsTouchStartY.current = null;
+            msgsSwipeDir.current = null;
+          }}>
           {(channelMessages).map(msg => (
             <MessageBubble key={msg.id} msg={msg} compact={false} showThreadPreview={true} chId={activeChannel} />
           ))}
