@@ -1662,6 +1662,7 @@ function Chat({ role, authedUser, perm }) {
   const threadEndRef = useRef(null);
   const threadScrollRef = useRef(null);
   const prevThreadId = useRef(null);
+  const msgsTouchStartY = useRef(null);
   const composerRef = useRef(null);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -2594,7 +2595,17 @@ function Chat({ role, authedUser, perm }) {
 
 
         <div className="chat-messages"
-          onTouchMove={() => { const el = document.activeElement; if (el && el !== document.body) el.blur(); }}>
+          onTouchStart={(e) => { msgsTouchStartY.current = e.touches[0].clientY; }}
+          onTouchMove={(e) => {
+            if (msgsTouchStartY.current === null) return;
+            const dy = msgsTouchStartY.current - e.touches[0].clientY;
+            if (dy > 30) { // scrolling down ≥30px → dismiss keyboard
+              const el = document.activeElement;
+              if (el && el !== document.body) el.blur();
+              msgsTouchStartY.current = null; // only fire once per gesture
+            }
+          }}
+          onTouchEnd={() => { msgsTouchStartY.current = null; }}>
           {(channelMessages).map(msg => (
             <MessageBubble key={msg.id} msg={msg} compact={false} showThreadPreview={true} chId={activeChannel} />
           ))}
