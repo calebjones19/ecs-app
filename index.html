@@ -182,20 +182,35 @@
   .chat-icon-btn { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border); background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--text-light); transition: all 0.15s; }
   .chat-icon-btn:hover { background: var(--bg); color: var(--text); }
 
-  .chat-messages { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 2px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-  .message-group { display: flex; gap: 10px; padding: 8px 0; }
-  .message-group { padding: 8px 20px; margin: 0 -20px; border-radius: 4px; }
-  .message-group:hover { background: var(--chat-hover); }
-  .msg-avatar { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: white; flex-shrink: 0; }
-  .msg-content { flex: 1; min-width: 0; }
-  .msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; height: 20px; }
-  .msg-name { font-weight: 700; font-size: 14px; }
-  .msg-time { font-size: 11px; color: var(--text-light); }
+  /* ── iMessage-style chat messages ── */
+  .chat-messages { flex: 1; overflow-y: auto; padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 2px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  .message-group { display: flex; align-items: flex-end; gap: 8px; padding: 2px 0; }
+  .message-group.msg-own { flex-direction: row-reverse; }
+  .message-group:hover { background: none; }
+  .message-group.long-press-active { background: var(--primary-light); border-radius: 12px; transition: background 0.2s; }
+  .msg-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10px; color: white; flex-shrink: 0; align-self: flex-end; }
+  .message-group.msg-own .msg-avatar { display: none; }
+  .msg-content { display: flex; flex-direction: column; max-width: 72%; gap: 2px; }
+  .message-group.msg-own .msg-content { align-items: flex-end; }
+  .message-group.msg-other .msg-content { align-items: flex-start; }
+  .msg-sender-name { font-size: 11px; font-weight: 600; color: var(--text-light); margin-left: 4px; margin-bottom: 2px; }
+  .msg-header { display: none; }
+  .msg-name { display: none; }
+  .msg-bubble { border-radius: 18px; padding: 9px 14px; font-size: 14px; line-height: 1.45; word-break: break-word; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .message-group.msg-own .msg-bubble { background: var(--msg-own); color: white; border-radius: 18px 18px 4px 18px; }
+  .message-group.msg-other .msg-bubble { background: var(--msg-other); color: var(--text); border-radius: 18px 18px 18px 4px; }
+  .msg-bubble-time { font-size: 10px; margin-top: 3px; opacity: 0.65; }
+  .message-group.msg-own .msg-bubble-time { color: rgba(255,255,255,0.8); text-align: right; }
+  .message-group.msg-other .msg-bubble-time { color: var(--text-light); }
   .msg-text { font-size: 14px; line-height: 1.5; }
-  .msg-text .tag { background: var(--primary-light); color: var(--primary); padding: 1px 4px; border-radius: 3px; font-weight: 500; }
-  .msg-reactions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; position: relative; }
+  .message-group.msg-own .msg-text .tag { background: rgba(255,255,255,0.25); color: white; padding: 1px 4px; border-radius: 3px; font-weight: 500; }
+  .message-group.msg-other .msg-text .tag { background: var(--primary-light); color: var(--primary); padding: 1px 4px; border-radius: 3px; font-weight: 500; }
+  .msg-time { display: none; }
+  .msg-reactions { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; align-items: center; position: relative; }
+  .message-group.msg-own .msg-reactions { justify-content: flex-end; }
   .reaction { background: var(--primary-light); border: 1px solid #c2dbc9; border-radius: 12px; padding: 2px 8px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
   .reaction:hover { background: #d0e8d8; }
+  .reaction.own-react { background: #dceee4; border-color: var(--primary); }
   .msg-file { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-top: 6px; display: flex; align-items: center; gap: 10px; max-width: 360px; }
   .msg-file i { font-size: 20px; color: var(--primary); }
   .msg-file-info { font-size: 13px; }
@@ -292,10 +307,10 @@
 
   /* Thread panel (3rd column) */
   .thread-panel { width: 380px; border-left: 1px solid var(--border); background: white; display: flex; flex-direction: column; flex-shrink: 0; animation: slideInThread 0.2s ease; }
-  @keyframes slideInThread { from { width: 0; opacity: 0; } to { width: 380px; opacity: 1; } }
+  @keyframes slideInThread { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
   .thread-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   .thread-header h4 { font-size: 15px; font-weight: 700; }
-  .thread-messages { flex: 1; overflow-y: auto; padding: 12px 16px; overscroll-behavior: contain; }
+  .thread-messages { flex: 1; overflow-y: auto; padding: 12px 16px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
   .thread-composer { padding: 10px 16px 14px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-end; }
   .thread-composer textarea { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 13px; resize: none; font-family: inherit; min-height: 36px; outline: none; }
   .thread-composer textarea:focus { border-color: var(--primary); }
@@ -317,7 +332,7 @@
     .msg-hover-actions { display: none !important; }
     .message-group.long-press-active { background: var(--primary-light); transition: background 0.2s; }
   }
-  .thread-messages .message-group { padding: 8px 12px; }
+  .thread-messages .message-group { padding: 2px 8px; }
 
   /* Long-press action sheet (Slack-style) */
   .action-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 400; animation: fadeIn 0.15s ease; }
@@ -665,13 +680,13 @@
     .chat-channels.hidden-mobile { display: none; }
     .chat-main { width: 100%; flex: 1; min-height: 0; }
     .chat-main.hidden-mobile { display: none; }
-    .chat-messages { padding: 12px; }
-    .message-group { padding: 8px 12px; margin: 0 -12px; }
-    .msg-avatar { width: 30px; height: 30px; font-size: 12px; }
-    .msg-name { font-size: 13px; }
-    .msg-text { font-size: 13px; }
+    .chat-messages { padding: 10px 10px 6px; }
+    .message-group { padding: 2px 0; margin: 0; }
+    .msg-avatar { width: 26px; height: 26px; font-size: 10px; }
+    .msg-text { font-size: 14px; }
     .msg-file { max-width: 100%; }
     .msg-poll { max-width: 100%; }
+    .msg-content { max-width: 78%; }
     .chat-composer { padding: 8px 10px 6px; }
     .chat-composer .composer-card {
       display: flex; flex-direction: column; background: white; border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden;
@@ -684,13 +699,17 @@
     .chat-composer .composer-send { width: 34px; height: 34px; font-size: 14px; margin-left: auto; border-radius: 50%; }
     .chat-composer .composer-input-wrap { display: contents; }
     .chat-composer .send-later-dropdown { display: contents; }
-    .thread-panel { width: 100%; position: fixed; top: 0; left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); z-index: 200; }
+    .thread-panel { width: 100%; position: fixed; top: 0; left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); z-index: 200; display: flex; flex-direction: column; }
     .thread-composer { padding: 6px 10px 4px; }
     .thread-composer textarea { padding: 6px 10px; font-size: 16px; min-height: 36px; }
     .members-panel-mobile { width: 100% !important; position: fixed !important; top: 0; left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom, 0px)); z-index: 200; }
 
     @keyframes slideInThread { from { transform: translateX(100%); } to { transform: translateX(0); } }
-    .chat-header { padding: 10px 12px; }
+    .chat-header { padding: 10px 12px; background: var(--sidebar-bg); border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .chat-header .chat-header-left h3 { color: white; }
+    .chat-header .chat-header-left span { color: rgba(255,255,255,0.5); }
+    .chat-header .chat-icon-btn { border-color: rgba(255,255,255,0.15); background: transparent; color: rgba(255,255,255,0.6); }
+    .chat-header .mobile-chat-back { color: var(--leaf-light); }
     .channel-list { max-height: none; flex: 1; }
     .chat-channels-header { padding: 12px; }
 
@@ -1956,15 +1975,12 @@ function Chat({ role, authedUser, perm }) {
     if (!container) return;
     const justOpened = openThread?.msgId !== prevThreadId.current;
     prevThreadId.current = openThread?.msgId ?? null;
-    if (justOpened) {
-      container.scrollTop = container.scrollHeight;
-      setTimeout(() => {
-        if (threadScrollRef.current) threadScrollRef.current.scrollTop = threadScrollRef.current.scrollHeight;
-      }, 250);
-    } else {
+    if (!justOpened) {
+      // New message arrived while thread is open — scroll if near bottom
       const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
       if (nearBottom) container.scrollTop = container.scrollHeight;
     }
+    // Initial open scroll is handled by onAnimationEnd on the thread panel
   }, [openThread, channelMessages]);
 
   // Close pickers on click outside
@@ -2255,111 +2271,134 @@ function Chat({ role, authedUser, perm }) {
     const isEditing = editingMsg && editingMsg.msgId === msg.id && editingMsg.channelId === (chId || activeChannel);
     const moreOpen = moreMenuMsg === msg.id;
 
+    const msgTime = msg.createdAt?.toDate
+      ? msg.createdAt.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      : (msg.time || 'Just now');
+
     return (
-      <div className="message-group" key={msg.id}
+      <div className={`message-group ${isOwnMsg ? 'msg-own' : 'msg-other'}`}
         onTouchStart={(e) => handleLongPressStart(e, msg, chId, parentMsgId)}
         onTouchMove={handleLongPressMove}
         onTouchEnd={handleLongPressEnd}
         onTouchCancel={handleLongPressEnd}
       >
-        <div className="msg-avatar" style={{ background: msgUser.color, borderRadius: 8, width: compact ? 28 : 36, height: compact ? 28 : 36, fontSize: compact ? 11 : 14 }}>{msgUser.avatar}</div>
+        {/* Avatar — only for other people's messages */}
+        {!isOwnMsg && (
+          <div className="msg-avatar" style={{ background: msgUser.color }}>{msgUser.avatar}</div>
+        )}
+
         <div className="msg-content">
-          <div className="msg-header">
-            <span className="msg-name" style={compact ? { fontSize: 13 } : {}}>{msgUser.name}</span>
-            <span className="msg-time">{msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : (msg.time || 'Just now')}{msg.edited && <span className="msg-edited">(edited)</span>}</span>
-            {!compact && (
-              <div className="msg-hover-actions" style={{ position: 'relative', ...(moreOpen ? { display: 'inline-flex', alignItems: 'center', gap: 2 } : {}) }}>
-                <button title="Reply in thread" onClick={() => { closeAllPickers(); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /></button>
-                <button title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
-                <button title="Pin"><i className="fas fa-thumbtack" /></button>
-                <button title="More" onClick={() => setMoreMenuMsg(moreOpen ? null : msg.id)}><i className="fas fa-ellipsis-h" /></button>
-                {moreOpen && ReactDOM.createPortal(<>
-                  <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => { setMoreMenuMsg(null); setConfirmUnsend(null); }} />
-                  <div className="more-menu">
-                    {confirmUnsend && confirmUnsend.msgId === msg.id ? (<>
-                      <div style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>Are you sure you want to unsend?</div>
-                      <div className="more-menu-item danger" onClick={(e) => { e.stopPropagation(); unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); setConfirmUnsend(null); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
-                      <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); setConfirmUnsend(null); setMoreMenuMsg(null); }}><i className="fas fa-times" /> Cancel</div>
-                    </>) : (<>
-                      {isOwnMsg && <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); startEdit(chId || activeChannel, msg, parentMsgId); }}><i className="fas fa-pen" /> Edit message</div>}
-                      <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(msg.text.replace(/<[^>]+>/g, '')); setMoreMenuMsg(null); }}><i className="fas fa-copy" /> Copy text</div>
-                      <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); closeAllPickers(); setMoreMenuMsg(null); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /> Reply in thread</div>
-                      <div className="more-menu-item"><i className="fas fa-thumbtack" /> Pin message</div>
-                      {isOwnMsg && <div className="more-menu-item danger" onClick={(e) => { e.stopPropagation(); setConfirmUnsend({ channelId: chId || activeChannel, msgId: msg.id, parentMsgId }); }}><i className="fas fa-trash-alt" /> Unsend</div>}
-                    </>)}
+          {/* Sender name — only for others, top-level only */}
+          {!isOwnMsg && !compact && (
+            <div className="msg-sender-name">{msgUser.name}</div>
+          )}
+
+          {/* Desktop hover actions (above bubble) */}
+          {!compact && (
+            <div className="msg-hover-actions" style={{ position: 'relative', ...(moreOpen ? { display: 'inline-flex', alignItems: 'center', gap: 2 } : {}) }}>
+              <button title="Reply in thread" onClick={() => { closeAllPickers(); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /></button>
+              <button title="React" onClick={() => setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id)}><i className="fas fa-smile" /></button>
+              <button title="More" onClick={() => setMoreMenuMsg(moreOpen ? null : msg.id)}><i className="fas fa-ellipsis-h" /></button>
+              {moreOpen && ReactDOM.createPortal(<>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={() => { setMoreMenuMsg(null); setConfirmUnsend(null); }} />
+                <div className="more-menu">
+                  {confirmUnsend && confirmUnsend.msgId === msg.id ? (<>
+                    <div style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>Are you sure you want to unsend?</div>
+                    <div className="more-menu-item danger" onClick={(e) => { e.stopPropagation(); unsendMessage(confirmUnsend.channelId, confirmUnsend.msgId, confirmUnsend.parentMsgId); setConfirmUnsend(null); }}><i className="fas fa-trash-alt" /> Yes, unsend</div>
+                    <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); setConfirmUnsend(null); setMoreMenuMsg(null); }}><i className="fas fa-times" /> Cancel</div>
+                  </>) : (<>
+                    {isOwnMsg && <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); startEdit(chId || activeChannel, msg, parentMsgId); }}><i className="fas fa-pen" /> Edit message</div>}
+                    <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(msg.text.replace(/<[^>]+>/g, '')); setMoreMenuMsg(null); }}><i className="fas fa-copy" /> Copy text</div>
+                    <div className="more-menu-item" onClick={(e) => { e.stopPropagation(); closeAllPickers(); setMoreMenuMsg(null); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}><i className="fas fa-comment-dots" /> Reply in thread</div>
+                    <div className="more-menu-item"><i className="fas fa-thumbtack" /> Pin message</div>
+                    {isOwnMsg && <div className="more-menu-item danger" onClick={(e) => { e.stopPropagation(); setConfirmUnsend({ channelId: chId || activeChannel, msgId: msg.id, parentMsgId }); }}><i className="fas fa-trash-alt" /> Unsend</div>}
+                  </>)}
+                </div>
+              </>, document.body)}
+            </div>
+          )}
+
+          {/* Bubble */}
+          <div className="msg-bubble">
+            {isEditing ? (
+              <div className="msg-edit-wrap">
+                <textarea className="msg-edit-input" value={editText} onChange={e => setEditText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
+                  ref={el => { if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }}
+                  rows={Math.min(Math.max(2, (editText.match(/\n/g) || []).length + 1), 6)} />
+                <div className="msg-edit-actions">
+                  <button onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); cancelEdit(); }} onClick={cancelEdit}>Cancel</button>
+                  <button className="primary" onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); saveEdit(); }} onClick={saveEdit}>Save</button>
+                </div>
+              </div>
+            ) : msg.text ? (
+              <div className="msg-text" dangerouslySetInnerHTML={{
+                __html: msg.text
+                  .replace(/\n/g, '<br>')
+                  .replace(/@(\w+\s\w+)/g, '<span class="tag">@$1</span>')
+              }} />
+            ) : null}
+            {msg.file && (
+              msg.file.type && msg.file.type.startsWith('image/') && msg.file.url ? (
+                <div>
+                  <a href={msg.file.url} target="_blank" rel="noopener noreferrer">
+                    <img src={msg.file.url} alt={msg.file.name} style={{ maxWidth: 240, maxHeight: 200, borderRadius: 10, cursor: 'pointer', display: 'block' }} />
+                  </a>
+                  <div style={{ fontSize: 10, marginTop: 3, opacity: 0.7 }}>{msg.file.name}</div>
+                </div>
+              ) : (
+                <a href={msg.file.url || '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <div className="msg-file" style={{ background: 'rgba(0,0,0,0.08)', border: 'none' }}>
+                    <i className={`fas ${msg.file.url ? 'fa-download' : 'fa-file'}`} />
+                    <div className="msg-file-info">
+                      <div className="file-name">{msg.file.name}</div>
+                      <div className="file-size">{msg.file.size}</div>
+                    </div>
                   </div>
-                </>, document.body)}
+                </a>
+              )
+            )}
+            {msg.gif && (
+              <div>
+                <img src={msg.gif.url} alt={msg.gif.title || 'GIF'} style={{ maxWidth: 220, maxHeight: 180, borderRadius: 10, display: 'block' }} />
+                <div style={{ fontSize: 9, marginTop: 2, opacity: 0.6 }}>via GIPHY</div>
               </div>
             )}
+            {msg.poll && (
+              <div className="msg-poll" style={{ background: 'rgba(0,0,0,0.08)', border: 'none' }}>
+                <h4><i className="fas fa-poll" style={{ marginRight: 6 }} />{msg.poll.question}</h4>
+                {msg.poll.options.map((opt, i) => {
+                  const pct = msg.poll.totalVotes > 0 ? (opt.votes / msg.poll.totalVotes * 100) : 0;
+                  return (
+                    <div className="poll-option" key={i}>
+                      <div className="poll-bar" style={{ width: `${pct}%` }} />
+                      <span>{opt.text}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 12 }}>{opt.votes} ({Math.round(pct)}%)</span>
+                    </div>
+                  );
+                })}
+                <div className="poll-votes">{msg.poll.totalVotes} total votes</div>
+              </div>
+            )}
+            {/* Timestamp + edited */}
+            <div className="msg-bubble-time">
+              {msgTime}{msg.edited && <span style={{ marginLeft: 4, opacity: 0.7 }}>(edited)</span>}
+            </div>
           </div>
-          {isEditing ? (
-            <div className="msg-edit-wrap">
-              <textarea className="msg-edit-input" value={editText} onChange={e => setEditText(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                ref={el => { if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200); } }}
-                rows={Math.min(Math.max(2, (editText.match(/\n/g) || []).length + 1), 6)} />
-              <div className="msg-edit-actions">
-                <button onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); cancelEdit(); }} onClick={cancelEdit}>Cancel</button>
-                <button className="primary" onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); saveEdit(); }} onClick={saveEdit}>Save</button>
-              </div>
-            </div>
-          ) : msg.text ? (
-            <div className="msg-text" style={compact ? { fontSize: 13 } : {}} dangerouslySetInnerHTML={{
-              __html: msg.text
-                .replace(/\n/g, '<br>')
-                .replace(/@(\w+\s\w+)/g, '<span class="tag">@$1</span>')
-            }} />
-          ) : null}
-          {msg.file && (
-            msg.file.type && msg.file.type.startsWith('image/') && msg.file.url ? (
-              <div style={{ marginTop: 6 }}>
-                <a href={msg.file.url} target="_blank" rel="noopener noreferrer">
-                  <img src={msg.file.url} alt={msg.file.name} style={{ maxWidth: 320, maxHeight: 240, borderRadius: 8, cursor: 'pointer' }} />
-                </a>
-                <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>{msg.file.name} · {msg.file.size}</div>
-              </div>
-            ) : (
-              <a href={msg.file.url || '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div className="msg-file">
-                  <i className={`fas ${msg.file.url ? 'fa-download' : 'fa-file'}`} />
-                  <div className="msg-file-info">
-                    <div className="file-name">{msg.file.name}</div>
-                    <div className="file-size">{msg.file.size}</div>
-                  </div>
-                </div>
-              </a>
-            )
-          )}
-          {msg.gif && (
-            <div style={{ marginTop: 6 }}>
-              <img src={msg.gif.url} alt={msg.gif.title || 'GIF'} style={{ maxWidth: 280, maxHeight: 200, borderRadius: 8 }} />
-              <div style={{ fontSize: 9, color: 'var(--text-light)', marginTop: 2 }}>via GIPHY</div>
-            </div>
-          )}
-          {msg.poll && (
-            <div className="msg-poll">
-              <h4><i className="fas fa-poll" style={{ marginRight: 6 }} />{msg.poll.question}</h4>
-              {msg.poll.options.map((opt, i) => {
-                const pct = msg.poll.totalVotes > 0 ? (opt.votes / msg.poll.totalVotes * 100) : 0;
-                return (
-                  <div className="poll-option" key={i}>
-                    <div className="poll-bar" style={{ width: `${pct}%` }} />
-                    <span>{opt.text}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-light)' }}>{opt.votes} votes ({Math.round(pct)}%)</span>
-                  </div>
-                );
-              })}
-              <div className="poll-votes">{msg.poll.totalVotes} total votes</div>
-            </div>
-          )}
+
+          {/* Reactions (below bubble) */}
           {msg.reactions && msg.reactions.length > 0 && (
             <div className="msg-reactions">
               {msg.reactions.map((r, i) => (
-                <span className="reaction" key={i} onClick={() => toggleReaction(chId || activeChannel, msg.id, r.emoji, !!parentMsgId, parentMsgId)} style={r.myReact ? { background: '#dceee4', borderColor: 'var(--primary)' } : {}}>{r.emoji} {r.count}</span>
+                <span className={`reaction${r.myReact ? ' own-react' : ''}`} key={i}
+                  onClick={() => toggleReaction(chId || activeChannel, msg.id, r.emoji, !!parentMsgId, parentMsgId)}>
+                  {r.emoji} {r.count}
+                </span>
               ))}
-              <span className="reaction" style={{ opacity: 0.4, fontSize: 11 }} onClick={() => { setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id); setReactPickerTab('favorites'); setReactPickerSearch(''); }}>+</span>
+              <span className="reaction" style={{ opacity: 0.4, fontSize: 11 }}
+                onClick={() => { setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id); setReactPickerTab('favorites'); setReactPickerSearch(''); }}>+</span>
               {quickReactMsg === msg.id && (
-                <div className="picker-popup" style={{ width: 340, position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, background: '#fff', color: 'var(--text)' }}>
+                <div className="picker-popup" style={{ width: 340, position: 'absolute', bottom: '100%', left: isOwnMsg ? 'auto' : 0, right: isOwnMsg ? 0 : 'auto', marginBottom: 4, background: '#fff', color: 'var(--text)' }}>
                   <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
                     <input placeholder="Search emojis..." value={reactPickerSearch} onChange={e => setReactPickerSearch(e.target.value)} style={{ background: 'var(--bg)', color: 'var(--text)' }} />
                   </div>
@@ -2391,7 +2430,8 @@ function Chat({ role, authedUser, perm }) {
               )}
             </div>
           )}
-          {/* Thread reply preview (collapsed) */}
+
+          {/* Thread reply preview */}
           {showThreadPreview && replies.length > 0 && (
             <div className="reply-preview" onClick={() => { closeAllPickers(); setOpenThread({ channelId: activeChannel, msgId: msg.id }); }}
               style={isThreadOpen ? { background: 'var(--primary-light)' } : {}}>
@@ -2405,7 +2445,6 @@ function Chat({ role, authedUser, perm }) {
             </div>
           )}
         </div>
-
       </div>
     );
   };
@@ -2764,7 +2803,11 @@ function Chat({ role, authedUser, perm }) {
 
       {/* ── Thread Panel (column 3) ── */}
       {openThread && threadParent && (
-        <div className="thread-panel">
+        <div className="thread-panel" onAnimationEnd={() => {
+          if (threadScrollRef.current) {
+            threadScrollRef.current.scrollTop = threadScrollRef.current.scrollHeight;
+          }
+        }}>
           <div className="thread-header">
             <h4>Thread</h4>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -2799,6 +2842,7 @@ function Chat({ role, authedUser, perm }) {
               value={threadReply}
               onChange={e => setThreadReply(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendThreadReply(); } }}
+              onFocus={() => window.scrollTo(0, 0)}
               rows={1}
             />
             <button onClick={sendThreadReply} title="Send reply"><i className="fas fa-paper-plane" /></button>
