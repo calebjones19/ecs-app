@@ -86,7 +86,7 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 // Cache the app shell for offline support
-const CACHE_NAME = 'essence-v1';
+const CACHE_NAME = 'essence-v3';
 const OFFLINE_URLS = [
   '/ecs-app/',
   '/ecs-app/index.html',
