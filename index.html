@@ -1660,6 +1660,7 @@ function Chat({ role, authedUser, perm }) {
   const [activeFormats, setActiveFormats] = useState({});
   const messagesEndRef = useRef(null);
   const threadEndRef = useRef(null);
+  const threadScrollRef = useRef(null);
   const prevThreadId = useRef(null);
   const composerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -1950,10 +1951,16 @@ function Chat({ role, authedUser, perm }) {
   }, [activeChannel, channelMessages]);
 
   useEffect(() => {
-    if (!threadEndRef.current) return;
+    const container = threadScrollRef.current;
+    if (!container) return;
     const justOpened = openThread?.msgId !== prevThreadId.current;
     prevThreadId.current = openThread?.msgId ?? null;
-    threadEndRef.current.scrollIntoView({ behavior: justOpened ? 'instant' : 'smooth' });
+    if (justOpened) {
+      // Direct assignment — no animation, works on all browsers including iOS Safari
+      container.scrollTop = container.scrollHeight;
+    } else {
+      threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [openThread, channelMessages]);
 
   // Close pickers on click outside
@@ -2755,7 +2762,7 @@ function Chat({ role, authedUser, perm }) {
               </button>
             </div>
           </div>
-          <div className="thread-messages">
+          <div className="thread-messages" ref={threadScrollRef}>
             {/* Original parent message */}
             <MessageBubble msg={threadParent} compact={false} showThreadPreview={false} chId={openThread.channelId} />
             {/* Divider */}
