@@ -309,12 +309,14 @@
   .reply-preview .reply-last { color: var(--text-light); margin-left: 4px; }
 
   /* Msg hover actions bar – desktop only */
+  .msg-mobile-react { display: none; }
   .msg-hover-actions { display: none; margin-left: 4px; }
   .msg-hover-actions button { width: 20px; height: 20px; border: none; background: none; cursor: pointer; border-radius: 4px; font-size: 12px; color: var(--text-light); display: inline-flex; align-items: center; justify-content: center; padding: 0; }
   .msg-hover-actions button:hover { background: var(--bg); color: var(--text); }
   .message-group:hover .msg-hover-actions { display: inline-flex; align-items: center; gap: 2px; }
   @media (max-width: 768px) {
     .msg-hover-actions { display: none !important; }
+    .msg-mobile-react { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--card); font-size: 14px; cursor: pointer; margin-top: 4px; -webkit-tap-highlight-color: transparent; }
     .message-group.long-press-active { background: var(--primary-light); transition: background 0.2s; }
   }
   .thread-messages .message-group { padding: 8px 12px; }
@@ -2387,6 +2389,13 @@ function Chat({ role, authedUser, perm }) {
                 </div>
               )}
             </div>
+          )}
+          {/* Mobile-only emoji react button */}
+          {!compact && (
+            <button className="msg-mobile-react"
+              onTouchEnd={(e) => { e.preventDefault(); setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id); setReactPickerTab('favorites'); setReactPickerSearch(''); }}>
+              😊
+            </button>
           )}
           {/* Thread reply preview (collapsed) */}
           {showThreadPreview && replies.length > 0 && (
