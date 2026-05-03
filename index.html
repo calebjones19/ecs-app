@@ -529,6 +529,9 @@
   /* ── Mobile Bottom Nav ── */
   .mobile-bottom-nav { display: none; }
 
+  /* ── Mobile Header ── */
+  .mobile-header { display: none; }
+
   /* ── Mobile Responsive ── */
   .mobile-only { display: none; }
   .desktop-only { display: block; }
@@ -548,8 +551,21 @@
     .main { overflow-x: hidden; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; background: white; }
     .content { padding: 12px; overflow-x: hidden; overflow-y: auto; width: 100%; max-width: 100vw; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
 
-    /* Hide desktop top nav, show mobile bottom nav */
+    /* Hide desktop top nav, show mobile header */
     .topnav { display: none; }
+    .mobile-header {
+      display: flex;
+      align-items: center;
+      height: 52px;
+      padding: 0 16px;
+      background: var(--sidebar-bg);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 100;
+    }
+    .mobile-header-logo { display: flex; align-items: center; flex: 1; cursor: pointer; }
+    .mobile-header-right { display: flex; align-items: center; gap: 10px; }
+    body.keyboard-open .mobile-header { display: none !important; }
     .mobile-bottom-nav {
       display: flex;
       position: fixed;
@@ -637,7 +653,7 @@
     .card { padding: 14px; margin-bottom: 12px; overflow-x: hidden; }
 
     /* Chat layout → full width, toggle between channels and messages */
-    .chat-layout { flex-direction: column; height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px)); }
+    .chat-layout { flex-direction: column; height: calc(100dvh - 60px - 52px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px)); }
     .chat-channels { width: 100%; border-right: none; border-bottom: 1px solid var(--border); flex: 1; }
     .chat-channels.hidden-mobile { display: none; }
     .chat-main { width: 100%; flex: 1; min-height: 0; }
@@ -6259,6 +6275,7 @@ function App() {
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
   const userMenuRef = useRef(null);
+  const mobileUserMenuRef = useRef(null);
   const [chatUnread, setChatUnread] = useState(0);
 
   // Sync active page to global for notification suppression
@@ -6465,7 +6482,10 @@ function App() {
 
   useEffect(() => {
     const handleClick = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setShowUserMenu(false);
+      if (
+        userMenuRef.current && !userMenuRef.current.contains(e.target) &&
+        mobileUserMenuRef.current && !mobileUserMenuRef.current.contains(e.target)
+      ) setShowUserMenu(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -6750,11 +6770,53 @@ function App() {
         </div>
       </nav>
 
+      {/* ── Mobile Header ── */}
+      <div className="mobile-header">
+        <div className="mobile-header-logo" onClick={() => setPage('dashboard')}>
+          <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 6, padding: '3px 10px 2px', display: 'flex', alignItems: 'center' }}>
+            <img src={ESSENCE_LOGO} alt="Essence" style={{ height: 28, objectFit: 'contain' }} />
+          </div>
+        </div>
+        <div className="mobile-header-right">
+          <button className="topnav-icon-btn" onClick={() => setPage('chat')} style={{ position: 'relative' }}>
+            <i className="fas fa-comments" />
+            {chatUnread > 0 && (
+              <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, background: 'var(--danger)', borderRadius: '50%', border: '2px solid var(--sidebar-bg)' }} />
+            )}
+          </button>
+          <div ref={mobileUserMenuRef} style={{ position: 'relative' }}>
+            <div className="avatar sm" style={{ background: 'var(--primary)', cursor: 'pointer', fontSize: 12 }} onClick={() => setShowUserMenu(!showUserMenu)}>
+              {initials}
+            </div>
+            {showUserMenu && (
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: 'white', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.15)', padding: 6, minWidth: 220, zIndex: 999 }}>
+                <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{authedUser.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>{authedUser.role || 'Employee'} · {({ admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' })[getUserPerm(authedUser)] || 'Schedule Viewer'}</div>
+                </div>
+                <div className="dd-item" onClick={() => setShowUserMenu(false)}>
+                  <i className="fas fa-user" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
+                  <span style={{ fontSize: 14 }}>My Profile</span>
+                </div>
+                <div className="dd-item" onClick={() => { setShowUserMenu(false); setPage('notifications'); }}>
+                  <i className="fas fa-cog" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
+                  <span style={{ fontSize: 14 }}>Settings</span>
+                </div>
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
+                <div className="dd-item" onClick={handleLogout} style={{ color: 'var(--danger)' }}>
+                  <i className="fas fa-sign-out-alt" style={{ width: 20, textAlign: 'center' }} />
+                  <span style={{ fontSize: 14 }}>Sign out</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* ── Mobile Bottom Nav ── */}
       <div className="mobile-bottom-nav">
         {[
           { id: 'dashboard', icon: 'fa-th-large', label: 'Home' },
-          { id: 'chat', icon: 'fa-comments', label: 'Chat' },
           { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule' },
           { id: 'timesheets', icon: 'fa-clock', label: 'Time' },
           { id: 'more', icon: 'fa-ellipsis-h', label: 'More' },
