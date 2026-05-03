@@ -316,7 +316,7 @@
   .message-group:hover .msg-hover-actions { display: inline-flex; align-items: center; gap: 2px; }
   @media (max-width: 768px) {
     .msg-hover-actions { display: none !important; }
-    .msg-mobile-react { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); background: white; font-size: 15px; cursor: pointer; flex-shrink: 0; align-self: flex-end; box-shadow: 0 1px 4px rgba(0,0,0,0.1); -webkit-tap-highlight-color: transparent; margin-bottom: 2px; }
+    .msg-mobile-react { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: none; background: #e5e5ea; font-size: 16px; cursor: pointer; flex-shrink: 0; align-self: flex-end; -webkit-tap-highlight-color: transparent; margin-bottom: 1px; }
     .message-group { -webkit-user-select: none; user-select: none; }
     .message-group.long-press-active { background: var(--primary-light); transition: background 0.2s; }
   }
@@ -1960,13 +1960,14 @@ function Chat({ role, authedUser, perm }) {
     const justOpened = openThread?.msgId !== prevThreadId.current;
     prevThreadId.current = openThread?.msgId ?? null;
     if (justOpened) {
-      // Set immediately, then again after the slideInThread animation (0.2s) completes
       container.scrollTop = container.scrollHeight;
       setTimeout(() => {
         if (threadScrollRef.current) threadScrollRef.current.scrollTop = threadScrollRef.current.scrollHeight;
       }, 220);
     } else {
-      threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // New reply arrived — only scroll if already near the bottom (no animation)
+      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+      if (nearBottom) container.scrollTop = container.scrollHeight;
     }
   }, [openThread, channelMessages]);
 
@@ -2316,7 +2317,7 @@ function Chat({ role, authedUser, perm }) {
               {!compact && (
                 <button className="msg-mobile-react"
                   onTouchEnd={(e) => { e.preventDefault(); setQuickReactMsg(quickReactMsg === msg.id ? null : msg.id); setReactPickerTab('favorites'); setReactPickerSearch(''); }}>
-                  😊
+                  <span style={{ fontSize: 15 }}>😊</span><span style={{ fontSize: 9, lineHeight: 1, marginLeft: 1 }}>+</span>
                 </button>
               )}
             </div>
