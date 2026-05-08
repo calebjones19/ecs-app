@@ -852,22 +852,32 @@
 }
 
 /* Home page widgets */
-.home-greeting { padding: 4px 0 20px; }
-.home-greeting h2 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 2px; }
+.home-greeting { padding: 4px 0 28px; }
+.home-greeting h2 { font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
 .home-greeting p { font-size: 14px; color: var(--text-light); }
-.home-widgets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
-.home-widget { background: white; border-radius: 16px; padding: 20px 16px 16px; cursor: pointer; transition: all 0.18s; border: 1.5px solid var(--border); display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden; }
-.home-widget:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
-.home-widget:active { transform: scale(0.97); }
-.home-widget-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; }
-.home-widget h4 { font-size: 15px; font-weight: 700; color: var(--text); margin: 0; }
-.home-widget p { font-size: 12px; color: var(--text-light); margin: 0; line-height: 1.4; }
+.home-widgets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.home-widget { background: white; border-radius: 20px; padding: 28px 16px 20px; cursor: pointer; transition: all 0.18s; border: 1.5px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 14px; position: relative; overflow: hidden; }
+.home-widget:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.home-widget:active { transform: scale(0.96); }
+.home-widget-icon { width: 68px; height: 68px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; }
+.home-widget h4 { font-size: 14px; font-weight: 700; color: var(--text); margin: 0; text-align: center; }
 @media (max-width: 768px) {
-  .home-widgets { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .home-widget { padding: 16px 14px 14px; }
-  .home-widget-icon { width: 38px; height: 38px; font-size: 17px; }
-  .home-widget h4 { font-size: 14px; }
+  .home-widgets { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .home-widget { padding: 24px 14px 18px; }
+  .home-widget-icon { width: 60px; height: 60px; font-size: 26px; }
+  .home-widget h4 { font-size: 13px; }
 }
+.home-tasks-section { margin-bottom: 24px; }
+.home-task-client { font-size: 13px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
+.home-task-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; background: white; border-radius: 12px; margin-bottom: 6px; border: 1.5px solid var(--border); cursor: pointer; transition: background 0.12s; }
+.home-task-row.done { opacity: 0.55; }
+.home-task-row:active { background: var(--bg); }
+.home-task-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+.home-task-check.checked { background: var(--success); border-color: var(--success); }
+.home-task-check.checked i { color: white; font-size: 11px; }
+.home-task-text { flex: 1; font-size: 14px; color: var(--text); }
+.home-task-row.done .home-task-text { text-decoration: line-through; color: var(--text-light); }
+.home-task-time { font-size: 12px; color: var(--text-light); flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -1242,6 +1252,156 @@ function Modal({ show, onClose, title, children }) {
   );
 }
 
+// ─── Home Page ─────────────────────────────────────────────────
+function Home({ role, perm, authedUser, setPage }) {
+  const hour = new Date().getHours();
+  const greetingWord = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+  const firstName = authedUser?.name?.split(' ')[0] || 'there';
+
+  return (
+    <div>
+      <div className="home-greeting">
+        <h2>Good {greetingWord}, {firstName}! 👋</h2>
+        <p>Welcome back to your team portal.</p>
+      </div>
+      <div className="home-widgets">
+        <div className="home-widget" onClick={() => setPage && setPage('dashboard')}>
+          <div className="home-widget-icon" style={{ background: 'var(--primary)' }}>
+            <i className="fas fa-chart-bar" />
+          </div>
+          <h4>Dashboard</h4>
+        </div>
+        <div className="home-widget" onClick={() => setPage && setPage('my-checklists')}>
+          <div className="home-widget-icon" style={{ background: '#b85c4a' }}>
+            <i className="fas fa-clipboard-check" />
+          </div>
+          <h4>Checklists</h4>
+        </div>
+        <div className="home-widget" onClick={() => setPage && setPage('schedule')}>
+          <div className="home-widget-icon" style={{ background: '#5e8a7a' }}>
+            <i className="fas fa-calendar-alt" />
+          </div>
+          <h4>Schedule</h4>
+        </div>
+        <div className="home-widget" onClick={() => setPage && setPage('timesheets')}>
+          <div className="home-widget-icon" style={{ background: '#c8a84e' }}>
+            <i className="fas fa-clock" />
+          </div>
+          <h4>Time Clock</h4>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Home Checklists (worker view — view & complete tasks) ──────
+function HomeChecklists({ role, perm, authedUser }) {
+  const [tasks, setTasks] = useState([]);
+  const [completions, setCompletions] = useState([]);
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    const unsubTasks = db.collection('checklist_tasks')
+      .where('active', '==', true)
+      .onSnapshot(snap => setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    const unsubComp = db.collection('checklist_completions')
+      .where('date', '==', todayStr)
+      .onSnapshot(snap => setCompletions(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    return () => { unsubTasks(); unsubComp(); };
+  }, []);
+
+  const completionsByTask = {};
+  completions.forEach(c => { completionsByTask[c.taskId] = c; });
+
+  const fmtTime = (t) => {
+    if (!t) return '';
+    const [hh, mm] = t.split(':').map(Number);
+    const ampm = hh < 12 ? 'AM' : 'PM';
+    const h = hh % 12 || 12;
+    return `${h}:${mm.toString().padStart(2,'0')} ${ampm}`;
+  };
+
+  const timeToMins = (t) => {
+    if (!t) return 9999;
+    const [hh, mm] = t.split(':').map(Number);
+    return hh * 60 + mm;
+  };
+
+  const toggleCompletion = async (task) => {
+    const existing = completionsByTask[task.id];
+    if (existing) {
+      await db.collection('checklist_completions').doc(existing.id).delete();
+    } else {
+      await db.collection('checklist_completions').add({
+        taskId: task.id,
+        clientId: task.clientId,
+        date: todayStr,
+        completedBy: authedUser?.id || '',
+        completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  };
+
+  // Group tasks by client
+  const tasksByClient = {};
+  tasks.forEach(t => {
+    if (!tasksByClient[t.clientId]) tasksByClient[t.clientId] = { name: t.clientName, tasks: [] };
+    tasksByClient[t.clientId].tasks.push(t);
+  });
+
+  const clientEntries = Object.entries(tasksByClient)
+    .map(([id, { name, tasks: ts }]) => ({ id, name, tasks: ts.sort((a,b) => timeToMins(a.time) - timeToMins(b.time)) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const totalTasks = tasks.length;
+  const doneTasks = tasks.filter(t => completionsByTask[t.id]).length;
+
+  if (clientEntries.length === 0) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+        <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>No tasks today</div>
+        <div style={{ fontSize: 13 }}>Tasks are added by your manager in the Checklists section.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 4 }}>Today's Progress</div>
+          <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: totalTasks > 0 ? `${Math.round(doneTasks/totalTasks*100)}%` : '0%', background: 'var(--success)', borderRadius: 4, transition: 'width 0.3s' }} />
+          </div>
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 15, color: doneTasks === totalTasks && totalTasks > 0 ? 'var(--success)' : 'var(--text)' }}>
+          {doneTasks}/{totalTasks}
+        </div>
+      </div>
+      <div className="home-tasks-section">
+        {clientEntries.map(client => (
+          <div key={client.id}>
+            <div className="home-task-client">{client.name}</div>
+            {client.tasks.map(task => {
+              const done = !!completionsByTask[task.id];
+              return (
+                <div key={task.id} className={`home-task-row${done ? ' done' : ''}`} onClick={() => toggleCompletion(task)}>
+                  <div className={`home-task-check${done ? ' checked' : ''}`}>
+                    {done && <i className="fas fa-check" />}
+                  </div>
+                  <span className="home-task-text">{task.text}</span>
+                  {task.time && <span className="home-task-time">{fmtTime(task.time)}</span>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard ─────────────────────────────────────────────────
 function Dashboard({ role, perm, authedUser, setPage }) {
   const canSchedule = perm?.canSchedule || role === 'admin';
@@ -1334,51 +1494,8 @@ function Dashboard({ role, perm, authedUser, setPage }) {
   // Day names for shift display
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // Greeting
-  const hour = new Date().getHours();
-  const greetingWord = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-  const firstName = authedUser?.name?.split(' ')[0] || 'there';
-
   return (
     <div>
-      {/* ── Greeting ── */}
-      <div className="home-greeting">
-        <h2>Good {greetingWord}, {firstName}! 👋</h2>
-        <p>Welcome back to your team portal.</p>
-      </div>
-
-      {/* ── Feature Widgets ── */}
-      <div className="home-widgets">
-        <div className="home-widget" onClick={() => {}}>
-          <div className="home-widget-icon" style={{ background: 'var(--primary)' }}>
-            <i className="fas fa-chart-bar" />
-          </div>
-          <h4>Stats</h4>
-          <p>{activeClients.length} active accounts · {totalScheduledHours}h scheduled</p>
-        </div>
-        <div className="home-widget" onClick={() => setPage && setPage('checklists')}>
-          <div className="home-widget-icon" style={{ background: '#b85c4a' }}>
-            <i className="fas fa-clipboard-check" />
-          </div>
-          <h4>Checklists</h4>
-          <p>Track job site tasks</p>
-        </div>
-        <div className="home-widget" onClick={() => setPage && setPage('schedule')}>
-          <div className="home-widget-icon" style={{ background: '#5e8a7a' }}>
-            <i className="fas fa-calendar-alt" />
-          </div>
-          <h4>Schedule</h4>
-          <p>{myShifts.length > 0 ? `${myShifts.length} shift${myShifts.length !== 1 ? 's' : ''} this week` : 'View your schedule'}</p>
-        </div>
-        <div className="home-widget" onClick={() => setPage && setPage('timesheets')}>
-          <div className="home-widget-icon" style={{ background: '#c8a84e' }}>
-            <i className="fas fa-clock" />
-          </div>
-          <h4>Time Clock</h4>
-          <p>Clock in / out</p>
-        </div>
-      </div>
-
       {/* ── Admin/Editor stats section ── */}
       {canEdit && (
         <div style={{ marginBottom: 24 }}>
@@ -5141,9 +5258,15 @@ function Checklists({ role, perm, authedUser }) {
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
   const [newTaskTime, setNewTaskTime] = useState('');
+  const [newTaskClientId, setNewTaskClientId] = useState('');
   const [savingTask, setSavingTask] = useState(false);
   const [actionSheet, setActionSheet] = useState(null); // { task }
   const [editingTask, setEditingTask] = useState(null); // { id, text, time }
+  const [showGlobalAddTask, setShowGlobalAddTask] = useState(false);
+  const [globalTaskText, setGlobalTaskText] = useState('');
+  const [globalTaskTime, setGlobalTaskTime] = useState('');
+  const [globalTaskClientId, setGlobalTaskClientId] = useState('');
+  const [savingGlobal, setSavingGlobal] = useState(false);
   const lpTimerRef = React.useRef(null);
 
   // ── Firestore listeners ──
@@ -5206,14 +5329,16 @@ function Checklists({ role, perm, authedUser }) {
     await batch.commit();
   };
 
-  // ── Add task ──
+  // ── Add task (within client view, with optional re-assignment) ──
   const handleAddTask = async () => {
     if (!newTaskText.trim() || !selectedClient) return;
     setSavingTask(true);
-    const clientTasks = tasksByClient[selectedClient.id] || [];
+    const assignId = newTaskClientId || selectedClient.id;
+    const assignClient = newTaskClientId ? CLIENTS.find(c => c.id === newTaskClientId) : selectedClient;
+    const clientTasks = tasksByClient[assignId] || [];
     await db.collection('checklist_tasks').add({
-      clientId: selectedClient.id,
-      clientName: selectedClient.name,
+      clientId: assignId,
+      clientName: assignClient?.name || selectedClient.name,
       text: newTaskText.trim(),
       time: newTaskTime,
       sortOrder: clientTasks.length,
@@ -5223,8 +5348,33 @@ function Checklists({ role, perm, authedUser }) {
     });
     setNewTaskText('');
     setNewTaskTime('');
+    setNewTaskClientId('');
     setShowAddTask(false);
     setSavingTask(false);
+  };
+
+  // ── Add task globally (with client assignment) ──
+  const handleGlobalAddTask = async () => {
+    if (!globalTaskText.trim() || !globalTaskClientId) return;
+    setSavingGlobal(true);
+    const assignedClient = CLIENTS.find(c => c.id === globalTaskClientId);
+    if (!assignedClient) { setSavingGlobal(false); return; }
+    const clientTasks = tasksByClient[globalTaskClientId] || [];
+    await db.collection('checklist_tasks').add({
+      clientId: assignedClient.id,
+      clientName: assignedClient.name,
+      text: globalTaskText.trim(),
+      time: globalTaskTime,
+      sortOrder: clientTasks.length,
+      active: true,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: authedUser?.id || '',
+    });
+    setGlobalTaskText('');
+    setGlobalTaskTime('');
+    setGlobalTaskClientId('');
+    setShowGlobalAddTask(false);
+    setSavingGlobal(false);
   };
 
   // ── Delete task ──
@@ -5335,13 +5485,21 @@ function Checklists({ role, perm, authedUser }) {
           <div className="cl-add-task-form">
             <input className="form-input" placeholder="Task description..." value={newTaskText}
               onChange={e => setNewTaskText(e.target.value)} autoFocus style={{ marginBottom: 10 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <label style={{ fontSize: 13, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>Assign to:</label>
+              <select className="form-input" value={newTaskClientId || selectedClient?.id || ''} onChange={e => setNewTaskClientId(e.target.value)}>
+                {[...CLIENTS].sort((a,b) => a.name.localeCompare(b.name)).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <label style={{ fontSize: 13, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>Time (optional):</label>
               <input type="time" className="form-input" value={newTaskTime} onChange={e => setNewTaskTime(e.target.value)} />
               {newTaskTime && <button className="topbar-btn" style={{ fontSize: 12 }} onClick={() => setNewTaskTime('')}>Clear</button>}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="topbar-btn" onClick={() => { setShowAddTask(false); setNewTaskText(''); setNewTaskTime(''); }}>Cancel</button>
+              <button className="topbar-btn" onClick={() => { setShowAddTask(false); setNewTaskText(''); setNewTaskTime(''); setNewTaskClientId(''); }}>Cancel</button>
               <button className="topbar-btn primary" onClick={handleAddTask} disabled={!newTaskText.trim() || savingTask}>
                 {savingTask ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-check" /> Save</>}
               </button>
@@ -5395,10 +5553,49 @@ function Checklists({ role, perm, authedUser }) {
   // ── Client grid view ──
   return (
     <div>
-      <div className="cl-filter-pills">
-        {['All', 'Homes', 'Businesses'].map(f => (
-          <button key={f} className={`cl-pill${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>{f}</button>
-        ))}
+      {/* Global Add Task Modal */}
+      {showGlobalAddTask && canEdit && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 400 }} onClick={() => setShowGlobalAddTask(false)}>
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px 36px', zIndex: 401 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, background: '#ddd', borderRadius: 2, margin: '0 auto 18px' }} />
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 16 }}>New Checklist Task</div>
+            <label className="form-label">Task description</label>
+            <input className="form-input" placeholder="e.g. Vacuum all rooms..." value={globalTaskText}
+              onChange={e => setGlobalTaskText(e.target.value)} autoFocus style={{ marginBottom: 14 }} />
+            <label className="form-label">Assign to account</label>
+            <select className="form-input" value={globalTaskClientId} onChange={e => setGlobalTaskClientId(e.target.value)} style={{ marginBottom: 14 }}>
+              <option value="">Select a client...</option>
+              {[...CLIENTS].sort((a,b) => a.name.localeCompare(b.name)).map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <label className="form-label">Time (optional)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+              <input type="time" className="form-input" value={globalTaskTime} onChange={e => setGlobalTaskTime(e.target.value)} style={{ flex: 1 }} />
+              {globalTaskTime && <button className="topbar-btn" onClick={() => setGlobalTaskTime('')}>Clear</button>}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="topbar-btn" style={{ flex: 1 }} onClick={() => { setShowGlobalAddTask(false); setGlobalTaskText(''); setGlobalTaskTime(''); setGlobalTaskClientId(''); }}>Cancel</button>
+              <button className="topbar-btn primary" style={{ flex: 1 }} onClick={handleGlobalAddTask} disabled={!globalTaskText.trim() || !globalTaskClientId || savingGlobal}>
+                {savingGlobal ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-plus" /> Add Task</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
+        <div className="cl-filter-pills" style={{ marginBottom: 0 }}>
+          {['All', 'Homes', 'Businesses'].map(f => (
+            <button key={f} className={`cl-pill${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>{f}</button>
+          ))}
+        </div>
+        {canEdit && (
+          <button className="topbar-btn primary" onClick={() => setShowGlobalAddTask(true)}>
+            <i className="fas fa-plus" /> Add Task
+          </button>
+        )}
       </div>
 
       {visibleClients.length === 0 && (
@@ -6768,7 +6965,7 @@ function App() {
   const canEdit = permLevel >= 2;      // editor+
   const isAdmin = permLevel >= 3;      // admin only
   const role = isAdmin ? 'admin' : canEdit ? 'editor' : canSchedule ? 'scheduler' : 'employee';
-  const [page, setPage] = useState('dashboard');
+  const [page, setPage] = useState('home');
   const [adminSubPage, setAdminSubPage] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [toast, setToast] = useState(null);
@@ -6844,11 +7041,25 @@ function App() {
   }, []);
 
   // Load clients from Firestore (realtime) — updates global + state
+  // Auto-seeds from CLIENT_SEED if the collection is empty on first load
+  const clientsSeededRef = React.useRef(false);
   useEffect(() => {
-    const unsub = db.collection('clients').onSnapshot((snap) => {
+    const unsub = db.collection('clients').onSnapshot(async (snap) => {
       const cls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       CLIENTS = cls;
       setClients(cls);
+      // Auto-seed if empty and not already seeded this session
+      if (cls.length === 0 && !clientsSeededRef.current) {
+        clientsSeededRef.current = true;
+        try {
+          const batch = db.batch();
+          CLIENT_SEED.forEach(seed => {
+            const ref = db.collection('clients').doc();
+            batch.set(ref, { name: seed.name, address: seed.address, type: seed.type, contact: '', phone: '', email: '', frequency: 'Weekly', rate: 0, budgetedHours: 0, notes: '', status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+          });
+          await batch.commit();
+        } catch (e) { console.warn('Auto-seed clients failed:', e); }
+      }
     });
     return () => unsub();
   }, []);
@@ -6966,7 +7177,7 @@ function App() {
   // Navigation structure — built dynamically based on permission level
   const buildNavItems = () => {
     const items = [
-      { id: 'dashboard', label: 'Home', icon: 'fa-th-large', desc: 'Overview & stats', color: '#4a6741', singlePage: true },
+      { id: 'home', label: 'Home', icon: 'fa-home', desc: 'Your home screen', color: '#4a6741', singlePage: true },
       { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: chatUnread || 0, singlePage: true },
     ];
     if (canSchedule) {
@@ -6975,7 +7186,8 @@ function App() {
         { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule', desc: canSchedule ? 'Assign shifts & manage the calendar' : 'View your upcoming shifts', color: '#4a6741' },
         { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets', desc: 'Clock in/out records & payroll hours', color: '#5a8a4a' },
         { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Swap requests & open shift pickups', color: '#c8a84e', badge: 2 },
-        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists for each location', color: '#b85c4a' },
+        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Manage Checklists', desc: 'Create and manage job site task lists', color: '#b85c4a' },
+        { id: 'dashboard', icon: 'fa-chart-bar', label: 'Dashboard', desc: 'Stats & hours overview', color: '#5e8a7a' },
       ];
       items.push({ id: 'operations', label: 'Operations', icon: 'fa-briefcase', children: opsChildren });
       if (canEdit) {
@@ -6989,10 +7201,10 @@ function App() {
     } else {
       // Viewer sees My Work group
       items.push({ id: 'mywork', label: 'My Work', icon: 'fa-briefcase', children: [
+        { id: 'my-checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'View & complete today\'s tasks', color: '#b85c4a' },
         { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule', desc: 'View your upcoming shifts', color: '#4a6741' },
         { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out', desc: 'Track your hours', color: '#5a8a4a' },
         { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Request swaps or pick up shifts', color: '#c8a84e' },
-        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists', color: '#b85c4a' },
         { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability', desc: 'Set when you can work', color: '#5e8a7a' },
       ]});
     }
@@ -7004,7 +7216,7 @@ function App() {
   const buildSidebarNav = () => {
     const sections = [
       { section: "Main", items: [
-        { id: 'dashboard', icon: 'fa-th-large', label: 'Dashboard' },
+        { id: 'home', icon: 'fa-home', label: 'Home' },
         { id: 'chat', icon: 'fa-comments', label: 'Chat', badge: chatUnread || 0 },
       ]},
     ];
@@ -7013,7 +7225,8 @@ function App() {
         { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule' },
         { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets' },
         { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', badge: 2 },
-        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists' },
+        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Manage Checklists' },
+        { id: 'dashboard', icon: 'fa-chart-bar', label: 'Dashboard' },
       ]});
       if (canEdit) {
         sections.push({ section: "People", items: [
@@ -7024,10 +7237,10 @@ function App() {
       }
     } else {
       sections.push({ section: "My Work", items: [
+        { id: 'my-checklists', icon: 'fa-clipboard-check', label: 'Checklists' },
         { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule' },
         { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out' },
         { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps' },
-        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists' },
         { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability' },
       ]});
     }
@@ -7040,12 +7253,14 @@ function App() {
   const nav = buildSidebarNav();
 
   const pageTitles = {
+    home: 'Home',
     dashboard: 'Dashboard',
+    'my-checklists': 'Checklists',
     chat: 'Chat',
     schedule: 'Schedule',
     timesheets: 'Timesheets',
     shifts: 'Shift Swaps',
-    checklists: 'Checklists',
+    checklists: 'Manage Checklists',
     employees: 'Employees',
     availability: 'Availability',
     clients: 'Clients',
@@ -7056,7 +7271,9 @@ function App() {
   const renderPage = () => {
     const perm = { role, isAdmin, canEdit, canSchedule, permLevel };
     switch (page) {
+      case 'home': return <Home role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       case 'dashboard': return <Dashboard role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
+      case 'my-checklists': return <HomeChecklists role={role} perm={perm} authedUser={authedUser} />;
       case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm} />;
       case 'schedule': return <Schedule role={role} perm={perm} />;
       case 'timesheets': return <Timesheets role={role} authedUser={authedUser} perm={perm} />;
@@ -7067,7 +7284,7 @@ function App() {
       case 'clients': return <ClientList role={role} perm={perm} />;
       case 'notifications': return <NotificationSettings userId={authedUser?.id} />;
       case 'admin': return <AdminPanel role={role} perm={perm} authedUser={authedUser} setPage={setPage} adminSubPage={adminSubPage} setAdminSubPage={setAdminSubPage} />;
-      default: return <Dashboard role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
+      default: return <Home role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
     }
   };
 
@@ -7135,7 +7352,7 @@ function App() {
 
       {/* ── Horizontal Top Nav ── */}
       <nav className="topnav">
-        <div className="topnav-logo" onClick={() => setPage('dashboard')} style={{ cursor: 'pointer' }}>
+        <div className="topnav-logo" onClick={() => setPage('home')} style={{ cursor: 'pointer' }}>
           <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 8, padding: '4px 12px 2px', display: 'flex', alignItems: 'center' }}>
             <img src={ESSENCE_LOGO} alt="Essence Cleaning" style={{ height: 32, objectFit: 'contain' }} />
           </div>
@@ -7144,7 +7361,7 @@ function App() {
         <div className="topnav-links">
           {navItems.map(item => {
             const isActive = item.singlePage
-              ? page === item.id
+              ? (item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page) : page === item.id)
               : item.children?.some(c => c.id === page);
 
             if (item.singlePage) {
@@ -7284,12 +7501,12 @@ function App() {
       {/* ── Mobile Bottom Nav ── */}
       <div className="mobile-bottom-nav">
         {[
-          { id: 'dashboard', icon: 'fa-th-large', label: 'Home' },
+          { id: 'home', icon: 'fa-home', label: 'Home' },
           { id: 'schedule', icon: 'fa-calendar-alt', label: 'Schedule' },
           { id: 'timesheets', icon: 'fa-clock', label: 'Time' },
           ...(canSchedule ? [{ id: 'admin', icon: 'fa-crown', label: 'Admin' }] : []),
         ].map(item => (
-          <button key={item.id} className={`mobile-nav-item ${(item.id === 'admin' ? ['employees','clients','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin'].includes(page) : page === item.id) ? 'active' : ''}`}
+          <button key={item.id} className={`mobile-nav-item ${(item.id === 'admin' ? ['employees','clients','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin','dashboard'].includes(page) : item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page) : page === item.id) ? 'active' : ''}`}
             onClick={() => {
               setPage(item.id);
             }}>
