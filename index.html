@@ -4627,7 +4627,19 @@ function EmployeeProfiles({ role, perm }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [editMode, setEditMode] = useState(false);
-  const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '' });
+  const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '', teams: [], managerId: '', managerName: '' });
+  const [availableTeams, setAvailableTeams] = useState([]);
+
+  // Load teams for dropdowns
+  useEffect(() => {
+    const unsub = db.collection('teams').onSnapshot(snap => {
+      setAvailableTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.name.localeCompare(b.name)));
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  // Managers = employees with scheduler+ permission
+  const managers = EMPLOYEES.filter(e => ['scheduler','editor','admin'].includes(e.permission) && e.status !== 'inactive').sort((a,b) => a.name.localeCompare(b.name));
 
   // Sync editData when selectedEmp changes
   useEffect(() => {
@@ -4662,6 +4674,9 @@ function EmployeeProfiles({ role, perm }) {
         emergencyContact: (editData.emergencyContact || '').trim(),
         avatar: initials || selectedEmp.avatar,
         status: editData.status || selectedEmp.status,
+        teams: editData.teams || [],
+        managerId: editData.managerId || '',
+        managerName: editData.managerName || '',
       });
       setEditDirty(false);
       setEditMode(false);
@@ -4697,10 +4712,13 @@ function EmployeeProfiles({ role, perm }) {
         color: color,
         startDate: new Date().toISOString().slice(0, 10),
         clockedIn: false,
+        teams: newEmp.teams || [],
+        managerId: newEmp.managerId || '',
+        managerName: newEmp.managerName || '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       setShowAdd(false);
-      setNewEmp({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '' });
+      setNewEmp({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '', teams: [], managerId: '', managerName: '' });
     } catch (err) {
       alert('Error adding employee: ' + err.message);
     }
@@ -4804,6 +4822,31 @@ function EmployeeProfiles({ role, perm }) {
         <div className="form-group">
           <label className="form-label">Emergency Contact</label>
           <input className="form-input" placeholder="Name — Phone" value={newEmp.emergencyContact} onChange={e => setNewEmp({...newEmp, emergencyContact: e.target.value})} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Manager</label>
+          <select className="form-input" value={newEmp.managerId} onChange={e => {
+            const mgr = managers.find(m => m.id === e.target.value);
+            setNewEmp({...newEmp, managerId: e.target.value, managerName: mgr?.name || ''});
+          }}>
+            <option value="">No manager assigned</option>
+            {managers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Teams</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {availableTeams.map(t => {
+              const selected = (newEmp.teams || []).includes(t.name);
+              return (
+                <button key={t.id} type="button"
+                  className={`cl-pill${selected ? ' active' : ''}`}
+                  onClick={() => setNewEmp({...newEmp, teams: selected ? newEmp.teams.filter(n => n !== t.name) : [...(newEmp.teams||[]), t.name]})}>
+                  {t.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <button className="topbar-btn" onClick={() => setShowAdd(false)}>Cancel</button>
@@ -5011,7 +5054,8 @@ function EmployeeProfiles({ role, perm }) {
                       {[['Pay Rate', selectedEmp.payRate ? `$${selectedEmp.payRate}/hr` : '—'],
                         ['Employment Type', selectedEmp.type === 'contractor' ? '1099 Contractor' : 'W-2 Employee'],
                         ['Job Title', selectedEmp.role || '—'],
-                        ['Start Date', selectedEmp.startDate || '—']
+                        ['Start Date', selectedEmp.startDate || '—'],
+                        ['Manager', selectedEmp.managerName || '—'],
                       ].map(([label, val]) => (
                         <div key={label} className="form-group">
                           <label className="form-label">{label}</label>
@@ -5019,6 +5063,14 @@ function EmployeeProfiles({ role, perm }) {
                         </div>
                       ))}
                     </div>
+                    {(selectedEmp.teams || []).length > 0 && (
+                      <div className="form-group">
+                        <label className="form-label">Teams</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 0' }}>
+                          {selectedEmp.teams.map(t => <span key={t} className="badge blue">{t}</span>)}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -5041,6 +5093,32 @@ function EmployeeProfiles({ role, perm }) {
                         </select>
                       </div>
                       <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
+                    </div>
+                    <div className="form-group" style={{ marginTop: 4 }}>
+                      <label className="form-label">Manager</label>
+                      <select className="form-input" value={editData.managerId || ''} onChange={e => {
+                        const mgr = managers.find(m => m.id === e.target.value);
+                        handleEditField('managerId', e.target.value);
+                        handleEditField('managerName', mgr?.name || '');
+                      }}>
+                        <option value="">No manager assigned</option>
+                        {managers.filter(m => m.id !== selectedEmp?.id).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Teams</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {availableTeams.map(t => {
+                          const selected = (editData.teams || []).includes(t.name);
+                          return (
+                            <button key={t.id} type="button"
+                              className={`cl-pill${selected ? ' active' : ''}`}
+                              onClick={() => handleEditField('teams', selected ? editData.teams.filter(n => n !== t.name) : [...(editData.teams||[]), t.name])}>
+                              {t.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
                       <button className="topbar-btn" onClick={() => { setEditMode(false); setEditData({ ...selectedEmp }); setEditDirty(false); }}>Cancel</button>
