@@ -4317,15 +4317,12 @@ function ClientList({ role, perm }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div className="search-bar" style={{ flex: 1, minWidth: 180 }}>
+        <div className="search-bar" style={{ flex: 1, minWidth: 0 }}>
           <i className="fas fa-search" />
           <input placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         {canEdit && (
-          <>
-            <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add Client</button>
-            <button className="topbar-btn" onClick={handleSeedClients} disabled={saving} title="Import template clients"><i className="fas fa-database" /> Import Template</button>
-          </>
+          <button className="topbar-btn primary" onClick={() => setShowAdd(true)} style={{ flexShrink: 0 }}><i className="fas fa-plus" /></button>
         )}
       </div>
       <div className="cl-filter-pills" style={{ marginBottom: 16 }}>
