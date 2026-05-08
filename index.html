@@ -1109,6 +1109,63 @@ const ESSENCE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAegAAAC6CAYA
 let EMPLOYEES = [];
 let CLIENTS = [];
 
+const EMPLOYEE_COLORS = ['#4a6741','#5e8a7a','#7c6f64','#c8a84e','#b85c4a','#5a8a4a','#4a7a8a','#8a4a7a','#7a6a4a','#4a5a8a'];
+
+const EMPLOYEE_SEED = [
+  { name: 'Caleb Jones',        role: 'Technology & Onboarding', teams: ['Leadership Team'],                          kioskCode: '4491', startDate: '01/15/2026', permission: 'admin' },
+  { name: 'Debbie Jones',       role: 'CEO',                     teams: ['Leadership Team'],                          kioskCode: '0064', startDate: '01/15/2026', permission: 'admin' },
+  { name: 'Greg Jones',         role: 'CEO',                     teams: ['Leadership Team'],                          kioskCode: '8413', startDate: '01/15/2026', permission: 'admin' },
+  { name: 'Sierra Stowe',       role: 'Operations Coordinator',  teams: ['Team Sierra'],                              kioskCode: '5791', startDate: '',           permission: 'scheduler' },
+  { name: 'Holli Myers',        role: 'Account Manager',         teams: ['Team Holli'],                               kioskCode: '0928', startDate: '',           permission: 'scheduler' },
+  { name: 'Donna Bailey',       role: 'Account Manager',         teams: ['Team Donna'],                               kioskCode: '3625', startDate: '10/16/2015', permission: 'scheduler' },
+  { name: 'Kayla Palm',         role: 'Account Manager',         teams: ['GHS - Children\'s Center'],                 kioskCode: '0238', startDate: '09/13/2023', permission: 'scheduler' },
+  { name: 'Melissa Poyorena',   role: 'Account Manager',         teams: ['Team Melissa'],                             kioskCode: '4797', startDate: '',           permission: 'scheduler' },
+  { name: 'RoseAnn Shetler',    role: 'Account Manager',         teams: ['Team Roseann'],                             kioskCode: '6718', startDate: '',           permission: 'scheduler' },
+  { name: 'Aedan Williams',     role: 'Cleaning Technician',     teams: ['Team Kayla'],                               kioskCode: '3185', startDate: '02/26/2025', permission: 'viewer' },
+  { name: 'Alec Gordon',        role: 'Cleaning Technician',     teams: ['Team Sierra'],                              kioskCode: '9535', startDate: '',           permission: 'viewer' },
+  { name: 'Alex Wood',          role: 'Cleaning Technician',     teams: ['Team Sierra'],                              kioskCode: '2596', startDate: '',           permission: 'viewer' },
+  { name: 'Alyssa Guralczyk',   role: 'Cleaning Technician',     teams: ['Team Sierra'],                              kioskCode: '0801', startDate: '',           permission: 'viewer' },
+  { name: 'Amy Beaman',         role: 'Cleaning Technician',     teams: ['Team Sierra', 'Team Holli'],                kioskCode: '6174', startDate: '',           permission: 'viewer' },
+  { name: 'Amanda Vandeventer', role: 'Cleaning Technician',     teams: [],                                           kioskCode: '3391', startDate: '',           permission: 'viewer' },
+  { name: 'Brittany Poyorena',  role: 'Cleaning Technician',     teams: ['Team Melissa'],                             kioskCode: '2239', startDate: '',           permission: 'viewer' },
+  { name: 'Carly Bahena',       role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center'],                 kioskCode: '1063', startDate: '',           permission: 'viewer' },
+  { name: 'Carrie McBride',     role: 'Cleaning Technician',     teams: ['Team Sierra'],                              kioskCode: '7052', startDate: '',           permission: 'viewer' },
+  { name: 'Cheryl Dobson',      role: 'Cleaning Technician',     teams: ['Team Melissa'],                             kioskCode: '9910', startDate: '',           permission: 'viewer' },
+  { name: 'Crystal Fingerle',   role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Holli'],   kioskCode: '3734', startDate: '',           permission: 'viewer' },
+  { name: 'Cynthia Ford',       role: 'Cleaning Technician',     teams: ['Team Roseann'],                             kioskCode: '1811', startDate: '',           permission: 'viewer' },
+  { name: 'Damia Cargill',      role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Holli', 'Team Sierra'], kioskCode: '3790', startDate: '', permission: 'viewer' },
+  { name: 'Dawn Morrissey',     role: 'Cleaning Technician',     teams: ['Team Holli'],                               kioskCode: '0446', startDate: '09/01/2024', permission: 'viewer' },
+  { name: 'Dora Gill',          role: 'Cleaning Technician',     teams: ['Team Holli'],                               kioskCode: '6704', startDate: '',           permission: 'viewer' },
+  { name: 'Fannie Shetler',     role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Holli', 'Team Sierra'], kioskCode: '1457', startDate: '05/05/2024', permission: 'viewer' },
+  { name: 'Francine Black',     role: 'Cleaning Technician',     teams: ['Team Sierra'],                              kioskCode: '8443', startDate: '',           permission: 'viewer' },
+  { name: 'Grace McGlaughlin',  role: 'Cleaning Technician',     teams: ['Team Melissa'],                             kioskCode: '8692', startDate: '',           permission: 'viewer' },
+  { name: 'Hannah Rose',        role: 'Cleaning Technician',     teams: [],                                           kioskCode: '1958', startDate: '',           permission: 'viewer' },
+  { name: 'Isaac Osmon',        role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center'],                 kioskCode: '1564', startDate: '08/04/2023', permission: 'viewer' },
+  { name: 'Jaden Long',         role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Holli'],   kioskCode: '3666', startDate: '',           permission: 'viewer' },
+  { name: 'Jenna Faber',        role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Holli'],   kioskCode: '4482', startDate: '',           permission: 'viewer' },
+  { name: 'Jennifer Barnes',    role: 'Cleaning Technician',     teams: ['Team Holli', 'Team Sierra'],                kioskCode: '9752', startDate: '09/12/2024', permission: 'viewer' },
+  { name: 'Josie Gibson',       role: 'Cleaning Technician',     teams: ['Team Holli'],                               kioskCode: '1729', startDate: '08/03/2023', permission: 'viewer' },
+  { name: 'Joyce Hetchler',     role: 'Cleaning Technician',     teams: ['Team Donna'],                               kioskCode: '4106', startDate: '',           permission: 'viewer' },
+  { name: 'Kathy Stimson',      role: 'Cleaning Technician',     teams: ['Team Donna'],                               kioskCode: '0283', startDate: '',           permission: 'viewer' },
+  { name: 'Libertad McLimans',  role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Donna', 'Team Sierra'], kioskCode: '5236', startDate: '', permission: 'viewer' },
+  { name: 'Lydia Black',        role: 'Cleaning Technician',     teams: ['Team Sierra'],                              kioskCode: '8510', startDate: '',           permission: 'viewer' },
+  { name: 'Maggie Fischer',     role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Melissa', 'Team Sierra'], kioskCode: '0973', startDate: '06/01/2024', permission: 'viewer' },
+  { name: 'Marisela Martinez',  role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Roseann'], kioskCode: '7915', startDate: '',           permission: 'viewer' },
+  { name: 'Mikaela Brewer',     role: 'Cleaning Technician',     teams: ['Team Donna', 'Team Sierra'],                kioskCode: '5424', startDate: '',           permission: 'viewer' },
+  { name: 'Nathan Myers',       role: 'Cleaning Technician',     teams: ['Team Holli'],                               kioskCode: '9172', startDate: '04/08/2025', permission: 'viewer' },
+  { name: 'Owen Fox',           role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Holli'],   kioskCode: '4347', startDate: '',           permission: 'viewer' },
+  { name: 'Pam Brewer',         role: 'Cleaning Technician',     teams: ['Team Donna'],                               kioskCode: '9053', startDate: '',           permission: 'viewer' },
+  { name: 'Parker Kitts',       role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center'],                 kioskCode: '0892', startDate: '',           permission: 'viewer' },
+  { name: 'Paul Tacy',          role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Holli'],   kioskCode: '3945', startDate: '',           permission: 'viewer' },
+  { name: 'Rachel Martin',      role: 'Cleaning Technician',     teams: ['Team Melissa'],                             kioskCode: '2404', startDate: '',           permission: 'viewer' },
+  { name: 'Randy Poyorena',     role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Melissa'], kioskCode: '0484', startDate: '',           permission: 'viewer' },
+  { name: 'Ryan Martin',        role: 'Cleaning Technician',     teams: ['Team Melissa'],                             kioskCode: '3229', startDate: '',           permission: 'viewer' },
+  { name: 'Samantha Gregson',   role: 'Cleaning Technician',     teams: ['Team Melissa'],                             kioskCode: '9958', startDate: '',           permission: 'viewer' },
+  { name: 'Sherri Sharp',       role: 'Cleaning Technician',     teams: ['Team Melissa'],                             kioskCode: '8907', startDate: '',           permission: 'viewer' },
+  { name: 'Vicki TeBeest',      role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center'],                 kioskCode: '4801', startDate: '01/01/2000', permission: 'viewer' },
+  { name: 'Wendy Stevens',      role: 'Cleaning Technician',     teams: ['GHS - Children\'s Center', 'Team Holli'],   kioskCode: '6943', startDate: '02/16/2026', permission: 'viewer' },
+];
+
 const CLIENT_SEED = [
   // Homes (type: 'Residential')
   { name: 'H - Karen Forester', address: '3795 Deer Ridge Run, Metamora, MI 48455', type: 'Residential' },
@@ -7280,11 +7337,52 @@ function App() {
   }, [page, authedUser]);
 
   // Load employees from Firestore (realtime) — updates global + state
+  // Auto-fills any EMPLOYEE_SEED entries missing from Firestore on first load
+  const employeesSeededRef = React.useRef(false);
   useEffect(() => {
-    const unsub = db.collection('employees').onSnapshot((snap) => {
+    const unsub = db.collection('employees').onSnapshot(async (snap) => {
       const emps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      EMPLOYEES = emps; // update global for child components
+      EMPLOYEES = emps;
       setEmployees(emps);
+      if (!employeesSeededRef.current) {
+        employeesSeededRef.current = true;
+        try {
+          const existingNames = new Set(emps.map(e => e.name));
+          const missing = EMPLOYEE_SEED.filter(s => !existingNames.has(s.name));
+          if (missing.length > 0) {
+            const chunks = [];
+            for (let i = 0; i < missing.length; i += 490) chunks.push(missing.slice(i, i + 490));
+            for (const chunk of chunks) {
+              const batch = db.batch();
+              chunk.forEach((seed, idx) => {
+                const initials = seed.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                const color = EMPLOYEE_COLORS[(emps.length + idx) % EMPLOYEE_COLORS.length];
+                const ref = db.collection('employees').doc();
+                batch.set(ref, {
+                  name: seed.name,
+                  role: seed.role || 'Cleaning Technician',
+                  teams: seed.teams || [],
+                  kioskCode: seed.kioskCode || '',
+                  startDate: seed.startDate || '',
+                  permission: seed.permission || 'viewer',
+                  phone: '',
+                  phoneNormalized: '',
+                  email: '',
+                  payRate: 0,
+                  address: '',
+                  emergencyContact: '',
+                  type: 'employee',
+                  status: 'active',
+                  avatar: initials,
+                  color,
+                  createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+              });
+              await batch.commit();
+            }
+          }
+        } catch (e) { console.warn('Auto-seed employees failed:', e); }
+      }
     });
     return () => unsub();
   }, []);
