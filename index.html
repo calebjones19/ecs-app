@@ -4314,6 +4314,160 @@ function ClientList({ role, perm }) {
     )
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // ── Client detail page ──
+  if (selectedClient) {
+    const c = selectedClient;
+    return (
+      <div>
+        <button className="topbar-btn" onClick={() => setSelectedClient(null)} style={{ marginBottom: 16 }}>
+          <i className="fas fa-arrow-left" /> Back to Clients
+        </button>
+
+        <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 20, color: c.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 18 }}>{c.name}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 2 }}>{c.address}</div>
+            </div>
+            {canEdit && !editClientMode && (
+              <button className="chat-icon-btn" onClick={() => setEditClientMode(true)} style={{ fontSize: 15 }}>
+                <i className="fas fa-pen" />
+              </button>
+            )}
+          </div>
+
+          {!editClientMode ? (
+            <div>
+              <div className="grid-2">
+                {[['Contact Person', c.contact], ['Phone', c.phone], ['Email', c.email], ['Type', c.type]].map(([label, val]) => (
+                  <div key={label} className="form-group">
+                    <label className="form-label">{label}</label>
+                    <div style={{ fontSize: 14, padding: '6px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="grid-2">
+                {[['Frequency', c.frequency], ['Rate', c.rate ? `$${c.rate}` : '—'], ['Budgeted Hrs/Week', c.budgetedHours ? `${c.budgetedHours}h` : '—'], ['Status', (c.status || 'active').charAt(0).toUpperCase() + (c.status || 'active').slice(1)]].map(([label, val]) => (
+                  <div key={label} className="form-group">
+                    <label className="form-label">{label}</label>
+                    <div style={{ fontSize: 14, padding: '6px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
+                  </div>
+                ))}
+              </div>
+              {c.notes && (
+                <div className="form-group">
+                  <label className="form-label">Notes</label>
+                  <div style={{ fontSize: 14, padding: '6px 0', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{c.notes}</div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Client Name</label>
+                  <input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Contact Person</label>
+                  <input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} />
+                </div>
+              </div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Phone</label>
+                  <input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Address</label>
+                <input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} />
+              </div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Type</label>
+                  <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
+                    <option>Commercial</option>
+                    <option>Residential</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Frequency</label>
+                  <select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}>
+                    <option>Daily</option>
+                    <option>Weekly</option>
+                    <option>Bi-weekly</option>
+                    <option>Monthly</option>
+                    <option>On-demand</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Rate ($)</label>
+                  <input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Budgeted Hours/Week</label>
+                  <input className="form-input" type="number" value={editClient.budgetedHours || ''} onChange={e => handleEditClientField('budgetedHours', e.target.value)} placeholder="0" />
+                </div>
+              </div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Status</label>
+                  <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Notes</label>
+                <textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
+                <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
+                  {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+                </button>
+              </div>
+              {canEdit && (
+                <div style={{ marginTop: 20, padding: 14, borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2' }}>
+                  {!showDeleteClientConfirm ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ fontSize: 13, color: '#991b1b' }}>Permanently remove this client</div>
+                      <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 12 }} onClick={() => setShowDeleteClientConfirm(true)}>
+                        <i className="fas fa-trash" style={{marginRight:4}} /> Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 8 }}>Are you sure? This cannot be undone.</div>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                        <button className="topbar-btn" onClick={() => setShowDeleteClientConfirm(false)}>Cancel</button>
+                        <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClient(selectedClient.id)}>
+                          <i className="fas fa-trash" style={{marginRight:4}} /> Yes, Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -4347,7 +4501,7 @@ function ClientList({ role, perm }) {
             </thead>
             <tbody>
               {filtered.map(c => (
-                <tr key={c.id}>
+                <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedClient(c)}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{c.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{c.address}</div>
@@ -4360,185 +4514,34 @@ function ClientList({ role, perm }) {
                   <td>{c.frequency}</td>
                   <td style={{ fontWeight: 600 }}>${c.rate}</td>
                   <td><span className={`badge ${c.status === 'active' ? 'green' : 'yellow'}`}>{c.status}</span></td>
-                  <td>
-                    <button className="chat-icon-btn" onClick={() => setSelectedClient(c)}><i className="fas fa-eye" /></button>
-                  </td>
+                  <td><i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
-      {/* Mobile list — name only, tap to view details */}
+      {/* Mobile list */}
       <div className="mobile-only">
         {filtered.map(c => (
           <div key={c.id} className="card" onClick={() => setSelectedClient(c)}
             style={{ padding: '14px 16px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: (c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 14, color: (c.type === 'Residential' ? '#388e3c' : '#1976d2') }} />
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 14, color: c.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
               </div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name}</div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{c.type} · {c.frequency}</div>
+              </div>
             </div>
             <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
           </div>
         ))}
-      </div>
-
-      <Modal show={!!selectedClient} onClose={() => setSelectedClient(null)} title={selectedClient?.name || ''}>
-        {selectedClient && (
-          <div>
-            {!editClientMode ? (
-              <div>
-                {canEdit && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                    <button className="chat-icon-btn" title="Edit" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}>
-                      <i className="fas fa-pen" />
-                    </button>
-                  </div>
-                )}
-                <div className="grid-2">
-                  {[['Client Name', selectedClient.name], ['Contact Person', selectedClient.contact],
-                    ['Phone', selectedClient.phone], ['Email', selectedClient.email]
-                  ].map(([label, val]) => (
-                    <div key={label} className="form-group">
-                      <label className="form-label">{label}</label>
-                      <div style={{ fontSize: 14, padding: '8px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
-                    </div>
-                  ))}
-                </div>
-                {[['Address', selectedClient.address]].map(([label, val]) => (
-                  <div key={label} className="form-group">
-                    <label className="form-label">{label}</label>
-                    <div style={{ fontSize: 14, padding: '8px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
-                  </div>
-                ))}
-                <div className="grid-2">
-                  {[['Type', selectedClient.type], ['Frequency', selectedClient.frequency],
-                    ['Rate', selectedClient.rate ? `$${selectedClient.rate}` : '—'],
-                    ['Budgeted Hours/Week', selectedClient.budgetedHours ? `${selectedClient.budgetedHours}h` : '—'],
-                    ['Status', (selectedClient.status || 'active').charAt(0).toUpperCase() + (selectedClient.status || 'active').slice(1)]
-                  ].map(([label, val]) => (
-                    <div key={label} className="form-group">
-                      <label className="form-label">{label}</label>
-                      <div style={{ fontSize: 14, padding: '8px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
-                    </div>
-                  ))}
-                </div>
-                {selectedClient.notes && (
-                  <div className="form-group">
-                    <label className="form-label">Notes</label>
-                    <div style={{ fontSize: 14, padding: '8px 0', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{selectedClient.notes}</div>
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                  <button className="topbar-btn" onClick={() => setSelectedClient(null)}>Close</button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Client Name</label>
-                    <input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Contact Person</label>
-                    <input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} />
-                  </div>
-                </div>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Phone</label>
-                    <input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Email</label>
-                    <input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Address</label>
-                  <input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} />
-                </div>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Type</label>
-                    <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
-                      <option>Commercial</option>
-                      <option>Residential</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Frequency</label>
-                    <select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}>
-                      <option>Daily</option>
-                      <option>Weekly</option>
-                      <option>Bi-weekly</option>
-                      <option>Monthly</option>
-                      <option>On-demand</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Rate ($)</label>
-                    <input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Budgeted Hours/Week</label>
-                    <input className="form-input" type="number" value={editClient.budgetedHours || ''} onChange={e => handleEditClientField('budgetedHours', e.target.value)} placeholder="0" />
-                  </div>
-                </div>
-                <div className="grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Status</label>
-                    <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Notes</label>
-                  <textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                  <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
-                  <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
-                    {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
-                  </button>
-                </div>
-                {/* Danger zone */}
-                {canEdit && (
-                  <div style={{ marginTop: 20, padding: 14, borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2' }}>
-                    {!showDeleteClientConfirm ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                        <div style={{ fontSize: 13, color: '#991b1b' }}>Permanently remove this client</div>
-                        <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 12 }}
-                          onClick={() => setShowDeleteClientConfirm(true)}>
-                          <i className="fas fa-trash" style={{marginRight:4}} /> Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 8 }}>Are you sure? This cannot be undone.</div>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                          <button className="topbar-btn" onClick={() => setShowDeleteClientConfirm(false)}>Cancel</button>
-                          <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)' }}
-                            onClick={() => handleDeleteClient(selectedClient.id)}>
-                            <i className="fas fa-trash" style={{marginRight:4}} /> Yes, Remove Client
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-light)' }}>No clients found</div>
         )}
-      </Modal>
+      </div>
 
       <Modal show={showAdd} onClose={() => setShowAdd(false)} title="Add New Client">
         <div className="grid-2">
