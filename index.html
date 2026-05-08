@@ -4193,6 +4193,8 @@ function ClientList({ role, perm }) {
   const [editClientMode, setEditClientMode] = useState(false);
   const [showDeleteClientConfirm, setShowDeleteClientConfirm] = useState(false);
   const [clientTab, setClientTab] = useState('info');
+  const [approvedEditMode, setApprovedEditMode] = useState(false);
+  const [approvedSearch, setApprovedSearch] = useState('');
   const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
 
   // Sync edit state when selected client changes
@@ -4411,37 +4413,69 @@ function ClientList({ role, perm }) {
           {/* APPROVED EMPLOYEES TAB */}
           {clientTab === 'approved' && (
             <div>
-              <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14 }}>Employees approved to clean at this account.</div>
-              {EMPLOYEES.sort((a,b) => a.name.localeCompare(b.name)).map(emp => {
-                const approved = (selectedClient.approvedEmployeeIds || []).includes(emp.id);
-                if (!approved && !canEdit) return null;
-                return (
-                  <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div className="avatar" style={{ background: emp.color, width: 32, height: 32, fontSize: 12 }}>{emp.avatar}</div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{emp.role}</div>
-                      </div>
-                    </div>
-                    {canEdit && (
-                      <button className="topbar-btn" style={approved ? { fontSize: 12, color: 'var(--danger)', borderColor: 'var(--danger)' } : { fontSize: 12 }}
-                        onClick={async () => {
-                          const ids = selectedClient.approvedEmployeeIds || [];
-                          const next = approved ? ids.filter(id => id !== emp.id) : [...ids, emp.id];
-                          await db.collection('clients').doc(selectedClient.id).update({ approvedEmployeeIds: next });
-                          setSelectedClient({ ...selectedClient, approvedEmployeeIds: next });
-                        }}>
-                        {approved ? 'Remove' : 'Approve'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-              {EMPLOYEES.filter(emp => (selectedClient.approvedEmployeeIds || []).includes(emp.id)).length === 0 && !canEdit && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-light)' }}>Approved to clean at this account</div>
+                {canEdit && !approvedEditMode && <button className="chat-icon-btn" onClick={() => { setApprovedEditMode(true); setApprovedSearch(''); }} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>}
+                {canEdit && approvedEditMode && <button className="topbar-btn" onClick={() => { setApprovedEditMode(false); setApprovedSearch(''); }}>Done</button>}
+              </div>
+              {/* Approved list */}
+              {(selectedClient.approvedEmployeeIds || []).length === 0 && !approvedEditMode && (
                 <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
                   <i className="fas fa-users" style={{ fontSize: 28, opacity: 0.2, display: 'block', marginBottom: 10 }} />
                   No approved employees yet
+                </div>
+              )}
+              {EMPLOYEES.filter(e => (selectedClient.approvedEmployeeIds || []).includes(e.id)).sort((a,b) => a.name.localeCompare(b.name)).map(emp => (
+                <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div className="avatar" style={{ background: emp.color, width: 32, height: 32, fontSize: 12 }}>{emp.avatar}</div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{emp.role}</div>
+                    </div>
+                  </div>
+                  {approvedEditMode && (
+                    <button className="chat-icon-btn" style={{ color: 'var(--danger)' }}
+                      onClick={async () => {
+                        const next = (selectedClient.approvedEmployeeIds || []).filter(id => id !== emp.id);
+                        await db.collection('clients').doc(selectedClient.id).update({ approvedEmployeeIds: next });
+                        setSelectedClient({ ...selectedClient, approvedEmployeeIds: next });
+                      }}>
+                      <i className="fas fa-times" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {/* Search to add */}
+              {approvedEditMode && (
+                <div style={{ marginTop: 16 }}>
+                  <div className="search-bar" style={{ marginBottom: 8 }}>
+                    <i className="fas fa-search" />
+                    <input placeholder="Search employees to add..." value={approvedSearch} onChange={e => setApprovedSearch(e.target.value)} autoFocus />
+                    {approvedSearch && <button onClick={() => setApprovedSearch('')}><i className="fas fa-times" /></button>}
+                  </div>
+                  {approvedSearch.trim() && EMPLOYEES
+                    .filter(e => !(selectedClient.approvedEmployeeIds || []).includes(e.id) && e.name.toLowerCase().includes(approvedSearch.toLowerCase()))
+                    .sort((a,b) => a.name.localeCompare(b.name))
+                    .map(emp => (
+                      <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                        onClick={async () => {
+                          const next = [...(selectedClient.approvedEmployeeIds || []), emp.id];
+                          await db.collection('clients').doc(selectedClient.id).update({ approvedEmployeeIds: next });
+                          setSelectedClient({ ...selectedClient, approvedEmployeeIds: next });
+                          setApprovedSearch('');
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div className="avatar" style={{ background: emp.color, width: 32, height: 32, fontSize: 12 }}>{emp.avatar}</div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{emp.role}</div>
+                          </div>
+                        </div>
+                        <i className="fas fa-plus" style={{ color: 'var(--primary)', fontSize: 13 }} />
+                      </div>
+                    ))
+                  }
                 </div>
               )}
             </div>
@@ -4612,6 +4646,8 @@ function EmployeeProfiles({ role, perm }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
   const [editMode, setEditMode] = useState(false);
+  const [accountsEditMode, setAccountsEditMode] = useState(false);
+  const [accountsSearch, setAccountsSearch] = useState('');
   const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '', teams: [], managerId: '', managerName: '' });
   const [availableTeams, setAvailableTeams] = useState([]);
 
@@ -5131,44 +5167,73 @@ function EmployeeProfiles({ role, perm }) {
             {/* ── Accounts Tab ── */}
             {profileTab === 'accounts' && (
               <div>
-                <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14 }}>
-                  Clients this employee is approved to clean at.
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-light)' }}>Accounts this employee is approved for</div>
+                  {canEdit && !accountsEditMode && <button className="chat-icon-btn" onClick={() => { setAccountsEditMode(true); setAccountsSearch(''); }} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>}
+                  {canEdit && accountsEditMode && <button className="topbar-btn" onClick={() => { setAccountsEditMode(false); setAccountsSearch(''); }}>Done</button>}
                 </div>
-                {CLIENTS.filter(c => (c.approvedEmployeeIds || []).includes(selectedEmp.id)).length === 0 && !canEdit && (
+                {/* Approved clients list */}
+                {CLIENTS.filter(c => (c.approvedEmployeeIds || []).includes(selectedEmp.id)).length === 0 && !accountsEditMode && (
                   <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
                     <i className="fas fa-building" style={{ fontSize: 28, opacity: 0.2, display: 'block', marginBottom: 10 }} />
                     Not approved for any accounts yet
                   </div>
                 )}
-                {CLIENTS.sort((a,b) => a.name.localeCompare(b.name)).map(client => {
-                  const approved = (client.approvedEmployeeIds || []).includes(selectedEmp.id);
-                  if (!approved && !canEdit) return null;
-                  return (
-                    <div key={client.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: client.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <i className={`fas ${client.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 12, color: client.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{client.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{client.type}</div>
-                        </div>
+                {CLIENTS.filter(c => (c.approvedEmployeeIds || []).includes(selectedEmp.id)).sort((a,b) => a.name.localeCompare(b.name)).map(client => (
+                  <div key={client.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: client.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className={`fas ${client.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 12, color: client.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
                       </div>
-                      {canEdit && (
-                        <button
-                          className={`topbar-btn${approved ? '' : ' primary'}`}
-                          style={approved ? { fontSize: 12, color: 'var(--danger)', borderColor: 'var(--danger)' } : { fontSize: 12 }}
-                          onClick={async () => {
-                            const ids = client.approvedEmployeeIds || [];
-                            const next = approved ? ids.filter(id => id !== selectedEmp.id) : [...ids, selectedEmp.id];
-                            await db.collection('clients').doc(client.id).update({ approvedEmployeeIds: next });
-                          }}>
-                          {approved ? 'Remove' : 'Approve'}
-                        </button>
-                      )}
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{client.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{client.type}</div>
+                      </div>
                     </div>
-                  );
-                })}
+                    {accountsEditMode && (
+                      <button className="chat-icon-btn" style={{ color: 'var(--danger)' }}
+                        onClick={async () => {
+                          const next = (client.approvedEmployeeIds || []).filter(id => id !== selectedEmp.id);
+                          await db.collection('clients').doc(client.id).update({ approvedEmployeeIds: next });
+                        }}>
+                        <i className="fas fa-times" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {/* Search to add */}
+                {accountsEditMode && (
+                  <div style={{ marginTop: 16 }}>
+                    <div className="search-bar" style={{ marginBottom: 8 }}>
+                      <i className="fas fa-search" />
+                      <input placeholder="Search accounts to add..." value={accountsSearch} onChange={e => setAccountsSearch(e.target.value)} autoFocus />
+                      {accountsSearch && <button onClick={() => setAccountsSearch('')}><i className="fas fa-times" /></button>}
+                    </div>
+                    {accountsSearch.trim() && CLIENTS
+                      .filter(c => !(c.approvedEmployeeIds || []).includes(selectedEmp.id) && c.name.toLowerCase().includes(accountsSearch.toLowerCase()))
+                      .sort((a,b) => a.name.localeCompare(b.name))
+                      .map(client => (
+                        <div key={client.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                          onClick={async () => {
+                            const next = [...(client.approvedEmployeeIds || []), selectedEmp.id];
+                            await db.collection('clients').doc(client.id).update({ approvedEmployeeIds: next });
+                            setAccountsSearch('');
+                          }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: client.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <i className={`fas ${client.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 12, color: client.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 14 }}>{client.name}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{client.type}</div>
+                            </div>
+                          </div>
+                          <i className="fas fa-plus" style={{ color: 'var(--primary)', fontSize: 13 }} />
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
               </div>
             )}
             {profileTab === 'schedule' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's schedule in the Schedule tab.</p>}
