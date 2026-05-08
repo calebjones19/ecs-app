@@ -558,6 +558,15 @@
   .mobile-only { display: none; }
   .desktop-only { display: block; }
 
+  /* Employee list letter index */
+  .emp-list-wrap { display: flex; gap: 0; position: relative; }
+  .emp-list-content { flex: 1; min-width: 0; padding-right: 20px; }
+  .emp-letter-index { position: sticky; top: 0; right: 0; display: flex; flex-direction: column; align-items: center; padding: 4px 0; gap: 1px; width: 20px; flex-shrink: 0; }
+  .emp-letter-btn { font-size: 10px; font-weight: 700; color: var(--primary); line-height: 1.4; cursor: pointer; padding: 1px 3px; border-radius: 3px; transition: background 0.1s; touch-action: none; user-select: none; }
+  .emp-letter-btn:hover, .emp-letter-btn.active-letter { background: var(--primary); color: white; }
+  .emp-letter-btn.dim { color: var(--border); cursor: default; }
+  .emp-section-header { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 0 4px; }
+
   @media (max-width: 768px) {
     .mobile-only { display: block; }
     .desktop-only { display: none !important; }
@@ -4739,10 +4748,40 @@ function EmployeeProfiles({ role, perm }) {
     setSaving(false);
   };
 
-  const filtered = EMPLOYEES.filter(e => {
-    const matchSearch = e.name.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === 'all' || e.type === filter || (filter === 'active' && e.status === 'active');
-    return matchSearch && matchFilter;
+  const [letterFilter, setLetterFilter] = useState('');
+  const letterRefsMap = React.useRef({});
+
+  const filtered = EMPLOYEES
+    .filter(e => {
+      const matchSearch = e.name.toLowerCase().includes(search.toLowerCase());
+      const matchFilter = filter === 'all' || e.type === filter || (filter === 'active' && e.status === 'active');
+      const matchLetter = !letterFilter || e.name.toUpperCase().startsWith(letterFilter);
+      return matchSearch && matchFilter && matchLetter;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Letters that have at least one employee
+  const activeLetters = new Set(
+    EMPLOYEES
+      .filter(e => filter === 'all' || e.type === filter || (filter === 'active' && e.status === 'active'))
+      .map(e => e.name[0]?.toUpperCase()).filter(Boolean)
+  );
+
+  const scrollToLetter = (letter) => {
+    setLetterFilter('');
+    setSearch('');
+    setTimeout(() => {
+      const el = letterRefsMap.current[letter];
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 30);
+  };
+
+  // Group sorted filtered list by first letter
+  const groupedByLetter = {};
+  filtered.forEach(e => {
+    const l = e.name[0]?.toUpperCase() || '#';
+    if (!groupedByLetter[l]) groupedByLetter[l] = [];
+    groupedByLetter[l].push(e);
   });
 
   const PERM_LABELS = { admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' };
@@ -4881,22 +4920,26 @@ function EmployeeProfiles({ role, perm }) {
 
       {!selectedEmp ? (
         <>
-        {/* Search & filter — only on list view */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-          <div className="search-bar" style={{ flex: 1, minWidth: 180 }}>
-            <i className="fas fa-search" />
-            <input placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} />
+        {/* Toolbar: filter + add on top row, search full-width below */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+            <select className="form-input" style={{ flex: 1 }} value={filter} onChange={e => { setFilter(e.target.value); setLetterFilter(''); }}>
+              <option value="all">All</option>
+              <option value="employee">Employees</option>
+              <option value="contractor">Contractors</option>
+              <option value="active">Active Only</option>
+            </select>
+            {canEdit && (
+              <button className="topbar-btn primary" onClick={() => setShowAdd(true)} style={{ flexShrink: 0 }}><i className="fas fa-plus" /> Add</button>
+            )}
           </div>
-          <select className="form-input" style={{ width: 'auto', minWidth: 120, maxWidth: 160 }} value={filter} onChange={e => setFilter(e.target.value)}>
-            <option value="all">All</option>
-            <option value="employee">Employees</option>
-            <option value="contractor">Contractors</option>
-            <option value="active">Active Only</option>
-          </select>
-          {canEdit && (
-            <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add</button>
-          )}
+          <div className="search-bar">
+            <i className="fas fa-search" />
+            <input placeholder="Search employees..." value={search} onChange={e => { setSearch(e.target.value); setLetterFilter(''); }} />
+            {search && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)', padding: '0 4px' }} onClick={() => setSearch('')}><i className="fas fa-times" /></button>}
+          </div>
         </div>
+
         {/* Desktop table */}
         <div className="card desktop-only" style={{ padding: 0 }}>
           <div className="table-wrap">
@@ -4940,21 +4983,46 @@ function EmployeeProfiles({ role, perm }) {
             </table>
           </div>
         </div>
-        {/* Mobile list */}
+
+        {/* Mobile list with letter index */}
         <div className="mobile-only">
-          {filtered.map(e => (
-            <div key={e.id} className="card" onClick={() => { setSelectedEmp(e); setProfileTab('info'); }}
-              style={{ padding: '12px 16px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div className="avatar" style={{ background: e.color, width: 36, height: 36, fontSize: 13 }}>{e.avatar}</div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{e.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{e.role} · {PERM_LABELS[e.permission || 'viewer']}</div>
+          <div className="emp-list-wrap">
+            <div className="emp-list-content">
+              {Object.keys(groupedByLetter).sort().map(letter => (
+                <div key={letter}>
+                  <div className="emp-section-header" ref={el => { if (el) letterRefsMap.current[letter] = el; }}>{letter}</div>
+                  {groupedByLetter[letter].map(e => (
+                    <div key={e.id} className="card" onClick={() => { setSelectedEmp(e); setProfileTab('info'); }}
+                      style={{ padding: '12px 16px', marginBottom: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="avatar" style={{ background: e.color, width: 36, height: 36, fontSize: 13 }}>{e.avatar}</div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 15 }}>{e.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{e.role}</div>
+                        </div>
+                      </div>
+                      <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
+              ))}
+              {filtered.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-light)' }}>No employees found</div>
+              )}
             </div>
-          ))}
+
+            {/* A–Z letter index strip */}
+            <div className="emp-letter-index">
+              {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => (
+                <div key={l}
+                  className={`emp-letter-btn${!activeLetters.has(l) ? ' dim' : ''}`}
+                  onTouchStart={activeLetters.has(l) ? () => scrollToLetter(l) : undefined}
+                  onClick={activeLetters.has(l) ? () => scrollToLetter(l) : undefined}>
+                  {l}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         </>
       ) : (
