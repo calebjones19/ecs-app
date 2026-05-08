@@ -822,6 +822,52 @@
 .admin-hub-item .hub-label { font-size: 15px; font-weight: 600; color: var(--text); }
 .admin-hub-item .hub-desc { font-size: 12px; color: var(--text-light); margin-top: 2px; }
 .admin-back-btn { display: flex; align-items: center; gap: 6px; border: none; background: none; color: var(--primary); font-size: 15px; font-weight: 600; cursor: pointer; padding: 12px 0 8px; }
+
+/* Checklist styles */
+.cl-filter-pills { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.cl-pill { padding: 6px 16px; border-radius: 20px; border: 1.5px solid var(--border); background: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; color: var(--text-light); }
+.cl-pill.active { background: var(--primary); border-color: var(--primary); color: white; }
+.cl-client-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.cl-client-card { background: white; border: 1.5px solid var(--border); border-radius: 14px; padding: 16px 14px 12px; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; gap: 8px; }
+.cl-client-card:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(74,103,65,0.12); }
+.cl-client-icon { font-size: 22px; }
+.cl-client-name { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.3; }
+.cl-client-prog { font-size: 11px; color: var(--text-light); }
+.cl-prog-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.cl-prog-fill { height: 100%; background: var(--primary); border-radius: 2px; transition: width 0.3s; }
+.cl-task-group { margin-bottom: 20px; }
+.cl-task-group-label { font-size: 11px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding: 0 2px; }
+.cl-task-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: white; border: 1.5px solid var(--border); border-radius: 10px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
+.cl-task-row:active { background: var(--primary-light); }
+.cl-task-row.done { opacity: 0.55; }
+.cl-task-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+.cl-task-row.done .cl-task-check { background: var(--primary); border-color: var(--primary); color: white; }
+.cl-task-text { flex: 1; font-size: 14px; color: var(--text); }
+.cl-task-row.done .cl-task-text { text-decoration: line-through; color: var(--text-light); }
+.cl-task-time { font-size: 11px; color: var(--text-light); background: var(--bg); border-radius: 6px; padding: 2px 7px; font-weight: 600; flex-shrink: 0; }
+.cl-add-task-form { background: white; border: 1.5px solid var(--primary); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+@media (max-width: 768px) {
+  .cl-client-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .cl-client-card { padding: 14px 12px 10px; }
+}
+
+/* Home page widgets */
+.home-greeting { padding: 4px 0 20px; }
+.home-greeting h2 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 2px; }
+.home-greeting p { font-size: 14px; color: var(--text-light); }
+.home-widgets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+.home-widget { background: white; border-radius: 16px; padding: 20px 16px 16px; cursor: pointer; transition: all 0.18s; border: 1.5px solid var(--border); display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden; }
+.home-widget:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+.home-widget:active { transform: scale(0.97); }
+.home-widget-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; }
+.home-widget h4 { font-size: 15px; font-weight: 700; color: var(--text); margin: 0; }
+.home-widget p { font-size: 12px; color: var(--text-light); margin: 0; line-height: 1.4; }
+@media (max-width: 768px) {
+  .home-widgets { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .home-widget { padding: 16px 14px 14px; }
+  .home-widget-icon { width: 38px; height: 38px; font-size: 17px; }
+  .home-widget h4 { font-size: 14px; }
+}
 </style>
 </head>
 <body>
@@ -1053,6 +1099,93 @@ const ESSENCE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAegAAAC6CAYA
 let EMPLOYEES = [];
 let CLIENTS = [];
 
+const CLIENT_SEED = [
+  // Homes (type: 'Residential')
+  { name: 'H - Karen Forester', address: '3795 Deer Ridge Run, Metamora, MI 48455', type: 'Residential' },
+  { name: 'H - Dee Posey', address: '4849 Metamora Rd, Metamora, MI 48455', type: 'Residential' },
+  { name: 'H - Carol Van Dyke', address: '42 Fox Hollow Dr, Metamora, MI 48455', type: 'Residential' },
+  { name: 'H - Elaine Gates Jocuns', address: '2726 Treymore St, Lapeer, MI 48446', type: 'Residential' },
+  { name: 'H - Ketura Becker', address: '2333 Belle Meade Dr, Davison, MI 48423', type: 'Residential' },
+  { name: 'H - Leslie Emmert-Buck', address: '596 Shrewsbury Dr, Clarkston, MI 48348', type: 'Residential' },
+  { name: 'H - Jim Durand', address: '6023 Lincoln Blvd, Grand Blanc, MI 48439', type: 'Residential' },
+  { name: 'H - Pete Serra', address: '5461 Coral Ridge Dr, Grand Blanc, MI 48439', type: 'Residential' },
+  { name: 'H - Tammy Rheil', address: '2878 Sunset Cir, Metamora, MI 48455', type: 'Residential' },
+  { name: 'H - Nancy Stock', address: '3702 Greenbrook Ln, Flint, MI 48507', type: 'Residential' },
+  { name: 'H - Marilou Fitzgerald', address: '4131 Binghampton Ct, Clarkston, MI 48348', type: 'Residential' },
+  { name: 'H - Beth Lowe', address: '334 N Castell Ave, Rochester, MI 48307', type: 'Residential' },
+  { name: 'H - Leigh Ann Stone', address: '475 Hampton Woods Ln, Lake Orion, MI 48360', type: 'Residential' },
+  { name: 'H - Erin Jones', address: '3098 Waterland Dr, Metamora, MI 48455', type: 'Residential' },
+  { name: 'H - Marissa Mersino', address: '844 Oaktree Ln, Lapeer, MI 48446', type: 'Residential' },
+  { name: 'H - Tara Novak (Office)', address: '3965 Auburn Rd, Rochester Hills, MI 48309', type: 'Residential' },
+  { name: 'H - Mary Ann Ramsey', address: '1327 Lakeshore Dr, Columbiaville, MI 48421', type: 'Residential' },
+  { name: 'H - Kelly Crystal', address: '8455 E Potter Rd, Davison, MI 48423', type: 'Residential' },
+  { name: 'H - Nathan Denney', address: '4077 Day St, Burton, MI 48519', type: 'Residential' },
+  // Businesses (type: 'Commercial')
+  { name: '4D Systems', address: '4130 Market Pl, Flint, MI 48507', type: 'Commercial' },
+  { name: 'Allen Funeral Home', address: '9136 Davison Rd, Davison, MI 48423', type: 'Commercial' },
+  { name: 'Alliance Automation', address: '4072 Market Pl, Flint, MI 48507', type: 'Commercial' },
+  { name: 'Barkman Landscaping', address: '401 W Rising St, Davison, MI 48423', type: 'Commercial' },
+  { name: 'Behler-Young', address: '5042 Hill 23 Dr, Flint, MI 48507', type: 'Commercial' },
+  { name: 'Communities First', address: '1112 W Bristol Rd, Flint, MI 48507', type: 'Commercial' },
+  { name: 'Corza Medical', address: '8170 Embury Rd, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'Creative Mobility', address: '3352 S Linden Rd, Flint, MI 48507', type: 'Commercial' },
+  { name: 'Elite Clean Room', address: '548 S Court St, Lapeer, MI 48446', type: 'Commercial' },
+  { name: 'Ennis Admin', address: '1112 W Bristol Rd, Flint, MI 48507', type: 'Commercial' },
+  { name: 'Ennis Program', address: '1120 W Bristol Rd, Flint, MI 48507', type: 'Commercial' },
+  { name: 'EP Screw', address: '1838 Remell St, Flint, MI 48503', type: 'Commercial' },
+  { name: 'FBC - Davison', address: '208 E 4th St, Davison, MI 48423', type: 'Commercial' },
+  { name: 'FBC Grand Blanc', address: '6106 S Saginaw St, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'Fresenius Medical Care', address: '3210 Tri Park Dr, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'Genesee TWP Fire Station 1', address: '7234 Glidden St, Genesee, MI 48437', type: 'Commercial' },
+  { name: 'Genesee TWP Fire Station 2', address: '3128 Alcott Ave, Flint, MI 48506', type: 'Commercial' },
+  { name: 'Genesee TWP Hall & Police Dept', address: '7244 N Genesee Rd, Genesee, MI 48437', type: 'Commercial' },
+  { name: 'Genesee TWP Library', address: '7397 N Genesee Rd, Genesee, MI 48437', type: 'Commercial' },
+  { name: 'GHS - 4th St', address: '422 W 4th Ave, Flint, MI 48503', type: 'Commercial' },
+  { name: 'GHS - BHUC', address: '1040 W Bristol Rd, Flint, MI 48507', type: 'Commercial' },
+  { name: 'GHS - Bristol Rd', address: '1040 W Bristol Rd, Flint, MI 48507', type: 'Commercial' },
+  { name: 'GHS - Center Rd', address: '2298 S Center Rd, Burton, MI 48519', type: 'Commercial' },
+  { name: "GHS - Children's Center", address: '1402 S Saginaw St, Flint, MI 48503', type: 'Commercial' },
+  { name: 'GHS - Coldwater', address: '1057 E Coldwater Rd, Flint, MI 48505', type: 'Commercial' },
+  { name: 'GHS - Grand Blanc', address: '', type: 'Commercial' },
+  { name: 'GHS - Lapeer Rd', address: '9171 Lapeer Rd, Davison, MI 48423', type: 'Commercial' },
+  { name: 'GHS - Mason St', address: '725 Mason St, Flint, MI 48503', type: 'Commercial' },
+  { name: 'Heart to Heart', address: '4438 Oak Bridge Dr, Flint, MI 48532', type: 'Commercial' },
+  { name: "Jim Riehl's", address: '1515 S Lapeer Rd, Lapeer, MI 48446', type: 'Commercial' },
+  { name: 'JLM', address: '3095 Mullins Ct, Oxford, MI 48371', type: 'Commercial' },
+  { name: 'Loramendi', address: '250 S Fenway Dr, Fenton, MI 48430', type: 'Commercial' },
+  { name: 'Main Manufacturing', address: '3181 Tri Park Dr, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'Mainstay', address: '10775 S Saginaw St, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'Mercury Broadband', address: 'Merle K Chambers Dr, North Branch, MI 48461', type: 'Commercial' },
+  { name: 'MI Electric', address: '4060 Somers Dr, Burton, MI 48529', type: 'Commercial' },
+  { name: 'MI Lung & Critical Care Specialists', address: '9450 S Saginaw St, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'MI Lung - Sleep Center', address: '', type: 'Commercial' },
+  { name: 'MI Storage Barns', address: '5464 N Lapeer Rd, Columbiaville, MI 48421', type: 'Commercial' },
+  { name: 'Northern Log', address: '5765 Lobdell Rd, Mayville, MI 48744', type: 'Commercial' },
+  { name: 'Oakland Psych', address: '10785 S Saginaw St, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'Owen Tree Service', address: '225 N Lake George Rd, Attica, MI 48412', type: 'Commercial' },
+  { name: 'Pentier', address: '587 S Court St, Lapeer, MI 48446', type: 'Commercial' },
+  { name: 'Periodontal - Flint', address: '4252 S Linden Rd, Flint, MI 48507', type: 'Commercial' },
+  { name: 'Periodontal - GB', address: '8185 Holly Rd, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'Pioneer Cabinetry', address: '301 W Rising St, Davison, MI 48423', type: 'Commercial' },
+  { name: 'River Church - Burton', address: '2350 Hemphill Rd, Burton, MI 48529', type: 'Commercial' },
+  { name: 'River Church - Davison', address: '2361 N Irish Rd, Davison, MI 48423', type: 'Commercial' },
+  { name: 'River Church - Flushing', address: '5105 N McKinley Rd, Flushing, MI 48433', type: 'Commercial' },
+  { name: 'River Church - Good Rich', address: '9430 Perry Rd, Goodrich, MI 48438', type: 'Commercial' },
+  { name: 'River Church - Grand Blanc', address: '2164 E Grand Blanc Rd, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'River Church - H Comm Center', address: '8393 E Holly Rd, Holly, MI 48442', type: 'Commercial' },
+  { name: "River Church - H Pastor's Academy", address: '8393 E Holly Rd, Holly, MI 48442', type: 'Commercial' },
+  { name: 'River Church - Holly', address: '8393 E Holly Rd, Holly, MI 48442', type: 'Commercial' },
+  { name: 'River Church - Lake Orion', address: '3920 S Baldwin Rd, Orion Township, MI 48359', type: 'Commercial' },
+  { name: 'River Church - Walled Lake', address: '309 Market St, Walled Lake, MI 48390', type: 'Commercial' },
+  { name: 'River Church - Walled Lake Comm Center', address: '1795 N Pontiac Trail, Walled Lake, MI 48390', type: 'Commercial' },
+  { name: 'River Church - Waterford', address: '3411 Airport Rd, Waterford Township, MI 48329', type: 'Commercial' },
+  { name: 'Roy Noye & Warren', address: '2377 S Linden Rd, Flint, MI 48532', type: 'Commercial' },
+  { name: 'Serra Benefits', address: '3059 Tri Park Dr, Grand Blanc, MI 48439', type: 'Commercial' },
+  { name: 'Vector Tech', address: '5085 Miller Rd, Flint, MI 48507', type: 'Commercial' },
+  { name: 'Veit', address: '303 S Dayton St, Davison, MI 48423', type: 'Commercial' },
+  { name: 'Woodside Bible Church - Lapeer', address: '148 Maple Grove Rd, Lapeer, MI 48446', type: 'Commercial' },
+];
+
 const CHANNELS_INIT = [
   { id: 1, name: "general", visibility: "public", unread: 0, muted: false, description: "Company-wide announcements", joined: true, members: 0 },
 ];
@@ -1110,7 +1243,7 @@ function Modal({ show, onClose, title, children }) {
 }
 
 // ─── Dashboard ─────────────────────────────────────────────────
-function Dashboard({ role, perm, authedUser }) {
+function Dashboard({ role, perm, authedUser, setPage }) {
   const canSchedule = perm?.canSchedule || role === 'admin';
   const canEdit = perm?.canEdit || role === 'admin';
   const isAdmin = perm?.isAdmin || role === 'admin';
@@ -1201,8 +1334,111 @@ function Dashboard({ role, perm, authedUser }) {
   // Day names for shift display
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+  // Greeting
+  const hour = new Date().getHours();
+  const greetingWord = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+  const firstName = authedUser?.name?.split(' ')[0] || 'there';
+
   return (
     <div>
+      {/* ── Greeting ── */}
+      <div className="home-greeting">
+        <h2>Good {greetingWord}, {firstName}! 👋</h2>
+        <p>Welcome back to your team portal.</p>
+      </div>
+
+      {/* ── Feature Widgets ── */}
+      <div className="home-widgets">
+        <div className="home-widget" onClick={() => {}}>
+          <div className="home-widget-icon" style={{ background: 'var(--primary)' }}>
+            <i className="fas fa-chart-bar" />
+          </div>
+          <h4>Stats</h4>
+          <p>{activeClients.length} active accounts · {totalScheduledHours}h scheduled</p>
+        </div>
+        <div className="home-widget" onClick={() => setPage && setPage('checklists')}>
+          <div className="home-widget-icon" style={{ background: '#b85c4a' }}>
+            <i className="fas fa-clipboard-check" />
+          </div>
+          <h4>Checklists</h4>
+          <p>Track job site tasks</p>
+        </div>
+        <div className="home-widget" onClick={() => setPage && setPage('schedule')}>
+          <div className="home-widget-icon" style={{ background: '#5e8a7a' }}>
+            <i className="fas fa-calendar-alt" />
+          </div>
+          <h4>Schedule</h4>
+          <p>{myShifts.length > 0 ? `${myShifts.length} shift${myShifts.length !== 1 ? 's' : ''} this week` : 'View your schedule'}</p>
+        </div>
+        <div className="home-widget" onClick={() => setPage && setPage('timesheets')}>
+          <div className="home-widget-icon" style={{ background: '#c8a84e' }}>
+            <i className="fas fa-clock" />
+          </div>
+          <h4>Time Clock</h4>
+          <p>Clock in / out</p>
+        </div>
+      </div>
+
+      {/* ── Admin/Editor stats section ── */}
+      {canEdit && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}><i className="fas fa-chart-bar" style={{ marginRight: 8, color: 'var(--primary)' }} />All Accounts — Hours Overview</h3>
+          <div className="grid-2" style={{ marginBottom: 16 }}>
+            <StatCard value={`${totalBudgetedHours}h`} label="Total Budgeted" sublabel={`${activeClients.length} active accounts`} icon="fa-bullseye" />
+            <StatCard value={`${totalScheduledHours}h`} label="Total Scheduled" color={budgetColor(totalScheduledHours, totalBudgetedHours)} icon="fa-calendar-check" />
+          </div>
+          <div className="card" style={{ padding: '16px' }}>
+            <label className="form-label" style={{ marginBottom: 8 }}>View Account</label>
+            <select className="form-input" value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)} style={{ marginBottom: selectedAccount ? 16 : 0 }}>
+              <option value="">Select an account...</option>
+              {activeClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+            {selectedAccount && (
+              <div className="grid-2" style={{ marginTop: 12 }}>
+                <div style={{ textAlign: 'center', padding: 16, background: 'var(--bg)', borderRadius: 12 }}>
+                  <div style={{ fontSize: 32, fontWeight: 800 }}>{selectedAccountBudgeted}h</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Budgeted</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: 16, background: 'var(--bg)', borderRadius: 12 }}>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: budgetColor(selectedAccountScheduled, selectedAccountBudgeted) }}>{selectedAccountScheduled}h</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Scheduled</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Scheduler: Account Hours Overview ── */}
+      {canSchedule && !canEdit && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}><i className="fas fa-building" style={{ marginRight: 8, color: 'var(--primary)' }} />My Accounts — Hours Overview</h3>
+          <div className="grid-2" style={{ marginBottom: 16 }}>
+            <StatCard value={`${schedulerTotalBudgeted}h`} label="Total Budgeted" icon="fa-bullseye" />
+            <StatCard value={`${schedulerTotalScheduled}h`} label="Total Scheduled" color={budgetColor(schedulerTotalScheduled, schedulerTotalBudgeted)} icon="fa-calendar-check" />
+          </div>
+          <div className="card" style={{ padding: '16px' }}>
+            <label className="form-label" style={{ marginBottom: 8 }}>View Account</label>
+            <select className="form-input" value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)} style={{ marginBottom: selectedAccount ? 16 : 0 }}>
+              <option value="">Select an account...</option>
+              {activeClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+            {selectedAccount && (
+              <div className="grid-2" style={{ marginTop: 12 }}>
+                <div style={{ textAlign: 'center', padding: 12, background: 'var(--bg)', borderRadius: 12 }}>
+                  <div style={{ fontSize: 28, fontWeight: 800 }}>{selectedAccountBudgeted}h</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Budgeted</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: 12, background: 'var(--bg)', borderRadius: 12 }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: budgetColor(selectedAccountScheduled, selectedAccountBudgeted) }}>{selectedAccountScheduled}h</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Scheduled</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Schedule Viewer & Scheduler: My Shifts ── */}
       {(!canEdit || canSchedule) && (
         <div style={{ marginBottom: 24 }}>
@@ -1243,66 +1479,6 @@ function Dashboard({ role, perm, authedUser }) {
             <StatCard value={`${myTotalHours}h`} label="Total Scheduled" icon="fa-calendar-alt" />
             <StatCard value={`${myConfirmedHours}h`} label="Confirmed" color="var(--success)" icon="fa-check-circle" />
             <StatCard value={`${myUnconfirmedHours}h`} label="Unconfirmed" color={myUnconfirmedHours > 0 ? 'var(--warning)' : 'var(--text-light)'} icon="fa-question-circle" />
-          </div>
-        </div>
-      )}
-
-      {/* ── Scheduler: Account Hours Overview ── */}
-      {canSchedule && !canEdit && (
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}><i className="fas fa-building" style={{ marginRight: 8, color: 'var(--primary)' }} />My Accounts — Hours Overview</h3>
-          <div className="grid-2" style={{ marginBottom: 16 }}>
-            <StatCard value={`${schedulerTotalBudgeted}h`} label="Total Budgeted" icon="fa-bullseye" />
-            <StatCard value={`${schedulerTotalScheduled}h`} label="Total Scheduled" color={budgetColor(schedulerTotalScheduled, schedulerTotalBudgeted)} icon="fa-calendar-check" />
-          </div>
-          <div className="card" style={{ padding: '16px' }}>
-            <label className="form-label" style={{ marginBottom: 8 }}>View Account</label>
-            <select className="form-input" value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)} style={{ marginBottom: selectedAccount ? 16 : 0 }}>
-              <option value="">Select an account...</option>
-              {activeClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-            {selectedAccount && (
-              <div className="grid-2" style={{ marginTop: 12 }}>
-                <div style={{ textAlign: 'center', padding: 12, background: 'var(--bg)', borderRadius: 12 }}>
-                  <div style={{ fontSize: 28, fontWeight: 800 }}>{selectedAccountBudgeted}h</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Budgeted</div>
-                </div>
-                <div style={{ textAlign: 'center', padding: 12, background: 'var(--bg)', borderRadius: 12 }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: budgetColor(selectedAccountScheduled, selectedAccountBudgeted) }}>{selectedAccountScheduled}h</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Scheduled</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Admin/Editor: All Accounts Hours Overview ── */}
-      {canEdit && (
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: 16 }}><i className="fas fa-chart-bar" style={{ marginRight: 8, color: 'var(--primary)' }} />All Accounts — Hours Overview</h3>
-          <div className="grid-2" style={{ marginBottom: 16 }}>
-            <StatCard value={`${totalBudgetedHours}h`} label="Total Budgeted" sublabel={`${activeClients.length} active accounts`} icon="fa-bullseye" />
-            <StatCard value={`${totalScheduledHours}h`} label="Total Scheduled" color={budgetColor(totalScheduledHours, totalBudgetedHours)} icon="fa-calendar-check" />
-          </div>
-          <div className="card" style={{ padding: '16px' }}>
-            <label className="form-label" style={{ marginBottom: 8 }}>View Account</label>
-            <select className="form-input" value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)} style={{ marginBottom: selectedAccount ? 16 : 0 }}>
-              <option value="">Select an account...</option>
-              {activeClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-            {selectedAccount && (
-              <div className="grid-2" style={{ marginTop: 12 }}>
-                <div style={{ textAlign: 'center', padding: 16, background: 'var(--bg)', borderRadius: 12 }}>
-                  <div style={{ fontSize: 32, fontWeight: 800 }}>{selectedAccountBudgeted}h</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Budgeted</div>
-                </div>
-                <div style={{ textAlign: 'center', padding: 16, background: 'var(--bg)', borderRadius: 12 }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: budgetColor(selectedAccountScheduled, selectedAccountBudgeted) }}>{selectedAccountScheduled}h</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-light)', marginTop: 4 }}>Scheduled</div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -3840,7 +4016,7 @@ function ClientList({ role, perm }) {
   const [editClientDirty, setEditClientDirty] = useState(false);
   const [editClientMode, setEditClientMode] = useState(false);
   const [showDeleteClientConfirm, setShowDeleteClientConfirm] = useState(false);
-  const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Commercial', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
+  const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
 
   // Sync edit state when selected client changes
   useEffect(() => {
@@ -3906,9 +4082,48 @@ function ClientList({ role, perm }) {
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       setShowAdd(false);
-      setNewClient({ name:'', contact:'', phone:'', email:'', address:'', type:'Commercial', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
+      setNewClient({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
     } catch (err) {
       alert('Error adding client: ' + err.message);
+    }
+    setSaving(false);
+  };
+
+  const handleSeedClients = async () => {
+    if (!canEdit) return;
+    setSaving(true);
+    try {
+      const existingNames = new Set(CLIENTS.map(c => c.name));
+      const batch = db.batch();
+      let count = 0;
+      CLIENT_SEED.forEach(seed => {
+        if (!existingNames.has(seed.name)) {
+          const ref = db.collection('clients').doc();
+          batch.set(ref, {
+            name: seed.name,
+            address: seed.address,
+            type: seed.type,
+            contact: '',
+            phone: '',
+            email: '',
+            frequency: 'Weekly',
+            rate: 0,
+            budgetedHours: 0,
+            notes: '',
+            status: 'active',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+          count++;
+        }
+      });
+      if (count > 0) {
+        await batch.commit();
+        alert(`Seeded ${count} clients.`);
+      } else {
+        alert('All seed clients already exist.');
+      }
+    } catch (err) {
+      alert('Error seeding clients: ' + err.message);
     }
     setSaving(false);
   };
@@ -3926,7 +4141,10 @@ function ClientList({ role, perm }) {
           <input placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         {canEdit && (
-          <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add Client</button>
+          <>
+            <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add Client</button>
+            <button className="topbar-btn" onClick={handleSeedClients} disabled={saving} title="Import template clients"><i className="fas fa-database" /> Import Template</button>
+          </>
         )}
       </div>
       {/* Desktop table */}
@@ -4905,212 +5123,314 @@ function ShiftSwaps({ role, perm }) {
 }
 
 // ─── Checklists ────────────────────────────────────────────────
-function Checklists({ role, perm }) {
-  const canSchedule = perm?.canSchedule || role === 'admin';
-  const [selectedChecklist, setSelectedChecklist] = useState(null);
-  const [items, setItems] = useState({});
-  const [customChecklists, setCustomChecklists] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('ecs-checklists') || '{}'); } catch { return {}; }
+function Checklists({ role, perm, authedUser }) {
+  const canEdit = perm?.canEdit || role === 'admin';
+
+  // ── Time helpers ──
+  const fmtTime = (t) => { if (!t) return ''; const [h,m] = t.split(':').map(Number); const ampm = h < 12 ? 'AM' : 'PM'; const hr = h % 12 || 12; return `${hr}:${m.toString().padStart(2,'0')} ${ampm}`; };
+  const timeToMins = (t) => { if (!t) return Infinity; const [h,m] = t.split(':').map(Number); return h*60+m; };
+  const timeGroup = (t) => { if (!t) return 'No Time'; const mins = timeToMins(t); if (mins < 720) return 'Morning'; if (mins < 1020) return 'Afternoon'; return 'Evening'; };
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayDisplay = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  // ── State ──
+  const [tasks, setTasks] = useState([]);
+  const [completions, setCompletions] = useState([]);
+  const [filter, setFilter] = useState('All');
+  const [selectedClient, setSelectedClient] = useState(null); // { id, name, type }
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTaskText, setNewTaskText] = useState('');
+  const [newTaskTime, setNewTaskTime] = useState('');
+  const [savingTask, setSavingTask] = useState(false);
+  const [actionSheet, setActionSheet] = useState(null); // { task }
+  const [editingTask, setEditingTask] = useState(null); // { id, text, time }
+  const lpTimerRef = React.useRef(null);
+
+  // ── Firestore listeners ──
+  useEffect(() => {
+    const unsubTasks = db.collection('checklist_tasks')
+      .where('active', '==', true)
+      .onSnapshot(snap => {
+        setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, () => {});
+    const unsubComp = db.collection('checklist_completions')
+      .where('date', '==', todayStr)
+      .onSnapshot(snap => {
+        setCompletions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, () => {});
+    return () => { unsubTasks(); unsubComp(); };
+  }, []);
+
+  // ── Task counts per client ──
+  const tasksByClient = {};
+  tasks.forEach(t => {
+    if (!tasksByClient[t.clientId]) tasksByClient[t.clientId] = [];
+    tasksByClient[t.clientId].push(t);
   });
-  const [showCreate, setShowCreate] = useState(false);
-  const [newListName, setNewListName] = useState('');
-  const [newListItems, setNewListItems] = useState(['']);
-  const [showAddItem, setShowAddItem] = useState(false);
-  const [addItemText, setAddItemText] = useState('');
 
-  const allChecklists = { ...CHECKLISTS, ...customChecklists };
+  const completionsByTask = {};
+  completions.forEach(c => { completionsByTask[c.taskId] = c; });
 
-  const saveCustom = (updated) => {
-    setCustomChecklists(updated);
-    try { localStorage.setItem('ecs-checklists', JSON.stringify(updated)); } catch {}
-  };
+  // ── Clients to show ──
+  const allClients = [...CLIENTS].sort((a, b) => a.name.localeCompare(b.name));
+  const visibleClients = allClients.filter(c => {
+    const hasTasks = (tasksByClient[c.id] || []).length > 0;
+    if (!hasTasks && !canEdit) return false;
+    if (filter === 'Homes') return c.type === 'Residential';
+    if (filter === 'Businesses') return c.type !== 'Residential';
+    return true;
+  });
 
-  const createChecklist = () => {
-    const validItems = newListItems.filter(t => t.trim());
-    if (!newListName.trim() || validItems.length === 0) return;
-    const listItems = validItems.map((text, i) => ({ id: i + 1, text: text.trim(), done: false }));
-    saveCustom({ ...customChecklists, [newListName.trim()]: listItems });
-    setNewListName('');
-    setNewListItems(['']);
-    setShowCreate(false);
-  };
-
-  const deleteChecklist = (name) => {
-    const updated = { ...customChecklists };
-    delete updated[name];
-    saveCustom(updated);
-    setSelectedChecklist(null);
-  };
-
-  const addItemToList = (listName, text) => {
-    if (!text.trim()) return;
-    const current = getItems(listName);
-    const newItem = { id: Date.now(), text: text.trim(), done: false };
-    const updated = [...current, newItem];
-    setItems({ ...items, [listName]: updated });
-    if (customChecklists[listName]) {
-      saveCustom({ ...customChecklists, [listName]: updated });
-    }
-    setAddItemText('');
-    setShowAddItem(false);
-  };
-
-  const toggleItem = (listName, itemId) => {
-    const current = items[listName] || (allChecklists[listName] || []).map(i => ({ ...i }));
-    const updated = current.map(i => i.id === itemId ? { ...i, done: !i.done } : i);
-    setItems({ ...items, [listName]: updated });
-    if (customChecklists[listName]) {
-      saveCustom({ ...customChecklists, [listName]: updated });
+  // ── Toggle completion ──
+  const toggleCompletion = async (task) => {
+    const existing = completionsByTask[task.id];
+    if (existing) {
+      await db.collection('checklist_completions').doc(existing.id).delete();
+    } else {
+      await db.collection('checklist_completions').add({
+        taskId: task.id,
+        clientId: task.clientId,
+        date: todayStr,
+        completedBy: authedUser?.id || '',
+        completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
     }
   };
 
-  const getItems = (name) => items[name] || allChecklists[name] || [];
-  const getProgress = (name) => {
-    const list = getItems(name);
-    if (list.length === 0) return 0;
-    const done = list.filter(i => i.done).length;
-    return Math.round((done / list.length) * 100);
+  // ── Reset today's completions for a client ──
+  const resetClientCompletions = async (clientId) => {
+    const batch = db.batch();
+    completions.filter(c => c.clientId === clientId).forEach(c => {
+      batch.delete(db.collection('checklist_completions').doc(c.id));
+    });
+    await batch.commit();
   };
 
-  const resetChecklist = (name) => {
-    const current = getItems(name);
-    const reset = current.map(i => ({ ...i, done: false }));
-    setItems({ ...items, [name]: reset });
-    if (customChecklists[name]) {
-      saveCustom({ ...customChecklists, [name]: reset });
-    }
+  // ── Add task ──
+  const handleAddTask = async () => {
+    if (!newTaskText.trim() || !selectedClient) return;
+    setSavingTask(true);
+    const clientTasks = tasksByClient[selectedClient.id] || [];
+    await db.collection('checklist_tasks').add({
+      clientId: selectedClient.id,
+      clientName: selectedClient.name,
+      text: newTaskText.trim(),
+      time: newTaskTime,
+      sortOrder: clientTasks.length,
+      active: true,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: authedUser?.id || '',
+    });
+    setNewTaskText('');
+    setNewTaskTime('');
+    setShowAddTask(false);
+    setSavingTask(false);
   };
 
-  return (
-    <div>
-      {showCreate ? (
-        <div>
-          <button className="topbar-btn" style={{ marginBottom: 16 }} onClick={() => setShowCreate(false)}>
-            <i className="fas fa-arrow-left" /> Back
-          </button>
-          <div className="card">
-            <div className="card-header"><span className="card-title">Create Checklist</span></div>
-            <div className="form-group">
-              <label className="form-label">Checklist Name</label>
-              <input className="form-input" placeholder="e.g. Office Deep Clean" value={newListName} onChange={e => setNewListName(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Items</label>
-              {newListItems.map((item, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                  <input className="form-input" placeholder={`Item ${i + 1}`} value={item}
-                    onChange={e => { const n = [...newListItems]; n[i] = e.target.value; setNewListItems(n); }} />
-                  {newListItems.length > 1 && (
-                    <button className="topbar-btn" onClick={() => setNewListItems(newListItems.filter((_, j) => j !== i))} style={{ padding: '6px 10px' }}>
-                      <i className="fas fa-times" />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button className="topbar-btn" onClick={() => setNewListItems([...newListItems, ''])} style={{ marginTop: 4 }}>
-                <i className="fas fa-plus" /> Add Item
-              </button>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <button className="topbar-btn" onClick={() => setShowCreate(false)}>Cancel</button>
-              <button className="topbar-btn primary" onClick={createChecklist} disabled={!newListName.trim() || newListItems.filter(t => t.trim()).length === 0}>
-                <i className="fas fa-check" /> Create
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : !selectedChecklist ? (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
-            <span style={{ fontSize: 14, color: 'var(--text-light)', flex: 1, minWidth: 200 }}>
-              {Object.keys(allChecklists).length === 0 ? 'No checklists yet — create one to get started' : 'Select a checklist to view and track progress'}
-            </span>
-            {canSchedule && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-plus" /> Create</button>}
-          </div>
-          {Object.keys(allChecklists).length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-              <i className="fas fa-clipboard-check" style={{ fontSize: 40, opacity: 0.2, marginBottom: 12, display: 'block' }} />
-              <p style={{ color: 'var(--text-light)', marginBottom: 16 }}>Create your first checklist to track tasks for client locations, cleaning procedures, or daily routines.</p>
-              {canSchedule && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-plus" /> Create Checklist</button>}
-            </div>
-          ) : (
-            <div className="grid-2">
-              {Object.keys(allChecklists).map(name => (
-                <div className="card" key={name} style={{ cursor: 'pointer' }} onClick={() => setSelectedChecklist(name)}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{name}</h3>
-                      <p style={{ fontSize: 13, color: 'var(--text-light)' }}>{getItems(name).length} items</p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: getProgress(name) === 100 ? 'var(--success)' : 'var(--text)' }}>{getProgress(name)}%</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-light)' }}>complete</div>
-                    </div>
+  // ── Delete task ──
+  const handleDeleteTask = async (taskId) => {
+    await db.collection('checklist_tasks').doc(taskId).update({ active: false });
+    setActionSheet(null);
+  };
+
+  // ── Save edit task ──
+  const handleSaveEditTask = async () => {
+    if (!editingTask) return;
+    await db.collection('checklist_tasks').doc(editingTask.id).update({
+      text: editingTask.text.trim(),
+      time: editingTask.time,
+    });
+    setEditingTask(null);
+    setActionSheet(null);
+  };
+
+  // ── Long press handlers ──
+  const handleLongPressStart = (task) => {
+    lpTimerRef.current = setTimeout(() => {
+      setActionSheet({ task });
+    }, 600);
+  };
+  const handleLongPressEnd = () => {
+    clearTimeout(lpTimerRef.current);
+  };
+
+  // ── Client checklist view ──
+  if (selectedClient) {
+    const clientTasks = (tasksByClient[selectedClient.id] || []).sort((a, b) => {
+      const ta = timeToMins(a.time), tb = timeToMins(b.time);
+      if (ta === Infinity && tb === Infinity) return (a.sortOrder || 0) - (b.sortOrder || 0);
+      return ta - tb;
+    });
+
+    // Group tasks
+    const groups = {};
+    const GROUP_ORDER = ['Morning', 'Afternoon', 'Evening', 'No Time'];
+    clientTasks.forEach(t => {
+      const g = timeGroup(t.time);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(t);
+    });
+
+    const doneCount = clientTasks.filter(t => completionsByTask[t.id]).length;
+
+    return (
+      <div>
+        {/* Action sheet */}
+        {actionSheet && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300 }} onClick={() => { setActionSheet(null); setEditingTask(null); }}>
+            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '16px 16px 0 0', padding: '16px 16px 32px', zIndex: 301 }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ width: 36, height: 4, background: '#ddd', borderRadius: 2, margin: '0 auto 16px' }} />
+              {editingTask ? (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Edit Task</div>
+                  <input className="form-input" style={{ marginBottom: 10 }} value={editingTask.text}
+                    onChange={e => setEditingTask({ ...editingTask, text: e.target.value })} autoFocus />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <label style={{ fontSize: 13, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>Time:</label>
+                    <input type="time" className="form-input" value={editingTask.time}
+                      onChange={e => setEditingTask({ ...editingTask, time: e.target.value })} />
+                    {editingTask.time && <button className="topbar-btn" style={{ fontSize: 12 }} onClick={() => setEditingTask({ ...editingTask, time: '' })}>Clear</button>}
                   </div>
-                  <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, marginTop: 12 }}>
-                    <div style={{ height: '100%', background: getProgress(name) === 100 ? 'var(--success)' : 'var(--primary)', borderRadius: 2, width: `${getProgress(name)}%`, transition: 'width 0.3s' }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="topbar-btn" style={{ flex: 1 }} onClick={() => { setEditingTask(null); }}>Cancel</button>
+                    <button className="topbar-btn primary" style={{ flex: 1 }} onClick={handleSaveEditTask}>Save</button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-            <button className="topbar-btn" onClick={() => { setSelectedChecklist(null); setShowAddItem(false); }}>
-              <i className="fas fa-arrow-left" /> Back
-            </button>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="topbar-btn" onClick={() => resetChecklist(selectedChecklist)} title="Reset all"><i className="fas fa-redo" /> Reset</button>
-              {customChecklists[selectedChecklist] && canSchedule && (
-                <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => { if (confirm('Delete this checklist?')) deleteChecklist(selectedChecklist); }}>
-                  <i className="fas fa-trash-alt" /> Delete
-                </button>
+              ) : (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-light)', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{actionSheet.task.text}</div>
+                  <button style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 12, padding: '14px 4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: 'var(--text)' }}
+                    onClick={() => setEditingTask({ id: actionSheet.task.id, text: actionSheet.task.text, time: actionSheet.task.time || '' })}>
+                    <i className="fas fa-pen" style={{ width: 20, color: 'var(--primary)' }} /> Edit
+                  </button>
+                  <button style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 12, padding: '14px 4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: 'var(--danger)' }}
+                    onClick={() => { if (confirm('Delete this task?')) handleDeleteTask(actionSheet.task.id); }}>
+                    <i className="fas fa-trash" style={{ width: 20 }} /> Delete
+                  </button>
+                </div>
               )}
             </div>
           </div>
-          <div className="card">
-            <div className="card-header">
-              <div>
-                <span className="card-title">{selectedChecklist}</span>
-                <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 4 }}>
-                  {getItems(selectedChecklist).filter(i => i.done).length} of {getItems(selectedChecklist).length} completed
-                </div>
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: getProgress(selectedChecklist) === 100 ? 'var(--success)' : 'var(--primary)' }}>
-                {getProgress(selectedChecklist)}%
-              </div>
-            </div>
-            <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, marginBottom: 20 }}>
-              <div style={{ height: '100%', background: getProgress(selectedChecklist) === 100 ? 'var(--success)' : 'var(--primary)', borderRadius: 3, width: `${getProgress(selectedChecklist)}%`, transition: 'width 0.3s' }} />
-            </div>
-            {getItems(selectedChecklist).map(item => (
-              <div key={item.id} className={`checklist-item ${item.done ? 'done' : ''}`} onClick={() => toggleItem(selectedChecklist, item.id)}>
-                <div className="check-circle">
-                  {item.done && <i className="fas fa-check" style={{ fontSize: 12 }} />}
-                </div>
-                <span className="checklist-text">{item.text}</span>
-              </div>
-            ))}
-            {canSchedule && (
-              showAddItem ? (
-                <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-                  <input className="form-input" placeholder="New item..." value={addItemText} onChange={e => setAddItemText(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') addItemToList(selectedChecklist, addItemText); }}
-                    autoFocus style={{ flex: 1 }} />
-                  <button className="topbar-btn primary" onClick={() => addItemToList(selectedChecklist, addItemText)}>Add</button>
-                  <button className="topbar-btn" onClick={() => { setShowAddItem(false); setAddItemText(''); }}>Cancel</button>
-                </div>
-              ) : (
-                <button className="topbar-btn" style={{ marginTop: 12 }} onClick={() => setShowAddItem(true)}>
-                  <i className="fas fa-plus" /> Add Item
-                </button>
-              )
-            )}
+        )}
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
+          <button className="topbar-btn" onClick={() => { setSelectedClient(null); setShowAddTask(false); setActionSheet(null); setEditingTask(null); }}>
+            <i className="fas fa-arrow-left" /> Back
+          </button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--text)' }}>{selectedClient.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{todayDisplay} · {doneCount}/{clientTasks.length} done</div>
           </div>
+          {canEdit && (
+            <button className="topbar-btn" onClick={() => resetClientCompletions(selectedClient.id)} title="Reset today">
+              <i className="fas fa-redo" /> Reset
+            </button>
+          )}
+        </div>
+
+        {/* Add task form */}
+        {canEdit && showAddTask && (
+          <div className="cl-add-task-form">
+            <input className="form-input" placeholder="Task description..." value={newTaskText}
+              onChange={e => setNewTaskText(e.target.value)} autoFocus style={{ marginBottom: 10 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <label style={{ fontSize: 13, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>Time (optional):</label>
+              <input type="time" className="form-input" value={newTaskTime} onChange={e => setNewTaskTime(e.target.value)} />
+              {newTaskTime && <button className="topbar-btn" style={{ fontSize: 12 }} onClick={() => setNewTaskTime('')}>Clear</button>}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="topbar-btn" onClick={() => { setShowAddTask(false); setNewTaskText(''); setNewTaskTime(''); }}>Cancel</button>
+              <button className="topbar-btn primary" onClick={handleAddTask} disabled={!newTaskText.trim() || savingTask}>
+                {savingTask ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-check" /> Save</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Task groups */}
+        {clientTasks.length === 0 && !showAddTask && (
+          <div className="card" style={{ textAlign: 'center', padding: 32, color: 'var(--text-light)' }}>
+            <i className="fas fa-clipboard" style={{ fontSize: 32, opacity: 0.2, display: 'block', marginBottom: 8 }} />
+            No tasks yet{canEdit ? ' — add one below' : ''}
+          </div>
+        )}
+
+        {GROUP_ORDER.filter(g => groups[g]).map(groupName => (
+          <div key={groupName} className="cl-task-group">
+            <div className="cl-task-group-label">{groupName}</div>
+            {groups[groupName].map(task => {
+              const done = !!completionsByTask[task.id];
+              return (
+                <div key={task.id}
+                  className={`cl-task-row${done ? ' done' : ''}`}
+                  onClick={() => toggleCompletion(task)}
+                  onMouseDown={() => canEdit && handleLongPressStart(task)}
+                  onMouseUp={handleLongPressEnd}
+                  onMouseLeave={handleLongPressEnd}
+                  onTouchStart={() => canEdit && handleLongPressStart(task)}
+                  onTouchEnd={handleLongPressEnd}>
+                  <div className="cl-task-check">
+                    {done && <i className="fas fa-check" style={{ fontSize: 11 }} />}
+                  </div>
+                  <span className="cl-task-text">{task.text}</span>
+                  {task.time && <span className="cl-task-time">{fmtTime(task.time)}</span>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+
+        {/* Add task FAB */}
+        {canEdit && !showAddTask && (
+          <button className="topbar-btn primary" style={{ marginTop: 8 }} onClick={() => setShowAddTask(true)}>
+            <i className="fas fa-plus" /> Add Task
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ── Client grid view ──
+  return (
+    <div>
+      <div className="cl-filter-pills">
+        {['All', 'Homes', 'Businesses'].map(f => (
+          <button key={f} className={`cl-pill${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>{f}</button>
+        ))}
+      </div>
+
+      {visibleClients.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-light)' }}>
+          <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, display: 'block', marginBottom: 12 }} />
+          No clients with tasks yet
         </div>
       )}
+
+      <div className="cl-client-grid">
+        {visibleClients.map(c => {
+          const clientTasks = tasksByClient[c.id] || [];
+          const doneCount = clientTasks.filter(t => completionsByTask[t.id]).length;
+          const total = clientTasks.length;
+          const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+          const isHome = c.type === 'Residential';
+          return (
+            <div key={c.id} className="cl-client-card" onClick={() => setSelectedClient(c)}>
+              <div className="cl-client-icon">{isHome ? '🏠' : '🏢'}</div>
+              <div className="cl-client-name">{c.name}</div>
+              {total > 0 ? (
+                <>
+                  <div className="cl-client-prog">{doneCount}/{total} tasks done</div>
+                  <div className="cl-prog-bar"><div className="cl-prog-fill" style={{ width: `${pct}%` }} /></div>
+                </>
+              ) : (
+                <div className="cl-client-prog" style={{ fontStyle: 'italic' }}>No tasks</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -6401,7 +6721,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
         case 'employees': return <EmployeeProfiles role={role} perm={perm} />;
         case 'clients': return <ClientList role={role} perm={perm} />;
         case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
-        case 'checklists': return <Checklists role={role} perm={perm} />;
+        case 'checklists': return <Checklists role={role} perm={perm} authedUser={authedUser} />;
         case 'admin-schedule': return <AdminSchedule role={role} perm={perm} />;
         case 'admin-timeoff': return <AdminTimeOff role={role} perm={perm} authedUser={authedUser} />;
         default: return null;
@@ -6736,18 +7056,18 @@ function App() {
   const renderPage = () => {
     const perm = { role, isAdmin, canEdit, canSchedule, permLevel };
     switch (page) {
-      case 'dashboard': return <Dashboard role={role} perm={perm} authedUser={authedUser} />;
+      case 'dashboard': return <Dashboard role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm} />;
       case 'schedule': return <Schedule role={role} perm={perm} />;
       case 'timesheets': return <Timesheets role={role} authedUser={authedUser} perm={perm} />;
       case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
-      case 'checklists': return <Checklists role={role} perm={perm} />;
+      case 'checklists': return <Checklists role={role} perm={perm} authedUser={authedUser} />;
       case 'employees': return <EmployeeProfiles role={role} perm={perm} />;
       case 'availability': return <AvailabilityView role={role} perm={perm} />;
       case 'clients': return <ClientList role={role} perm={perm} />;
       case 'notifications': return <NotificationSettings userId={authedUser?.id} />;
       case 'admin': return <AdminPanel role={role} perm={perm} authedUser={authedUser} setPage={setPage} adminSubPage={adminSubPage} setAdminSubPage={setAdminSubPage} />;
-      default: return <Dashboard role={role} perm={perm} authedUser={authedUser} />;
+      default: return <Dashboard role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
     }
   };
 
