@@ -7041,23 +7041,32 @@ function App() {
   }, []);
 
   // Load clients from Firestore (realtime) — updates global + state
-  // Auto-seeds from CLIENT_SEED if the collection is empty on first load
+  // Auto-fills any CLIENT_SEED entries missing from Firestore on first load
   const clientsSeededRef = React.useRef(false);
   useEffect(() => {
     const unsub = db.collection('clients').onSnapshot(async (snap) => {
       const cls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       CLIENTS = cls;
       setClients(cls);
-      // Auto-seed if empty and not already seeded this session
-      if (cls.length === 0 && !clientsSeededRef.current) {
+      // On first snapshot, add any seed clients not already in Firestore (by name)
+      if (!clientsSeededRef.current) {
         clientsSeededRef.current = true;
         try {
-          const batch = db.batch();
-          CLIENT_SEED.forEach(seed => {
-            const ref = db.collection('clients').doc();
-            batch.set(ref, { name: seed.name, address: seed.address, type: seed.type, contact: '', phone: '', email: '', frequency: 'Weekly', rate: 0, budgetedHours: 0, notes: '', status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-          });
-          await batch.commit();
+          const existingNames = new Set(cls.map(c => c.name));
+          const missing = CLIENT_SEED.filter(s => !existingNames.has(s.name));
+          if (missing.length > 0) {
+            // Firestore batches max 500 writes; chunk if needed
+            const chunks = [];
+            for (let i = 0; i < missing.length; i += 490) chunks.push(missing.slice(i, i + 490));
+            for (const chunk of chunks) {
+              const batch = db.batch();
+              chunk.forEach(seed => {
+                const ref = db.collection('clients').doc();
+                batch.set(ref, { name: seed.name, address: seed.address, type: seed.type, contact: '', phone: '', email: '', frequency: 'Weekly', rate: 0, budgetedHours: 0, notes: '', status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+              });
+              await batch.commit();
+            }
+          }
         } catch (e) { console.warn('Auto-seed clients failed:', e); }
       }
     });
