@@ -558,14 +558,6 @@
   .mobile-only { display: none; }
   .desktop-only { display: block; }
 
-  /* Employee list letter index */
-  .emp-list-wrap { display: flex; gap: 0; position: relative; }
-  .emp-list-content { flex: 1; min-width: 0; padding-right: 26px; }
-  .emp-letter-index { position: fixed; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; gap: 0; width: 22px; z-index: 50; }
-  .emp-letter-btn { font-size: 10px; font-weight: 700; color: var(--primary); line-height: 1; cursor: pointer; padding: 2px 3px; border-radius: 3px; transition: background 0.1s; touch-action: none; user-select: none; flex-shrink: 0; }
-  .emp-letter-btn:hover, .emp-letter-btn.active-letter { background: var(--primary); color: white; border-radius: 50%; }
-  .emp-letter-btn.dim { color: var(--border); cursor: default; }
-  .emp-section-header { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 0 4px; }
 
   @media (max-width: 768px) {
     .mobile-only { display: block; }
@@ -4748,41 +4740,13 @@ function EmployeeProfiles({ role, perm }) {
     setSaving(false);
   };
 
-  const [letterFilter, setLetterFilter] = useState('');
-  const letterRefsMap = React.useRef({});
-
   const filtered = EMPLOYEES
     .filter(e => {
       const matchSearch = e.name.toLowerCase().includes(search.toLowerCase());
       const matchFilter = filter === 'all' || e.type === filter || (filter === 'active' && e.status === 'active');
-      const matchLetter = !letterFilter || e.name.toUpperCase().startsWith(letterFilter);
-      return matchSearch && matchFilter && matchLetter;
+      return matchSearch && matchFilter;
     })
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Letters that have at least one employee
-  const activeLetters = new Set(
-    EMPLOYEES
-      .filter(e => filter === 'all' || e.type === filter || (filter === 'active' && e.status === 'active'))
-      .map(e => e.name[0]?.toUpperCase()).filter(Boolean)
-  );
-
-  const scrollToLetter = (letter) => {
-    setLetterFilter('');
-    setSearch('');
-    setTimeout(() => {
-      const el = letterRefsMap.current[letter];
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 30);
-  };
-
-  // Group sorted filtered list by first letter
-  const groupedByLetter = {};
-  filtered.forEach(e => {
-    const l = e.name[0]?.toUpperCase() || '#';
-    if (!groupedByLetter[l]) groupedByLetter[l] = [];
-    groupedByLetter[l].push(e);
-  });
 
   const PERM_LABELS = { admin: 'Admin', editor: 'Editor', scheduler: 'Scheduler', viewer: 'Schedule Viewer' };
   const PERM_DESCS = {
@@ -4984,45 +4948,24 @@ function EmployeeProfiles({ role, perm }) {
           </div>
         </div>
 
-        {/* Mobile list with letter index */}
+        {/* Mobile list */}
         <div className="mobile-only">
-          <div className="emp-list-wrap">
-            <div className="emp-list-content">
-              {Object.keys(groupedByLetter).sort().map(letter => (
-                <div key={letter}>
-                  <div className="emp-section-header" ref={el => { if (el) letterRefsMap.current[letter] = el; }}>{letter}</div>
-                  {groupedByLetter[letter].map(e => (
-                    <div key={e.id} className="card" onClick={() => { setSelectedEmp(e); setProfileTab('info'); }}
-                      style={{ padding: '12px 16px', marginBottom: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div className="avatar" style={{ background: e.color, width: 36, height: 36, fontSize: 13 }}>{e.avatar}</div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 15 }}>{e.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{e.role}</div>
-                        </div>
-                      </div>
-                      <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
-                    </div>
-                  ))}
+          {filtered.map(e => (
+            <div key={e.id} className="card" onClick={() => { setSelectedEmp(e); setProfileTab('info'); }}
+              style={{ padding: '12px 16px', marginBottom: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="avatar" style={{ background: e.color, width: 36, height: 36, fontSize: 13 }}>{e.avatar}</div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{e.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{e.role}</div>
                 </div>
-              ))}
-              {filtered.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-light)' }}>No employees found</div>
-              )}
+              </div>
+              <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
             </div>
-
-            {/* A–Z letter index strip */}
-            <div className="emp-letter-index">
-              {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => (
-                <div key={l}
-                  className={`emp-letter-btn${!activeLetters.has(l) ? ' dim' : ''}`}
-                  onTouchStart={activeLetters.has(l) ? () => scrollToLetter(l) : undefined}
-                  onClick={activeLetters.has(l) ? () => scrollToLetter(l) : undefined}>
-                  {l}
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
+          {filtered.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-light)' }}>No employees found</div>
+          )}
         </div>
         </>
       ) : (
@@ -7268,10 +7211,13 @@ function Announcements({ role, perm, authedUser, homeView }) {
   };
 
   if (homeView) {
-    if (announcements.length === 0) return null;
     return (
       <div style={{ marginBottom: 20 }}>
-        {announcements.map(a => (
+        {announcements.length === 0 ? (
+          <div style={{ background: '#f5f7f4', border: '1.5px dashed var(--border)', borderRadius: 14, padding: '14px 16px', color: 'var(--text-light)', fontSize: 13, textAlign: 'center' }}>
+            <i className="fas fa-bullhorn" style={{ marginRight: 8, opacity: 0.4 }} />No announcements right now
+          </div>
+        ) : announcements.map(a => (
           <div key={a.id} style={{ background: 'var(--primary)', color: 'white', borderRadius: 14, padding: '14px 16px', marginBottom: 10 }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: a.body ? 4 : 0 }}>{a.title}</div>
             {a.body && <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>{a.body}</div>}
@@ -8011,6 +7957,8 @@ function App() {
           <button key={item.id} className={`mobile-nav-item ${(item.id === 'admin' ? ['employees','clients','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin','dashboard'].includes(page) : item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page) : page === item.id) ? 'active' : ''}`}
             onClick={() => {
               setPage(item.id);
+              setAdminSubPage(null);
+              setTimeout(() => { const el = document.querySelector('.content'); if (el) el.scrollTop = 0; window.scrollTo(0, 0); }, 10);
             }}>
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <i className={`fas ${item.icon}`} />
