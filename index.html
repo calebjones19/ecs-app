@@ -4333,136 +4333,187 @@ function ClientList({ role, perm }) {
               <div style={{ fontWeight: 700, fontSize: 18 }}>{c.name}</div>
               <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 2 }}>{c.address}</div>
             </div>
-            {canEdit && !editClientMode && (
-              <button className="chat-icon-btn" onClick={() => setEditClientMode(true)} style={{ fontSize: 15 }}>
-                <i className="fas fa-pen" />
-              </button>
-            )}
           </div>
 
-          {!editClientMode ? (
-            <div>
-              <div className="grid-2">
-                {[['Contact Person', c.contact], ['Phone', c.phone], ['Email', c.email], ['Type', c.type]].map(([label, val]) => (
-                  <div key={label} className="form-group">
-                    <label className="form-label">{label}</label>
-                    <div style={{ fontSize: 14, padding: '6px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="grid-2">
-                {[['Frequency', c.frequency], ['Rate', c.rate ? `$${c.rate}` : '—'], ['Budgeted Hrs/Week', c.budgetedHours ? `${c.budgetedHours}h` : '—'], ['Status', (c.status || 'active').charAt(0).toUpperCase() + (c.status || 'active').slice(1)]].map(([label, val]) => (
-                  <div key={label} className="form-group">
-                    <label className="form-label">{label}</label>
-                    <div style={{ fontSize: 14, padding: '6px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
-                  </div>
-                ))}
-              </div>
-              {c.notes && (
-                <div className="form-group">
-                  <label className="form-label">Notes</label>
-                  <div style={{ fontSize: 14, padding: '6px 0', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{c.notes}</div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Client Name</label>
-                  <input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Contact Person</label>
-                  <input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} />
-                </div>
-              </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Phone</label>
-                  <input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email</label>
-                  <input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Address</label>
-                <input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} />
-              </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Type</label>
-                  <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
-                    <option>Commercial</option>
-                    <option>Residential</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Frequency</label>
-                  <select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}>
-                    <option>Daily</option>
-                    <option>Weekly</option>
-                    <option>Bi-weekly</option>
-                    <option>Monthly</option>
-                    <option>On-demand</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Rate ($)</label>
-                  <input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Budgeted Hours/Week</label>
-                  <input className="form-input" type="number" value={editClient.budgetedHours || ''} onChange={e => handleEditClientField('budgetedHours', e.target.value)} placeholder="0" />
-                </div>
-              </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Notes</label>
-                <textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
-                <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
-                  {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
-                </button>
-              </div>
-              {canEdit && (
-                <div style={{ marginTop: 20, padding: 14, borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2' }}>
-                  {!showDeleteClientConfirm ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                      <div style={{ fontSize: 13, color: '#991b1b' }}>Permanently remove this client</div>
-                      <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 12 }} onClick={() => setShowDeleteClientConfirm(true)}>
-                        <i className="fas fa-trash" style={{marginRight:4}} /> Remove
-                      </button>
+          {(() => {
+            const [clientTab, setClientTab] = React.useState('info');
+            return (
+              <div>
+                <div className="tabs" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 0 }}>
+                  {['info', 'details', 'approved'].map(t => (
+                    <div key={t} className={`tab ${clientTab === t ? 'active' : ''}`}
+                      onClick={() => { setClientTab(t); setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}
+                      style={{ whiteSpace: 'nowrap' }}>
+                      {t === 'info' ? 'Info' : t === 'details' ? 'Details' : 'Approved Employees'}
                     </div>
-                  ) : (
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 8 }}>Are you sure? This cannot be undone.</div>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                        <button className="topbar-btn" onClick={() => setShowDeleteClientConfirm(false)}>Cancel</button>
-                        <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClient(selectedClient.id)}>
-                          <i className="fas fa-trash" style={{marginRight:4}} /> Yes, Remove
-                        </button>
+                  ))}
+                </div>
+
+                {/* INFO TAB */}
+                {clientTab === 'info' && (
+                  <div style={{ paddingTop: 16 }}>
+                    {!editClientMode ? (
+                      <div>
+                        {canEdit && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                            <button className="chat-icon-btn" title="Edit" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>
+                          </div>
+                        )}
+                        {[['Client Name', c.name], ['Contact Person', c.contact], ['Phone', c.phone], ['Email', c.email], ['Address', c.address]].map(([label, val]) => (
+                          <div key={label} className="form-group">
+                            <label className="form-label">{label}</label>
+                            <div style={{ fontSize: 14, padding: '6px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <div>
+                        <div className="form-group"><label className="form-label">Client Name</label><input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} /></div>
+                        <div className="form-group"><label className="form-label">Contact Person</label><input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} /></div>
+                        <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} /></div>
+                        <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} /></div>
+                        <div className="form-group"><label className="form-label">Address</label><input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} /></div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                          <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
+                          <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
+                            {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* DETAILS TAB */}
+                {clientTab === 'details' && (
+                  <div style={{ paddingTop: 16 }}>
+                    {!editClientMode ? (
+                      <div>
+                        {canEdit && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                            <button className="chat-icon-btn" title="Edit" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>
+                          </div>
+                        )}
+                        {[['Type', c.type], ['Frequency', c.frequency], ['Rate', c.rate ? `$${c.rate}` : '—'], ['Budgeted Hrs/Week', c.budgetedHours ? `${c.budgetedHours}h` : '—'], ['Status', (c.status || 'active').charAt(0).toUpperCase() + (c.status || 'active').slice(1)]].map(([label, val]) => (
+                          <div key={label} className="form-group">
+                            <label className="form-label">{label}</label>
+                            <div style={{ fontSize: 14, padding: '6px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
+                          </div>
+                        ))}
+                        {c.notes && (
+                          <div className="form-group">
+                            <label className="form-label">Notes</label>
+                            <div style={{ fontSize: 14, padding: '6px 0', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{c.notes}</div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="form-group">
+                          <label className="form-label">Type</label>
+                          <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
+                            <option>Commercial</option>
+                            <option>Residential</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Frequency</label>
+                          <select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}>
+                            <option>Daily</option>
+                            <option>Weekly</option>
+                            <option>Bi-weekly</option>
+                            <option>Monthly</option>
+                            <option>On-demand</option>
+                          </select>
+                        </div>
+                        <div className="form-group"><label className="form-label">Rate ($)</label><input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} /></div>
+                        <div className="form-group"><label className="form-label">Budgeted Hours/Week</label><input className="form-input" type="number" value={editClient.budgetedHours || ''} onChange={e => handleEditClientField('budgetedHours', e.target.value)} placeholder="0" /></div>
+                        <div className="form-group">
+                          <label className="form-label">Status</label>
+                          <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </select>
+                        </div>
+                        <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} /></div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                          <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
+                          <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
+                            {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+                          </button>
+                        </div>
+                        {canEdit && (
+                          <div style={{ marginTop: 20, padding: 14, borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2' }}>
+                            {!showDeleteClientConfirm ? (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                <div style={{ fontSize: 13, color: '#991b1b' }}>Permanently remove this client</div>
+                                <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 12 }} onClick={() => setShowDeleteClientConfirm(true)}>
+                                  <i className="fas fa-trash" style={{marginRight:4}} /> Remove
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 8 }}>Are you sure? This cannot be undone.</div>
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                                  <button className="topbar-btn" onClick={() => setShowDeleteClientConfirm(false)}>Cancel</button>
+                                  <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClient(selectedClient.id)}>
+                                    <i className="fas fa-trash" style={{marginRight:4}} /> Yes, Remove
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* APPROVED EMPLOYEES TAB */}
+                {clientTab === 'approved' && (
+                  <div style={{ paddingTop: 16 }}>
+                    <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14 }}>
+                      Employees approved to clean at this account.
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                    {EMPLOYEES.sort((a,b) => a.name.localeCompare(b.name)).map(emp => {
+                      const approved = (selectedClient.approvedEmployeeIds || []).includes(emp.id);
+                      if (!approved && !canEdit) return null;
+                      return (
+                        <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div className="avatar" style={{ background: emp.color, width: 32, height: 32, fontSize: 12 }}>{emp.avatar}</div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{emp.role}</div>
+                            </div>
+                          </div>
+                          {canEdit && (
+                            <button
+                              className="topbar-btn"
+                              style={approved ? { fontSize: 12, color: 'var(--danger)', borderColor: 'var(--danger)' } : { fontSize: 12 }}
+                              onClick={async () => {
+                                const ids = selectedClient.approvedEmployeeIds || [];
+                                const next = approved ? ids.filter(id => id !== emp.id) : [...ids, emp.id];
+                                await db.collection('clients').doc(selectedClient.id).update({ approvedEmployeeIds: next });
+                                setSelectedClient({ ...selectedClient, approvedEmployeeIds: next });
+                              }}>
+                              {approved ? 'Remove' : 'Approve'}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {EMPLOYEES.filter(emp => (selectedClient.approvedEmployeeIds || []).includes(emp.id)).length === 0 && !canEdit && (
+                      <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
+                        <i className="fas fa-users" style={{ fontSize: 28, opacity: 0.2, display: 'block', marginBottom: 10 }} />
+                        No approved employees yet
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
@@ -4544,7 +4595,7 @@ function ClientList({ role, perm }) {
       </div>
 
       <Modal show={showAdd} onClose={() => setShowAdd(false)} title="Add New Client">
-        <div className="grid-2">
+        <div>
           <div className="form-group">
             <label className="form-label">Client Name *</label>
             <input className="form-input" placeholder="Company or family name" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} />
@@ -4554,7 +4605,7 @@ function ClientList({ role, perm }) {
             <input className="form-input" placeholder="Primary contact" value={newClient.contact} onChange={e => setNewClient({...newClient, contact: e.target.value})} />
           </div>
         </div>
-        <div className="grid-2">
+        <div>
           <div className="form-group">
             <label className="form-label">Phone</label>
             <input className="form-input" placeholder="555-0000" value={newClient.phone} onChange={e => setNewClient({...newClient, phone: e.target.value})} />
@@ -4568,7 +4619,7 @@ function ClientList({ role, perm }) {
           <label className="form-label">Address</label>
           <input className="form-input" placeholder="Full address" value={newClient.address} onChange={e => setNewClient({...newClient, address: e.target.value})} />
         </div>
-        <div className="grid-2">
+        <div>
           <div className="form-group">
             <label className="form-label">Type</label>
             <select className="form-input" value={newClient.type} onChange={e => setNewClient({...newClient, type: e.target.value})}>
@@ -4587,7 +4638,7 @@ function ClientList({ role, perm }) {
             </select>
           </div>
         </div>
-        <div className="grid-2">
+        <div>
           <div className="form-group">
             <label className="form-label">Rate ($)</label>
             <input className="form-input" type="number" placeholder="0.00" value={newClient.rate} onChange={e => setNewClient({...newClient, rate: e.target.value})} />
@@ -4756,7 +4807,7 @@ function EmployeeProfiles({ role, perm }) {
     admin: 'Full access to everything. Can grant Admin permission to others, export timesheets, access payroll, and delete records.',
   };
 
-  const profileTabs = ['info', 'tax', 'schedule', 'timesheets'];
+  const profileTabs = ['info', 'tax', 'accounts', 'schedule', 'timesheets'];
   if (isAdmin) profileTabs.push('permission');
 
   return (
@@ -4787,7 +4838,7 @@ function EmployeeProfiles({ role, perm }) {
           <label className="form-label">Email</label>
           <input className="form-input" placeholder="maria@email.com" value={newEmp.email} onChange={e => setNewEmp({...newEmp, email: e.target.value})} />
         </div>
-        <div className="grid-2">
+        <div>
           <div className="form-group">
             <label className="form-label">Job Title</label>
             <select className="form-input" value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value})}>
@@ -4807,7 +4858,7 @@ function EmployeeProfiles({ role, perm }) {
             </select>
           </div>
         </div>
-        <div className="grid-2">
+        <div>
           <div className="form-group">
             <label className="form-label">Employment Type</label>
             <select className="form-input" value={newEmp.type} onChange={e => setNewEmp({...newEmp, type: e.target.value})}>
@@ -4994,7 +5045,7 @@ function EmployeeProfiles({ role, perm }) {
             <div className="tabs" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {profileTabs.map(t => (
                 <div key={t} className={`tab ${profileTab === t ? 'active' : ''}`} onClick={() => { setProfileTab(t); setEditMode(false); setEditData({ ...selectedEmp }); setEditDirty(false); }} style={{ whiteSpace: 'nowrap' }}>
-                  {t === 'info' ? 'Personal Info' : t === 'tax' ? 'Tax & Pay' : t === 'schedule' ? 'Schedule' : t === 'timesheets' ? 'Timesheets' : 'Permission'}
+                  {t === 'info' ? 'Personal Info' : t === 'tax' ? 'Tax & Pay' : t === 'accounts' ? 'Accounts' : t === 'schedule' ? 'Schedule' : t === 'timesheets' ? 'Timesheets' : 'Permission'}
                 </div>
               ))}
             </div>
@@ -5011,7 +5062,7 @@ function EmployeeProfiles({ role, perm }) {
                         </button>
                       </div>
                     )}
-                    <div className="grid-2">
+                    <div>
                       {[['Name', selectedEmp.name], ['Phone', selectedEmp.phone], ['Email', selectedEmp.email],
                         ['Address', selectedEmp.address], ['Emergency Contact', selectedEmp.emergencyContact],
                         ['Status', (selectedEmp.status || 'active').charAt(0).toUpperCase() + (selectedEmp.status || 'active').slice(1)]
@@ -5025,7 +5076,7 @@ function EmployeeProfiles({ role, perm }) {
                   </div>
                 ) : (
                   <div>
-                    <div className="grid-2">
+                    <div>
                       <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={editData.name || ''} onChange={e => handleEditField('name', e.target.value)} /></div>
                       <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editData.phone || ''} onChange={e => handleEditField('phone', e.target.value)} /></div>
                       <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editData.email || ''} onChange={e => handleEditField('email', e.target.value)} /></div>
@@ -5063,7 +5114,7 @@ function EmployeeProfiles({ role, perm }) {
                         </button>
                       </div>
                     )}
-                    <div className="grid-2">
+                    <div>
                       {[['Pay Rate', selectedEmp.payRate ? `$${selectedEmp.payRate}/hr` : '—'],
                         ['Employment Type', selectedEmp.type === 'contractor' ? '1099 Contractor' : 'W-2 Employee'],
                         ['Job Title', selectedEmp.role || '—'],
@@ -5087,7 +5138,7 @@ function EmployeeProfiles({ role, perm }) {
                   </div>
                 ) : (
                   <div>
-                    <div className="grid-2">
+                    <div>
                       <div className="form-group"><label className="form-label">Pay Rate ($/hr)</label><input className="form-input" type="number" value={editData.payRate || ''} onChange={e => handleEditField('payRate', e.target.value)} /></div>
                       <div className="form-group">
                         <label className="form-label">Employment Type</label>
@@ -5144,6 +5195,49 @@ function EmployeeProfiles({ role, perm }) {
               </div>
             )}
 
+            {/* ── Accounts Tab ── */}
+            {profileTab === 'accounts' && (
+              <div>
+                <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14 }}>
+                  Clients this employee is approved to clean at.
+                </div>
+                {CLIENTS.filter(c => (c.approvedEmployeeIds || []).includes(selectedEmp.id)).length === 0 && !canEdit && (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
+                    <i className="fas fa-building" style={{ fontSize: 28, opacity: 0.2, display: 'block', marginBottom: 10 }} />
+                    Not approved for any accounts yet
+                  </div>
+                )}
+                {CLIENTS.sort((a,b) => a.name.localeCompare(b.name)).map(client => {
+                  const approved = (client.approvedEmployeeIds || []).includes(selectedEmp.id);
+                  if (!approved && !canEdit) return null;
+                  return (
+                    <div key={client.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: client.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <i className={`fas ${client.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 12, color: client.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{client.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{client.type}</div>
+                        </div>
+                      </div>
+                      {canEdit && (
+                        <button
+                          className={`topbar-btn${approved ? '' : ' primary'}`}
+                          style={approved ? { fontSize: 12, color: 'var(--danger)', borderColor: 'var(--danger)' } : { fontSize: 12 }}
+                          onClick={async () => {
+                            const ids = client.approvedEmployeeIds || [];
+                            const next = approved ? ids.filter(id => id !== selectedEmp.id) : [...ids, selectedEmp.id];
+                            await db.collection('clients').doc(client.id).update({ approvedEmployeeIds: next });
+                          }}>
+                          {approved ? 'Remove' : 'Approve'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {profileTab === 'schedule' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's schedule in the Schedule tab.</p>}
             {profileTab === 'timesheets' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's timesheets in the Timesheets tab.</p>}
 
