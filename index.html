@@ -1264,6 +1264,7 @@ function Home({ role, perm, authedUser, setPage }) {
         <h2>Good {greetingWord}, {firstName}! 👋</h2>
         <p>Welcome back to your team portal.</p>
       </div>
+      <Announcements role={role} perm={perm} authedUser={authedUser} homeView={true} />
       <div className="home-widgets">
         <div className="home-widget" onClick={() => setPage && setPage('dashboard')}>
           <div className="home-widget-icon" style={{ background: 'var(--primary)' }}>
@@ -4245,14 +4246,19 @@ function ClientList({ role, perm }) {
     setSaving(false);
   };
 
-  const filtered = CLIENTS.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.contact || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const [typeFilter, setTypeFilter] = useState('All');
+
+  const filtered = CLIENTS
+    .filter(c =>
+      (c.name.toLowerCase().includes(search.toLowerCase()) ||
+      (c.contact || '').toLowerCase().includes(search.toLowerCase())) &&
+      (typeFilter === 'All' || c.type === typeFilter)
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
         <div className="search-bar" style={{ flex: 1, minWidth: 180 }}>
           <i className="fas fa-search" />
           <input placeholder="Search clients..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -4263,6 +4269,11 @@ function ClientList({ role, perm }) {
             <button className="topbar-btn" onClick={handleSeedClients} disabled={saving} title="Import template clients"><i className="fas fa-database" /> Import Template</button>
           </>
         )}
+      </div>
+      <div className="cl-filter-pills" style={{ marginBottom: 16 }}>
+        {['All', 'Commercial', 'Residential'].map(f => (
+          <button key={f} className={`cl-pill${typeFilter === f ? ' active' : ''}`} onClick={() => setTypeFilter(f)}>{f}</button>
+        ))}
       </div>
       {/* Desktop table */}
       <div className="card desktop-only" style={{ padding: 0 }}>
@@ -4290,7 +4301,7 @@ function ClientList({ role, perm }) {
                     <div>{c.contact}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{c.phone}</div>
                   </td>
-                  <td><span className={`badge ${c.type === 'Commercial' ? 'blue' : c.type === 'Medical' ? 'purple' : 'green'}`}>{c.type}</span></td>
+                  <td><span className={`badge ${c.type === 'Residential' ? 'green' : 'blue'}`}>{c.type}</span></td>
                   <td>{c.frequency}</td>
                   <td style={{ fontWeight: 600 }}>${c.rate}</td>
                   <td><span className={`badge ${c.status === 'active' ? 'green' : 'yellow'}`}>{c.status}</span></td>
@@ -4309,8 +4320,8 @@ function ClientList({ role, perm }) {
           <div key={c.id} className="card" onClick={() => setSelectedClient(c)}
             style={{ padding: '14px 16px', marginBottom: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: (c.type === 'Commercial' ? '#e3f2fd' : c.type === 'Medical' ? '#f3e5f5' : '#e8f5e9'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className={`fas ${c.type === 'Commercial' ? 'fa-building' : c.type === 'Medical' ? 'fa-hospital' : 'fa-home'}`} style={{ fontSize: 14, color: (c.type === 'Commercial' ? '#1976d2' : c.type === 'Medical' ? '#7b1fa2' : '#388e3c') }} />
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: (c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 14, color: (c.type === 'Residential' ? '#388e3c' : '#1976d2') }} />
               </div>
               <div style={{ fontWeight: 600, fontSize: 15 }}>{c.name}</div>
             </div>
@@ -4401,7 +4412,6 @@ function ClientList({ role, perm }) {
                     <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
                       <option>Commercial</option>
                       <option>Residential</option>
-                      <option>Medical</option>
                     </select>
                   </div>
                   <div className="form-group">
@@ -4506,7 +4516,6 @@ function ClientList({ role, perm }) {
             <select className="form-input" value={newClient.type} onChange={e => setNewClient({...newClient, type: e.target.value})}>
               <option>Commercial</option>
               <option>Residential</option>
-              <option>Medical</option>
             </select>
           </div>
           <div className="form-group">
@@ -4549,6 +4558,7 @@ function ClientList({ role, perm }) {
 function EmployeeProfiles({ role, perm }) {
   const canEdit = perm?.canEdit || role === 'admin';
   const isAdmin = perm?.isAdmin || role === 'admin';
+  const [mainTab, setMainTab] = useState('employees');
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -4673,6 +4683,16 @@ function EmployeeProfiles({ role, perm }) {
 
   return (
     <div>
+      {/* Tab bar */}
+      <div className="tabs" style={{ marginBottom: 20 }}>
+        <div className={`tab ${mainTab === 'employees' ? 'active' : ''}`} onClick={() => { setMainTab('employees'); setSelectedEmp(null); }}>Employees</div>
+        {canEdit && <div className={`tab ${mainTab === 'teams' ? 'active' : ''}`} onClick={() => { setMainTab('teams'); setSelectedEmp(null); }}>Teams</div>}
+      </div>
+
+      {mainTab === 'teams' && <TeamsManager role={role} perm={perm} />}
+
+      {mainTab === 'employees' && <>
+
       {/* Add Employee Modal */}
       <Modal show={showAdd} onClose={() => setShowAdd(false)} title="Add Employee">
         <div className="form-group">
@@ -5056,6 +5076,7 @@ function EmployeeProfiles({ role, perm }) {
           )}
         </div>
       )}
+      </>}
     </div>
   );
 }
@@ -6890,6 +6911,231 @@ function AdminSchedule({ role, perm }) {
   return <Schedule role={role} perm={perm} />;
 }
 
+// ── Teams Management ─────────────────────────────────────────────────────────
+const DEFAULT_TEAMS = [
+  'Team Holli', 'Team Sierra', 'Team Melissa', 'Team Roseanne', 'Team Donna', 'Team Kayla'
+];
+
+function TeamsManager({ role, perm }) {
+  const canEdit = perm?.canEdit || role === 'admin';
+  const [teams, setTeams] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editTeam, setEditTeam] = useState(null);
+  const [editName, setEditName] = useState('');
+
+  useEffect(() => {
+    const unsub = db.collection('teams').onSnapshot(snap => {
+      const ts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (ts.length === 0) {
+        // seed default teams
+        const batch = db.batch();
+        DEFAULT_TEAMS.forEach(name => {
+          batch.set(db.collection('teams').doc(), { name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        });
+        batch.commit().catch(() => {});
+      } else {
+        setTeams(ts.sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  const handleAddTeam = async () => {
+    const trimmed = newTeamName.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    await db.collection('teams').add({ name: trimmed.startsWith('Team ') ? trimmed : 'Team ' + trimmed, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    setNewTeamName('');
+    setShowAdd(false);
+    setSaving(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTeam || !editName.trim()) return;
+    setSaving(true);
+    await db.collection('teams').doc(editTeam.id).update({ name: editName.trim() });
+    setEditTeam(null);
+    setSaving(false);
+  };
+
+  const handleDelete = async (id) => {
+    await db.collection('teams').doc(id).delete();
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-light)' }}>{teams.length} team{teams.length !== 1 ? 's' : ''}</div>
+        {canEdit && <button className="topbar-btn primary" onClick={() => setShowAdd(true)}><i className="fas fa-plus" /> Add Team</button>}
+      </div>
+      {showAdd && (
+        <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+          <label className="form-label">Team name</label>
+          <input className="form-input" placeholder="e.g. Team Sarah" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} autoFocus style={{ marginBottom: 12 }} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="topbar-btn" onClick={() => { setShowAdd(false); setNewTeamName(''); }}>Cancel</button>
+            <button className="topbar-btn primary" onClick={handleAddTeam} disabled={!newTeamName.trim() || saving}>
+              {saving ? <i className="fas fa-spinner fa-spin" /> : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+      {teams.map(team => (
+        <div key={team.id} className="card" style={{ padding: '14px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
+          {editTeam?.id === team.id ? (
+            <>
+              <input className="form-input" value={editName} onChange={e => setEditName(e.target.value)} style={{ flex: 1 }} autoFocus />
+              <button className="topbar-btn primary" onClick={handleSaveEdit} disabled={saving}>Save</button>
+              <button className="topbar-btn" onClick={() => setEditTeam(null)}>Cancel</button>
+            </>
+          ) : (
+            <>
+              <div style={{ flex: 1, fontWeight: 600, fontSize: 15 }}>{team.name}</div>
+              {canEdit && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="chat-icon-btn" onClick={() => { setEditTeam(team); setEditName(team.name); }}><i className="fas fa-pen" /></button>
+                  <button className="chat-icon-btn" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(team.id)}><i className="fas fa-trash" /></button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Announcements ─────────────────────────────────────────────────────────────
+function Announcements({ role, perm, authedUser, homeView }) {
+  const canEdit = perm?.canEdit || role === 'admin';
+  const [announcements, setAnnouncements] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [showCreate, setShowCreate] = useState(false);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [selectedTeams, setSelectedTeams] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const unsub = db.collection('announcements')
+      .orderBy('createdAt', 'desc')
+      .limit(homeView ? 5 : 50)
+      .onSnapshot(snap => setAnnouncements(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = db.collection('teams').onSnapshot(snap => {
+      setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.name.localeCompare(b.name)));
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  const toggleTeam = (name) => setSelectedTeams(prev => prev.includes(name) ? prev.filter(t => t !== name) : [...prev, name]);
+
+  const handlePublish = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      const targets = selectedTeams.length === 0 ? ['All'] : selectedTeams;
+      await db.collection('announcements').add({
+        title: title.trim(),
+        body: body.trim(),
+        teams: targets,
+        createdBy: authedUser?.name || '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setTitle('');
+      setBody('');
+      setSelectedTeams([]);
+      setShowCreate(false);
+    } catch (e) { alert('Error: ' + e.message); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (id) => {
+    await db.collection('announcements').doc(id).delete();
+  };
+
+  const fmtDate = (ts) => {
+    if (!ts?.toDate) return '';
+    return ts.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  if (homeView) {
+    if (announcements.length === 0) return null;
+    return (
+      <div style={{ marginBottom: 20 }}>
+        {announcements.map(a => (
+          <div key={a.id} style={{ background: 'var(--primary)', color: 'white', borderRadius: 14, padding: '14px 16px', marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: a.body ? 4 : 0 }}>{a.title}</div>
+            {a.body && <div style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.4 }}>{a.body}</div>}
+            <div style={{ fontSize: 11, opacity: 0.65, marginTop: 6 }}>
+              {a.teams?.join(', ') || 'All'} · {fmtDate(a.createdAt)}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-light)' }}>{announcements.length} announcement{announcements.length !== 1 ? 's' : ''}</div>
+        {canEdit && <button className="topbar-btn primary" onClick={() => setShowCreate(true)}><i className="fas fa-bullhorn" /> New Announcement</button>}
+      </div>
+
+      {showCreate && (
+        <div className="card" style={{ padding: 18, marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>New Announcement</div>
+          <label className="form-label">Title</label>
+          <input className="form-input" placeholder="Announcement title..." value={title} onChange={e => setTitle(e.target.value)} style={{ marginBottom: 12 }} />
+          <label className="form-label">Message (optional)</label>
+          <textarea className="form-input" placeholder="Add more detail..." value={body} onChange={e => setBody(e.target.value)} rows={3} style={{ marginBottom: 14, resize: 'vertical' }} />
+          <label className="form-label">Send to teams</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+            <button className={`cl-pill${selectedTeams.length === 0 ? ' active' : ''}`} onClick={() => setSelectedTeams([])}>All Teams</button>
+            {teams.map(t => (
+              <button key={t.id} className={`cl-pill${selectedTeams.includes(t.name) ? ' active' : ''}`} onClick={() => toggleTeam(t.name)}>{t.name}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="topbar-btn" onClick={() => { setShowCreate(false); setTitle(''); setBody(''); setSelectedTeams([]); }}>Cancel</button>
+            <button className="topbar-btn primary" onClick={handlePublish} disabled={!title.trim() || saving}>
+              {saving ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-paper-plane" /> Publish</>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {announcements.length === 0 && !showCreate && (
+        <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+          <i className="fas fa-bullhorn" style={{ fontSize: 32, opacity: 0.2, display: 'block', marginBottom: 12 }} />
+          No announcements yet
+        </div>
+      )}
+
+      {announcements.map(a => (
+        <div key={a.id} className="card" style={{ padding: '14px 16px', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: a.body ? 4 : 0 }}>{a.title}</div>
+              {a.body && <div style={{ fontSize: 13, color: 'var(--text-light)', lineHeight: 1.4, marginBottom: 6 }}>{a.body}</div>}
+              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>
+                <span style={{ fontWeight: 600 }}>{a.teams?.join(', ') || 'All Teams'}</span> · {fmtDate(a.createdAt)} · by {a.createdBy}
+              </div>
+            </div>
+            {canEdit && <button className="chat-icon-btn" style={{ color: 'var(--danger)', flexShrink: 0 }} onClick={() => handleDelete(a.id)}><i className="fas fa-trash" /></button>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── AdminPanel: full-page admin hub ──────────────────────────────────────────
 function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSubPage }) {
   const adminPage = adminSubPage;
@@ -6906,6 +7152,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
       { id: 'employees', icon: 'fa-id-badge', label: 'Employees', desc: 'Profiles, pay rates & permissions', color: '#7c6f64' },
       { id: 'clients', icon: 'fa-building', label: 'Clients', desc: 'Locations, contacts & rates', color: '#c8a84e' },
     ] : []),
+    { id: 'announcements', icon: 'fa-bullhorn', label: 'Announcements', desc: 'Post updates to your teams', color: '#4a6741' },
     { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Pending swap requests', color: '#c8a84e' },
     { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists', color: '#b85c4a' },
     { id: 'admin-schedule', icon: 'fa-calendar-alt', label: 'Scheduling', desc: 'Create & manage team shifts', color: '#4a6741' },
@@ -6917,10 +7164,12 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
       switch (adminPage) {
         case 'employees': return <EmployeeProfiles role={role} perm={perm} />;
         case 'clients': return <ClientList role={role} perm={perm} />;
+        case 'announcements': return <Announcements role={role} perm={perm} authedUser={authedUser} />;
         case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
         case 'checklists': return <Checklists role={role} perm={perm} authedUser={authedUser} />;
         case 'admin-schedule': return <AdminSchedule role={role} perm={perm} />;
         case 'admin-timeoff': return <AdminTimeOff role={role} perm={perm} authedUser={authedUser} />;
+        case 'teams': return <TeamsManager role={role} perm={perm} />;
         default: return null;
       }
     };
