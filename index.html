@@ -4192,6 +4192,7 @@ function ClientList({ role, perm }) {
   const [editClientDirty, setEditClientDirty] = useState(false);
   const [editClientMode, setEditClientMode] = useState(false);
   const [showDeleteClientConfirm, setShowDeleteClientConfirm] = useState(false);
+  const [clientTab, setClientTab] = useState('info');
   const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
 
   // Sync edit state when selected client changes
@@ -4201,6 +4202,7 @@ function ClientList({ role, perm }) {
       setEditClientDirty(false);
       setEditClientMode(false);
       setShowDeleteClientConfirm(false);
+      setClientTab('info');
     }
   }, [selectedClient?.id]);
 
@@ -4322,198 +4324,129 @@ function ClientList({ role, perm }) {
         <button className="topbar-btn" onClick={() => setSelectedClient(null)} style={{ marginBottom: 16 }}>
           <i className="fas fa-arrow-left" /> Back to Clients
         </button>
-
         <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
             <div style={{ width: 52, height: 52, borderRadius: '50%', background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 20, color: c.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div>
               <div style={{ fontWeight: 700, fontSize: 18 }}>{c.name}</div>
               <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 2 }}>{c.address}</div>
             </div>
           </div>
-
-          {(() => {
-            const [clientTab, setClientTab] = React.useState('info');
-            return (
-              <div>
-                <div className="tabs" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 0 }}>
-                  {['info', 'details', 'approved'].map(t => (
-                    <div key={t} className={`tab ${clientTab === t ? 'active' : ''}`}
-                      onClick={() => { setClientTab(t); setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}
-                      style={{ whiteSpace: 'nowrap' }}>
-                      {t === 'info' ? 'Info' : t === 'details' ? 'Details' : 'Approved Employees'}
-                    </div>
-                  ))}
-                </div>
-
-                {/* INFO TAB */}
-                {clientTab === 'info' && (
-                  <div style={{ paddingTop: 16 }}>
-                    {!editClientMode ? (
-                      <div>
-                        {canEdit && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                            <button className="chat-icon-btn" title="Edit" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>
-                          </div>
-                        )}
-                        {[['Client Name', c.name], ['Contact Person', c.contact], ['Phone', c.phone], ['Email', c.email], ['Address', c.address]].map(([label, val]) => (
-                          <div key={label} className="form-group">
-                            <label className="form-label">{label}</label>
-                            <div style={{ fontSize: 14, padding: '6px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="form-group"><label className="form-label">Client Name</label><input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} /></div>
-                        <div className="form-group"><label className="form-label">Contact Person</label><input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} /></div>
-                        <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} /></div>
-                        <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} /></div>
-                        <div className="form-group"><label className="form-label">Address</label><input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} /></div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                          <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
-                          <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
-                            {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* DETAILS TAB */}
-                {clientTab === 'details' && (
-                  <div style={{ paddingTop: 16 }}>
-                    {!editClientMode ? (
-                      <div>
-                        {canEdit && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                            <button className="chat-icon-btn" title="Edit" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>
-                          </div>
-                        )}
-                        {[['Type', c.type], ['Frequency', c.frequency], ['Rate', c.rate ? `$${c.rate}` : '—'], ['Budgeted Hrs/Week', c.budgetedHours ? `${c.budgetedHours}h` : '—'], ['Status', (c.status || 'active').charAt(0).toUpperCase() + (c.status || 'active').slice(1)]].map(([label, val]) => (
-                          <div key={label} className="form-group">
-                            <label className="form-label">{label}</label>
-                            <div style={{ fontSize: 14, padding: '6px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div>
-                          </div>
-                        ))}
-                        {c.notes && (
-                          <div className="form-group">
-                            <label className="form-label">Notes</label>
-                            <div style={{ fontSize: 14, padding: '6px 0', color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{c.notes}</div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="form-group">
-                          <label className="form-label">Type</label>
-                          <select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}>
-                            <option>Commercial</option>
-                            <option>Residential</option>
-                          </select>
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Frequency</label>
-                          <select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}>
-                            <option>Daily</option>
-                            <option>Weekly</option>
-                            <option>Bi-weekly</option>
-                            <option>Monthly</option>
-                            <option>On-demand</option>
-                          </select>
-                        </div>
-                        <div className="form-group"><label className="form-label">Rate ($)</label><input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} /></div>
-                        <div className="form-group"><label className="form-label">Budgeted Hours/Week</label><input className="form-input" type="number" value={editClient.budgetedHours || ''} onChange={e => handleEditClientField('budgetedHours', e.target.value)} placeholder="0" /></div>
-                        <div className="form-group">
-                          <label className="form-label">Status</label>
-                          <select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                          </select>
-                        </div>
-                        <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} /></div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                          <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
-                          <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>
-                            {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
-                          </button>
-                        </div>
-                        {canEdit && (
-                          <div style={{ marginTop: 20, padding: 14, borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2' }}>
-                            {!showDeleteClientConfirm ? (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ fontSize: 13, color: '#991b1b' }}>Permanently remove this client</div>
-                                <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 12 }} onClick={() => setShowDeleteClientConfirm(true)}>
-                                  <i className="fas fa-trash" style={{marginRight:4}} /> Remove
-                                </button>
-                              </div>
-                            ) : (
-                              <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 8 }}>Are you sure? This cannot be undone.</div>
-                                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                                  <button className="topbar-btn" onClick={() => setShowDeleteClientConfirm(false)}>Cancel</button>
-                                  <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClient(selectedClient.id)}>
-                                    <i className="fas fa-trash" style={{marginRight:4}} /> Yes, Remove
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* APPROVED EMPLOYEES TAB */}
-                {clientTab === 'approved' && (
-                  <div style={{ paddingTop: 16 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14 }}>
-                      Employees approved to clean at this account.
-                    </div>
-                    {EMPLOYEES.sort((a,b) => a.name.localeCompare(b.name)).map(emp => {
-                      const approved = (selectedClient.approvedEmployeeIds || []).includes(emp.id);
-                      if (!approved && !canEdit) return null;
-                      return (
-                        <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div className="avatar" style={{ background: emp.color, width: 32, height: 32, fontSize: 12 }}>{emp.avatar}</div>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
-                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{emp.role}</div>
-                            </div>
-                          </div>
-                          {canEdit && (
-                            <button
-                              className="topbar-btn"
-                              style={approved ? { fontSize: 12, color: 'var(--danger)', borderColor: 'var(--danger)' } : { fontSize: 12 }}
-                              onClick={async () => {
-                                const ids = selectedClient.approvedEmployeeIds || [];
-                                const next = approved ? ids.filter(id => id !== emp.id) : [...ids, emp.id];
-                                await db.collection('clients').doc(selectedClient.id).update({ approvedEmployeeIds: next });
-                                setSelectedClient({ ...selectedClient, approvedEmployeeIds: next });
-                              }}>
-                              {approved ? 'Remove' : 'Approve'}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {EMPLOYEES.filter(emp => (selectedClient.approvedEmployeeIds || []).includes(emp.id)).length === 0 && !canEdit && (
-                      <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
-                        <i className="fas fa-users" style={{ fontSize: 28, opacity: 0.2, display: 'block', marginBottom: 10 }} />
-                        No approved employees yet
-                      </div>
-                    )}
-                  </div>
-                )}
+          <div className="tabs" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 0 }}>
+            {['info', 'details', 'approved'].map(t => (
+              <div key={t} className={`tab ${clientTab === t ? 'active' : ''}`}
+                onClick={() => { setClientTab(t); setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}
+                style={{ whiteSpace: 'nowrap' }}>
+                {t === 'info' ? 'Info' : t === 'details' ? 'Details' : 'Approved Employees'}
               </div>
-            );
-          })()}
+            ))}
+          </div>
+          <div style={{ paddingTop: 16 }}>
+          {/* INFO TAB */}
+          {clientTab === 'info' && (!editClientMode ? (
+            <div>
+              {canEdit && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><button className="chat-icon-btn" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button></div>}
+              {[['Client Name', c.name], ['Contact Person', c.contact], ['Phone', c.phone], ['Email', c.email], ['Address', c.address]].map(([label, val]) => (
+                <div key={label} className="form-group"><label className="form-label">{label}</label><div style={{ fontSize: 14, padding: '6px 0', color: val ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div></div>
+              ))}
+            </div>
+          ) : (
+            <div>
+              <div className="form-group"><label className="form-label">Client Name</label><input className="form-input" value={editClient.name || ''} onChange={e => handleEditClientField('name', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">Contact Person</label><input className="form-input" value={editClient.contact || ''} onChange={e => handleEditClientField('contact', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editClient.phone || ''} onChange={e => handleEditClientField('phone', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editClient.email || ''} onChange={e => handleEditClientField('email', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">Address</label><input className="form-input" value={editClient.address || ''} onChange={e => handleEditClientField('address', e.target.value)} /></div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
+                <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>{saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}</button>
+              </div>
+            </div>
+          ))}
+
+          {/* DETAILS TAB */}
+          {clientTab === 'details' && (!editClientMode ? (
+            <div>
+              {canEdit && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><button className="chat-icon-btn" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button></div>}
+              {[['Type', c.type], ['Frequency', c.frequency], ['Rate', c.rate ? `$${c.rate}` : '—'], ['Budgeted Hrs/Week', c.budgetedHours ? `${c.budgetedHours}h` : '—'], ['Status', (c.status || 'active').charAt(0).toUpperCase() + (c.status || 'active').slice(1)]].map(([label, val]) => (
+                <div key={label} className="form-group"><label className="form-label">{label}</label><div style={{ fontSize: 14, padding: '6px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div></div>
+              ))}
+              {c.notes && <div className="form-group"><label className="form-label">Notes</label><div style={{ fontSize: 14, padding: '6px 0', whiteSpace: 'pre-wrap' }}>{c.notes}</div></div>}
+            </div>
+          ) : (
+            <div>
+              <div className="form-group"><label className="form-label">Type</label><select className="form-input" value={editClient.type || 'Commercial'} onChange={e => handleEditClientField('type', e.target.value)}><option>Commercial</option><option>Residential</option></select></div>
+              <div className="form-group"><label className="form-label">Frequency</label><select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}><option>Daily</option><option>Weekly</option><option>Bi-weekly</option><option>Monthly</option><option>On-demand</option></select></div>
+              <div className="form-group"><label className="form-label">Rate ($)</label><input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">Budgeted Hours/Week</label><input className="form-input" type="number" value={editClient.budgetedHours || ''} onChange={e => handleEditClientField('budgetedHours', e.target.value)} placeholder="0" /></div>
+              <div className="form-group"><label className="form-label">Status</label><select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+              <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} /></div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button className="topbar-btn" onClick={() => { setEditClientMode(false); setEditClient({ ...selectedClient }); setEditClientDirty(false); }}>Cancel</button>
+                <button className="topbar-btn primary" onClick={handleSaveClient} disabled={saving || !editClientDirty}>{saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}</button>
+              </div>
+              {canEdit && (
+                <div style={{ marginTop: 20, padding: 14, borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2' }}>
+                  {!showDeleteClientConfirm ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ fontSize: 13, color: '#991b1b' }}>Permanently remove this client</div>
+                      <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 12 }} onClick={() => setShowDeleteClientConfirm(true)}><i className="fas fa-trash" style={{marginRight:4}} /> Remove</button>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: 8 }}>Are you sure? This cannot be undone.</div>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                        <button className="topbar-btn" onClick={() => setShowDeleteClientConfirm(false)}>Cancel</button>
+                        <button className="topbar-btn" style={{ background: 'var(--danger)', color: 'white', borderColor: 'var(--danger)' }} onClick={() => handleDeleteClient(selectedClient.id)}><i className="fas fa-trash" style={{marginRight:4}} /> Yes, Remove</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* APPROVED EMPLOYEES TAB */}
+          {clientTab === 'approved' && (
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14 }}>Employees approved to clean at this account.</div>
+              {EMPLOYEES.sort((a,b) => a.name.localeCompare(b.name)).map(emp => {
+                const approved = (selectedClient.approvedEmployeeIds || []).includes(emp.id);
+                if (!approved && !canEdit) return null;
+                return (
+                  <div key={emp.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="avatar" style={{ background: emp.color, width: 32, height: 32, fontSize: 12 }}>{emp.avatar}</div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{emp.role}</div>
+                      </div>
+                    </div>
+                    {canEdit && (
+                      <button className="topbar-btn" style={approved ? { fontSize: 12, color: 'var(--danger)', borderColor: 'var(--danger)' } : { fontSize: 12 }}
+                        onClick={async () => {
+                          const ids = selectedClient.approvedEmployeeIds || [];
+                          const next = approved ? ids.filter(id => id !== emp.id) : [...ids, emp.id];
+                          await db.collection('clients').doc(selectedClient.id).update({ approvedEmployeeIds: next });
+                          setSelectedClient({ ...selectedClient, approvedEmployeeIds: next });
+                        }}>
+                        {approved ? 'Remove' : 'Approve'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {EMPLOYEES.filter(emp => (selectedClient.approvedEmployeeIds || []).includes(emp.id)).length === 0 && !canEdit && (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
+                  <i className="fas fa-users" style={{ fontSize: 28, opacity: 0.2, display: 'block', marginBottom: 10 }} />
+                  No approved employees yet
+                </div>
+              )}
+            </div>
+          )}
+          </div>
         </div>
       </div>
     );
