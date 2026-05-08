@@ -7534,7 +7534,7 @@ function App() {
 
       {/* ── Main Content ── */}
       <div className="main">
-        {page !== 'chat' && page !== 'admin' && (
+        {!['chat','admin','home','my-checklists','dashboard','schedule','timesheets'].includes(page) && (
           <div className="page-header">
             <div className="page-header-title">
               {pageTitles[page]}
