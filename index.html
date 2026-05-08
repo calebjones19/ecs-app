@@ -4765,9 +4765,11 @@ function EmployeeProfiles({ role, perm }) {
       <div className="tabs" style={{ marginBottom: 20 }}>
         <div className={`tab ${mainTab === 'employees' ? 'active' : ''}`} onClick={() => { setMainTab('employees'); setSelectedEmp(null); }}>Employees</div>
         {canEdit && <div className={`tab ${mainTab === 'teams' ? 'active' : ''}`} onClick={() => { setMainTab('teams'); setSelectedEmp(null); }}>Teams</div>}
+        {canEdit && <div className={`tab ${mainTab === 'clients' ? 'active' : ''}`} onClick={() => { setMainTab('clients'); setSelectedEmp(null); }}>Clients</div>}
       </div>
 
       {mainTab === 'teams' && <TeamsManager role={role} perm={perm} />}
+      {mainTab === 'clients' && <ClientList role={role} perm={perm} />}
 
       {mainTab === 'employees' && <>
 
@@ -7298,8 +7300,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
 
   const hubItems = [
     ...(perm?.canEdit ? [
-      { id: 'employees', icon: 'fa-id-badge', label: 'Employees', desc: 'Profiles, pay rates & permissions', color: '#7c6f64' },
-      { id: 'clients', icon: 'fa-building', label: 'Clients', desc: 'Locations, contacts & rates', color: '#c8a84e' },
+      { id: 'people', icon: 'fa-users', label: 'People', desc: 'Employees, teams & clients', color: '#7c6f64' },
     ] : []),
     { id: 'announcements', icon: 'fa-bullhorn', label: 'Announcements', desc: 'Post updates to your teams', color: '#4a6741' },
     { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Pending swap requests', color: '#c8a84e' },
@@ -7311,8 +7312,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
   if (adminPage !== null) {
     const renderAdminSub = () => {
       switch (adminPage) {
-        case 'employees': return <EmployeeProfiles role={role} perm={perm} />;
-        case 'clients': return <ClientList role={role} perm={perm} />;
+        case 'people': return <EmployeeProfiles role={role} perm={perm} />;
         case 'announcements': return <Announcements role={role} perm={perm} authedUser={authedUser} />;
         case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
         case 'checklists': return <Checklists role={role} perm={perm} authedUser={authedUser} />;
@@ -7641,9 +7641,8 @@ function App() {
       if (canEdit) {
         // Editor+ sees People group
         items.push({ id: 'people', label: 'People', icon: 'fa-users', children: [
-          { id: 'employees', icon: 'fa-id-badge', label: 'Employees', desc: 'Profiles, pay rates & tax info', color: '#7c6f64' },
+          { id: 'admin', icon: 'fa-users', label: 'People', desc: 'Employees, teams & clients', color: '#7c6f64' },
           { id: 'availability', icon: 'fa-calendar-check', label: 'Availability', desc: 'Weekly availability for each team member', color: '#5e8a7a' },
-          { id: 'clients', icon: 'fa-building', label: 'Clients', desc: 'Client locations, contacts & rates', color: '#c8a84e' },
         ]});
       }
     } else {
@@ -7678,9 +7677,8 @@ function App() {
       ]});
       if (canEdit) {
         sections.push({ section: "People", items: [
-          { id: 'employees', icon: 'fa-users', label: 'Employees' },
+          { id: 'admin', icon: 'fa-users', label: 'People' },
           { id: 'availability', icon: 'fa-calendar-check', label: 'Availability' },
-          { id: 'clients', icon: 'fa-building', label: 'Clients' },
         ]});
       }
     } else {
@@ -7709,9 +7707,7 @@ function App() {
     timesheets: 'Timesheets',
     shifts: 'Shift Swaps',
     checklists: 'Manage Checklists',
-    employees: 'Employees',
     availability: 'Availability',
-    clients: 'Clients',
     notifications: 'Notification Settings',
     admin: 'Admin',
   };
@@ -7954,7 +7950,7 @@ function App() {
           { id: 'timesheets', icon: 'fa-clock', label: 'Time' },
           ...(canSchedule ? [{ id: 'admin', icon: 'fa-crown', label: 'Admin' }] : []),
         ].map(item => (
-          <button key={item.id} className={`mobile-nav-item ${(item.id === 'admin' ? ['employees','clients','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin','dashboard'].includes(page) : item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page) : page === item.id) ? 'active' : ''}`}
+          <button key={item.id} className={`mobile-nav-item ${(item.id === 'admin' ? ['shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin','dashboard'].includes(page) : item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page) : page === item.id) ? 'active' : ''}`}
             onClick={() => {
               setPage(item.id);
               setAdminSubPage(null);
