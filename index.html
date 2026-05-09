@@ -5459,13 +5459,16 @@ function ShiftSwaps({ role, perm }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
-        <div className="tabs" style={{ marginBottom: 0 }}>
-          {['pending', 'approved', 'all'].map(t => (
-            <div key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-              {t.charAt(0).toUpperCase() + t.slice(1)} {t === 'pending' && `(${SHIFT_SWAPS.filter(s => s.status === 'pending' || s.status === 'open').length})`}
-            </div>
-          ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div className="cl-filter-pills" style={{ marginBottom: 0 }}>
+          {[['pending','Pending'],['approved','Approved'],['all','All']].map(([val, label]) => {
+            const count = val === 'pending' ? SHIFT_SWAPS.filter(s => s.status === 'pending' || s.status === 'open').length : null;
+            return (
+              <button key={val} className={`cl-pill${tab === val ? ' active' : ''}`} onClick={() => setTab(val)}>
+                {label}{count !== null && count > 0 ? ` (${count})` : ''}
+              </button>
+            );
+          })}
         </div>
         {!canSchedule && (
           <button className="topbar-btn primary" onClick={() => setShowRequestSwap(true)}>
