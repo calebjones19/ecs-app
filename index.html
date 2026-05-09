@@ -3547,11 +3547,16 @@ function Schedule({ role, perm }) {
   const [calView, setCalView] = useState(isMobile ? 'day' : 'week'); // day, week, month
   const [groupBy, setGroupBy] = useState('employee'); // employee, client
   const [showLabor, setShowLabor] = useState(!isMobile);
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [selectedDay, setSelectedDay] = useState(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1); // default to today
 
   // Date helpers
   const baseDate = new Date(2026, 3, 20); // April 20, 2026 (Mon)
+
+  // Init to the current week so the calendar opens on today
+  const [weekOffset, setWeekOffset] = useState(() => {
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    return Math.floor((Date.now() - new Date(2026, 3, 20).getTime()) / msPerWeek);
+  });
+  const [selectedDay, setSelectedDay] = useState(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1); // default to today
   const getWeekStart = () => {
     const d = new Date(baseDate);
     d.setDate(d.getDate() + weekOffset * 7);
@@ -3745,7 +3750,7 @@ function Schedule({ role, perm }) {
   };
 
   // ── Day View ──
-  const renderDayView = () => {
+  const renderDayView = (canCreate = canSchedule) => {
     const dayIndex = selectedDay;
     const dayInfo = weekDays[dayIndex];
     const allShifts = [];
@@ -3798,7 +3803,7 @@ function Schedule({ role, perm }) {
               ))}
             </div>
           ))}
-          {canSchedule && (
+          {canCreate && (
             <div className="card" style={{ marginBottom: 12, padding: '14px 16px', cursor: 'pointer', border: '2px dashed var(--border)', background: '#f7f6f3', textAlign: 'center', color: 'var(--text-light)', transition: 'all 0.15s' }}
               onClick={() => openAddShift({ day: dayIndex })}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
@@ -3807,7 +3812,7 @@ function Schedule({ role, perm }) {
             </div>
           )}
           {allShifts.length === 0 && (
-            <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{canSchedule ? 'Click above or on any empty space to add a shift.' : 'No one is scheduled for this day.'}</p></div>
+            <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{canCreate ? 'Click above or on any empty space to add a shift.' : 'No shifts scheduled for this day.'}</p></div>
           )}
         </div>
       );
@@ -3816,7 +3821,7 @@ function Schedule({ role, perm }) {
     // Group by employee (day view)
     return (
       <div>
-        {showLabor && (() => {
+        {showLabor && canCreate && (() => {
           const { scheduled, actual } = getLaborForDay(dayIndex);
           return (
             <div className="card" style={{ padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3844,12 +3849,12 @@ function Schedule({ role, perm }) {
             <div className={`schedule-shift ${s.type}`} style={{ margin: 0, minWidth: 80 }}>
               <div className="shift-time">{s.time}</div>
             </div>
-            {!canSchedule && (
+            {!canCreate && (
               <button className="chat-icon-btn" title="Request swap"><i className="fas fa-exchange-alt" /></button>
             )}
           </div>
         ))}
-        {canSchedule && (
+        {canCreate && (
           <div className="card" style={{ padding: '14px 16px', cursor: 'pointer', border: '2px dashed var(--border)', background: '#fafbfc', textAlign: 'center', color: 'var(--text-light)', transition: 'all 0.15s' }}
             onClick={() => openAddShift({ day: dayIndex })}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
@@ -3858,7 +3863,7 @@ function Schedule({ role, perm }) {
           </div>
         )}
         {allShifts.length === 0 && (
-          <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{canSchedule ? 'Click the button above to add a shift.' : 'No one is scheduled for this day.'}</p></div>
+          <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{canCreate ? 'Click the button above to add a shift.' : 'No shifts scheduled for this day.'}</p></div>
         )}
       </div>
     );
@@ -4260,9 +4265,8 @@ function Schedule({ role, perm }) {
           {scheduleTab === 'timeoff' && <EmployeeTimeOff authedUser={null} />}
           {scheduleTab === 'schedule' && (
             <div>
-              {/* Day view only for non-editors */}
               <DayTabs />
-              {renderDayView()}
+              {renderDayView(false)}
             </div>
           )}
         </div>
@@ -4327,7 +4331,7 @@ function Schedule({ role, perm }) {
           )}
 
           {(canEdit || isAdmin) && (
-            <button className="topbar-btn primary" onClick={() => setShowAddShift(true)}><i className="fas fa-plus" />{isMobile ? '' : ' Add Shift'}</button>
+            <button className="topbar-btn primary" onClick={() => openAddShift()}><i className="fas fa-plus" />{isMobile ? '' : ' Add Shift'}</button>
           )}
           {(canEdit || isAdmin) && !isMobile && (
             <React.Fragment>
