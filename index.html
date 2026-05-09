@@ -183,21 +183,21 @@
   .chat-icon-btn:hover { background: var(--bg); color: var(--text); }
 
   /* ── iMessage-style chat messages ── */
-  .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 2px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; --swipe-x: 0px; }
-  .message-group { display: flex; align-items: flex-end; gap: 8px; padding: 10px 0 2px; position: relative; transform: translateX(calc(-1 * var(--swipe-x, 0px))); transition: transform 0.2s ease-out; }
+  .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 12px 12px; display: flex; flex-direction: column; gap: 3px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; --swipe-x: 0px; }
+  .message-group { display: flex; align-items: flex-end; gap: 8px; padding: 5px 0 2px; position: relative; transform: translateX(calc(-1 * var(--swipe-x, 0px))); transition: transform 0.2s ease-out; }
   .chat-swiping .message-group { transition: none; }
   .message-group.msg-own { flex-direction: row-reverse; }
   .message-group:hover { background: none; }
   .message-group.long-press-active { background: var(--primary-light); border-radius: 12px; transition: background 0.2s; }
-  .msg-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10px; color: white; flex-shrink: 0; align-self: flex-end; }
+  .msg-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; color: white; flex-shrink: 0; align-self: flex-end; }
   .message-group.msg-own .msg-avatar { display: none; }
-  .msg-content { display: flex; flex-direction: column; max-width: 72%; gap: 2px; }
+  .msg-content { display: flex; flex-direction: column; max-width: 74%; gap: 3px; }
   .message-group.msg-own .msg-content { align-items: flex-end; }
   .message-group.msg-other .msg-content { align-items: flex-start; }
-  .msg-sender-name { font-size: 11px; font-weight: 600; color: var(--text-light); margin-left: 4px; margin-bottom: 2px; }
+  .msg-sender-name { font-size: 11px; font-weight: 600; color: var(--text-light); margin-left: 4px; margin-bottom: 3px; }
   .msg-header { display: none; }
   .msg-name { display: none; }
-  .msg-bubble { border-radius: 18px; padding: 6px 12px; font-size: 14px; line-height: 1.45; word-break: break-word; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .msg-bubble { border-radius: 18px; padding: 10px 14px; font-size: 15px; line-height: 1.45; word-break: break-word; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
   .message-group.msg-own .msg-bubble { background: var(--msg-own); color: white; border-radius: 18px 18px 4px 18px; }
   .message-group.msg-other .msg-bubble { background: var(--msg-other); color: var(--text); border-radius: 18px 18px 18px 4px; }
   /* Time hidden by default, revealed by left swipe */
@@ -208,7 +208,7 @@
   .msg-reaction-badge { display: inline-flex; align-items: center; gap: 3px; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 2px 7px; font-size: 13px; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 3px rgba(0,0,0,0.10); -webkit-user-select: none; user-select: none; }
   .msg-reaction-badge.own-react { background: var(--primary-light); border-color: var(--primary); }
   .msg-reaction-badge .badge-count { font-size: 10px; font-weight: 700; color: var(--text-light); }
-  .msg-text { font-size: 14px; line-height: 1.5; }
+  .msg-text { font-size: 15px; line-height: 1.5; }
   .message-group.msg-own .msg-text .tag { background: rgba(255,255,255,0.25); color: white; padding: 1px 4px; border-radius: 3px; font-weight: 500; }
   .message-group.msg-other .msg-text .tag { background: var(--primary-light); color: var(--primary); padding: 1px 4px; border-radius: 3px; font-weight: 500; }
   .msg-time { display: none; }
@@ -338,7 +338,7 @@
     .msg-hover-actions { display: none !important; }
     .message-group.long-press-active { background: var(--primary-light); transition: background 0.2s; }
   }
-  .thread-messages .message-group { padding: 2px 8px; }
+  .thread-messages .message-group { padding: 4px 8px; }
 
   /* Long-press action sheet (Slack-style) */
   .action-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 400; animation: fadeIn 0.15s ease; }
