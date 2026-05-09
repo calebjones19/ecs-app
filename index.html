@@ -1929,14 +1929,7 @@ function EmojiPickerSheet({ show, onSelect, onClose }) {
 }
 
 // ─── Chat ──────────────────────────────────────────────────────
-function Chat({ role, authedUser, perm }) {
-  const [channels, setChannels] = useState([]);
-  const [activeChannel, setActiveChannel] = useState(null);
-  // All channel messages kept in memory keyed by channel ID — same pattern as golf app's DATA.messages
-  const [allMessages, setAllMessages] = useState({});
-  const messageUnsubsRef = useRef({});
-  // Derived — always immediately available when channel switches, no async wait
-  const channelMessages = allMessages[activeChannel] || [];
+function Chat({ role, authedUser, perm, channels, setChannels, activeChannel, setActiveChannel, channelMessages, setAllMessages, messageUnsubsRef }) {
   const [message, setMessage] = useState('');
   const [showSendLater, setShowSendLater] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
@@ -1991,66 +1984,8 @@ function Chat({ role, authedUser, perm }) {
     return { starred, unstarred };
   };
 
-  // Load channels from Firestore (realtime)
-  useEffect(() => {
-    const unsub = db.collection('channels').orderBy('createdAt').onSnapshot(async (snap) => {
-      const chs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      if (chs.length === 0 && authedUser) {
-        // Seed the default "general" channel
-        await db.collection('channels').add({
-          name: 'general',
-          visibility: 'public',
-          description: 'Company-wide announcements',
-          members: [],
-          joinedBy: [authedUser.id],
-          createdBy: authedUser.id,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        });
-        return; // onSnapshot will fire again with the new channel
-      }
-      setChannels(chs);
-      if (!activeChannel && chs.length > 0) setActiveChannel(chs[0].id);
-    });
-    return () => unsub();
-  }, [authedUser]);
-
-  // Sync active channel to global so foreground notification handler knows
-  useEffect(() => {
-    window.__ecsActiveChannel = activeChannel;
-    return () => { window.__ecsActiveChannel = null; };
-  }, [activeChannel]);
-
-  // Subscribe to messages for every channel as soon as the channel list loads.
-  // This keeps all messages in memory (golf app DATA.messages pattern) so switching
-  // channels is instant — no Firestore round-trip needed.
-  useEffect(() => {
-    if (!channels.length) return;
-    channels.forEach(ch => {
-      if (messageUnsubsRef.current[ch.id]) return; // already subscribed
-      const unsub = db.collection('channels').doc(ch.id)
-        .collection('messages').orderBy('createdAt')
-        .onSnapshot(snap => {
-          const msgs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setAllMessages(prev => ({ ...prev, [ch.id]: msgs }));
-        });
-      messageUnsubsRef.current[ch.id] = unsub;
-    });
-  }, [channels]);
-
-  // Unsubscribe all message listeners on unmount
-  useEffect(() => {
-    return () => {
-      Object.values(messageUnsubsRef.current).forEach(u => u());
-      messageUnsubsRef.current = {};
-    };
-  }, []);
-
-  // Flag: channel just opened — scroll to bottom on next render (golf app openChat() pattern)
-  const pendingScrollRef = useRef(false);
-  useEffect(() => {
-    if (!activeChannel) return;
-    pendingScrollRef.current = true;
-  }, [activeChannel]);
+  // Track previous channel so useLayoutEffect can detect a channel switch
+  const prevActiveChannelRef = useRef(null);
   // Thread state
   const [openThread, setOpenThread] = useState(null);
   const [threadReply, setThreadReply] = useState('');
@@ -2362,26 +2297,24 @@ function Chat({ role, authedUser, perm }) {
     ? channelMessages.find(m => m.id === openThread.msgId)
     : null;
 
-  // Scroll logic — built exactly like the golf app:
-  //   openChat()  → renderChatMessages() → setTimeout(50ms, scrollToBottom)  [unconditional]
-  //   new message → nearBottom check only                                      [don't hijack scroll]
-  useEffect(() => {
-    if (!channelMessages.length) return;
-    if (pendingScrollRef.current) {
-      // Channel just opened — scroll to newest message after DOM settles (golf app pattern)
-      pendingScrollRef.current = false;
-      setTimeout(() => {
-        const el = chatMessagesRef.current;
-        if (el) el.scrollTop = el.scrollHeight;
-      }, 50);
+  // Scroll logic — useLayoutEffect fires before the browser paints, so the user never
+  // sees the chat at scrollTop=0.
+  // mobileShowMessages in deps: on mobile the panel starts display:none, so we must
+  // re-fire when it becomes visible. We also bail (without updating the ref) when
+  // el.clientHeight===0 so the "channel changed" branch still fires once the panel shows.
+  React.useLayoutEffect(() => {
+    const el = chatMessagesRef.current;
+    if (!el || !channelMessages.length || el.clientHeight === 0) return;
+    if (activeChannel !== prevActiveChannelRef.current) {
+      // Channel just opened/switched — snap to bottom before first paint
+      prevActiveChannelRef.current = activeChannel;
+      el.scrollTop = el.scrollHeight;
     } else {
       // New message in already-open channel — only scroll if near the bottom
-      const el = chatMessagesRef.current;
-      if (!el) return;
       const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
       if (nearBottom) el.scrollTop = el.scrollHeight;
     }
-  }, [channelMessages]);
+  }, [activeChannel, channelMessages, mobileShowMessages]);
 
   React.useLayoutEffect(() => {
     const container = threadScrollRef.current;
@@ -8284,6 +8217,65 @@ function App() {
     }
   }, [page, authedUser]);
 
+  // ── Chat state lives at App level so messages survive navigation ──────────────
+  // (golf app DATA.messages pattern — data loaded once, never thrown away on tab switch)
+  const [channels, setChannels] = useState([]);
+  const [activeChannel, setActiveChannel] = useState(null);
+  const [allMessages, setAllMessages] = useState({});
+  const messageUnsubsRef = useRef({});
+
+  // Load channels from Firestore + seed "general" if empty
+  useEffect(() => {
+    if (!authedUser) return;
+    const unsub = db.collection('channels').orderBy('createdAt').onSnapshot(async (snap) => {
+      const chs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (chs.length === 0) {
+        await db.collection('channels').add({
+          name: 'general',
+          visibility: 'public',
+          description: 'Company-wide announcements',
+          members: [],
+          joinedBy: [authedUser.id],
+          createdBy: authedUser.id,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+      setChannels(chs);
+      setActiveChannel(prev => prev ? prev : (chs.length > 0 ? chs[0].id : null));
+    });
+    return () => {
+      unsub();
+      Object.values(messageUnsubsRef.current).forEach(u => u());
+      messageUnsubsRef.current = {};
+      setAllMessages({});
+      setChannels([]);
+      setActiveChannel(null);
+    };
+  }, [authedUser]);
+
+  // Sync active channel to global so foreground notification handler knows
+  useEffect(() => {
+    window.__ecsActiveChannel = activeChannel;
+    return () => { window.__ecsActiveChannel = null; };
+  }, [activeChannel]);
+
+  // Subscribe to messages for every channel — stays active across navigation
+  useEffect(() => {
+    if (!channels.length) return;
+    channels.forEach(ch => {
+      if (messageUnsubsRef.current[ch.id]) return;
+      const unsub = db.collection('channels').doc(ch.id)
+        .collection('messages').orderBy('createdAt')
+        .onSnapshot(snap => {
+          const msgs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAllMessages(prev => ({ ...prev, [ch.id]: msgs }));
+        });
+      messageUnsubsRef.current[ch.id] = unsub;
+    });
+  }, [channels]);
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // Load employees from Firestore (realtime) — updates global + state
   // Auto-fills any EMPLOYEE_SEED entries missing from Firestore on first load
   const employeesSeededRef = React.useRef(false);
@@ -8574,7 +8566,11 @@ function App() {
       case 'home': return <Home role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       case 'dashboard': return <Dashboard role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       case 'my-checklists': return <HomeChecklists role={role} perm={perm} authedUser={authedUser} />;
-      case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm} />;
+      case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm}
+        channels={channels} setChannels={setChannels}
+        activeChannel={activeChannel} setActiveChannel={setActiveChannel}
+        channelMessages={allMessages[activeChannel] || []}
+        setAllMessages={setAllMessages} messageUnsubsRef={messageUnsubsRef} />;
       case 'schedule': return <Schedule role={role} perm={perm} authedUser={authedUser} />;
       case 'timesheets': return <Timesheets role={role} authedUser={authedUser} perm={perm} />;
       case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
