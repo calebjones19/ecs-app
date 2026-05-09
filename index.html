@@ -4136,7 +4136,7 @@ function Schedule({ role, perm }) {
           <select className="form-input" value={newShift.employee} onChange={e => setNewShift({...newShift, employee: e.target.value})}
             style={newShift.employee ? { borderColor: 'var(--success)' } : {}}>
             <option value="">Select employee...</option>
-            {EMPLOYEES.filter(e => e.status === 'active').map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {EMPLOYEES.filter(e => e.status === 'active').sort((a,b) => a.name.localeCompare(b.name)).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </div>
         <div className="form-group">
