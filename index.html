@@ -2016,12 +2016,15 @@ function Chat({ role, authedUser, perm }) {
     return () => { window.__ecsActiveChannel = null; };
   }, [activeChannel]);
 
+  // Flag: next messages load for this channel should unconditionally scroll to bottom
+  // (mirrors golf app's openChat() → renderChatMessages() → setTimeout(scroll, 50) pattern)
+  const pendingScrollRef = useRef(false);
+
   // Load messages for active channel from Firestore (realtime)
   useEffect(() => {
     if (!activeChannel) return;
-    // Clear immediately so the scroll logic sees empty messages and waits for
-    // the real load before snapping — prevents snapping to the wrong channel's position
     setChannelMessages([]);
+    pendingScrollRef.current = true; // channel opened — next load always scrolls to bottom
     const unsub = db.collection('channels').doc(activeChannel)
       .collection('messages').orderBy('createdAt')
       .onSnapshot((snap) => {
@@ -2341,21 +2344,26 @@ function Chat({ role, authedUser, perm }) {
     ? channelMessages.find(m => m.id === openThread.msgId)
     : null;
 
-  // Track the last channel we hard-snapped for so switching back always re-snaps
-  const lastSnappedChannel = useRef(null);
-  React.useLayoutEffect(() => {
-    const container = chatMessagesRef.current;
-    if (!container || !channelMessages.length) return;
-    if (activeChannel !== lastSnappedChannel.current) {
-      // Channel switched (or first load) — always snap to newest message immediately
-      lastSnappedChannel.current = activeChannel;
-      container.scrollTop = container.scrollHeight;
+  // Scroll logic — built exactly like the golf app:
+  //   openChat()  → renderChatMessages() → setTimeout(50ms, scrollToBottom)  [unconditional]
+  //   new message → nearBottom check only                                      [don't hijack scroll]
+  useEffect(() => {
+    if (!channelMessages.length) return;
+    if (pendingScrollRef.current) {
+      // Channel just opened — scroll to newest message after DOM settles (golf app pattern)
+      pendingScrollRef.current = false;
+      setTimeout(() => {
+        const el = chatMessagesRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 50);
     } else {
-      // Same channel, new message: only scroll if already near the bottom
-      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
-      if (nearBottom) container.scrollTop = container.scrollHeight;
+      // New message in already-open channel — only scroll if near the bottom
+      const el = chatMessagesRef.current;
+      if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      if (nearBottom) el.scrollTop = el.scrollHeight;
     }
-  }, [activeChannel, channelMessages]);
+  }, [channelMessages]);
 
   React.useLayoutEffect(() => {
     const container = threadScrollRef.current;
