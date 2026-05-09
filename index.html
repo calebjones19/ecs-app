@@ -2337,8 +2337,13 @@ function Chat({ role, authedUser, perm }) {
     ? channelMessages.find(m => m.id === openThread.msgId)
     : null;
 
+  const prevChannelRef = useRef(null);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!messagesEndRef.current) return;
+    const channelChanged = activeChannel !== prevChannelRef.current;
+    prevChannelRef.current = activeChannel;
+    // Jump instantly when opening a channel; smooth-scroll only for new messages
+    messagesEndRef.current.scrollIntoView({ behavior: channelChanged ? 'instant' : 'smooth' });
   }, [activeChannel, channelMessages]);
 
   React.useLayoutEffect(() => {
