@@ -2019,6 +2019,9 @@ function Chat({ role, authedUser, perm }) {
   // Load messages for active channel from Firestore (realtime)
   useEffect(() => {
     if (!activeChannel) return;
+    // Clear immediately so the scroll logic sees empty messages and waits for
+    // the real load before snapping — prevents snapping to the wrong channel's position
+    setChannelMessages([]);
     const unsub = db.collection('channels').doc(activeChannel)
       .collection('messages').orderBy('createdAt')
       .onSnapshot((snap) => {
