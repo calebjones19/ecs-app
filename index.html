@@ -1932,7 +1932,11 @@ function EmojiPickerSheet({ show, onSelect, onClose }) {
 function Chat({ role, authedUser, perm }) {
   const [channels, setChannels] = useState([]);
   const [activeChannel, setActiveChannel] = useState(null);
-  const [channelMessages, setChannelMessages] = useState([]);
+  // All channel messages kept in memory keyed by channel ID — same pattern as golf app's DATA.messages
+  const [allMessages, setAllMessages] = useState({});
+  const messageUnsubsRef = useRef({});
+  // Derived — always immediately available when channel switches, no async wait
+  const channelMessages = allMessages[activeChannel] || [];
   const [message, setMessage] = useState('');
   const [showSendLater, setShowSendLater] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
@@ -2016,22 +2020,36 @@ function Chat({ role, authedUser, perm }) {
     return () => { window.__ecsActiveChannel = null; };
   }, [activeChannel]);
 
-  // Flag: next messages load for this channel should unconditionally scroll to bottom
-  // (mirrors golf app's openChat() → renderChatMessages() → setTimeout(scroll, 50) pattern)
-  const pendingScrollRef = useRef(false);
+  // Subscribe to messages for every channel as soon as the channel list loads.
+  // This keeps all messages in memory (golf app DATA.messages pattern) so switching
+  // channels is instant — no Firestore round-trip needed.
+  useEffect(() => {
+    if (!channels.length) return;
+    channels.forEach(ch => {
+      if (messageUnsubsRef.current[ch.id]) return; // already subscribed
+      const unsub = db.collection('channels').doc(ch.id)
+        .collection('messages').orderBy('createdAt')
+        .onSnapshot(snap => {
+          const msgs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAllMessages(prev => ({ ...prev, [ch.id]: msgs }));
+        });
+      messageUnsubsRef.current[ch.id] = unsub;
+    });
+  }, [channels]);
 
-  // Load messages for active channel from Firestore (realtime)
+  // Unsubscribe all message listeners on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(messageUnsubsRef.current).forEach(u => u());
+      messageUnsubsRef.current = {};
+    };
+  }, []);
+
+  // Flag: channel just opened — scroll to bottom on next render (golf app openChat() pattern)
+  const pendingScrollRef = useRef(false);
   useEffect(() => {
     if (!activeChannel) return;
-    setChannelMessages([]);
-    pendingScrollRef.current = true; // channel opened — next load always scrolls to bottom
-    const unsub = db.collection('channels').doc(activeChannel)
-      .collection('messages').orderBy('createdAt')
-      .onSnapshot((snap) => {
-        const msgs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setChannelMessages(msgs);
-      });
-    return () => unsub();
+    pendingScrollRef.current = true;
   }, [activeChannel]);
   // Thread state
   const [openThread, setOpenThread] = useState(null);
