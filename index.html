@@ -7435,7 +7435,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
   const setAdminPage = setAdminSubPage;
 
   useEffect(() => {
-    const handler = (e) => { if (!e.detail?.handled && adminPage) { if (e.detail) e.detail.handled = true; setAdminPage(null); } };
+    const handler = (e) => { setTimeout(() => { if (!e.detail?.handled && adminPage) { if (e.detail) e.detail.handled = true; setAdminPage(null); } }, 0); };
     window.addEventListener('ecs-back', handler);
     return () => window.removeEventListener('ecs-back', handler);
   }, [adminPage]);
