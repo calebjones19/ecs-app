@@ -4202,17 +4202,19 @@ function ClientList({ role, perm, onCardOpen }) {
     if (onCardOpen) onCardOpen(!!selectedClient);
   }, [!!selectedClient]);
 
-  // Handle ecs-back: close card if open
+  // Handle ecs-back: close card if open (ref-based so listener registers once on mount)
+  const selectedClientRef = useRef(null);
+  selectedClientRef.current = selectedClient;
   useEffect(() => {
     const handler = (e) => {
-      if (selectedClient && !e.detail?.handled) {
+      if (selectedClientRef.current && !e.detail?.handled) {
         if (e.detail) e.detail.handled = true;
         setSelectedClient(null);
       }
     };
     window.addEventListener('ecs-back', handler);
     return () => window.removeEventListener('ecs-back', handler);
-  }, [!!selectedClient]);
+  }, []);
 
   // Sync edit state when selected client changes
   useEffect(() => {
@@ -4677,10 +4679,12 @@ function EmployeeProfiles({ role, perm }) {
   // Managers = employees with scheduler+ permission
   const managers = EMPLOYEES.filter(e => ['scheduler','editor','admin'].includes(e.permission) && e.status !== 'inactive').sort((a,b) => a.name.localeCompare(b.name));
 
-  // Handle ecs-back: close employee card if open
+  // Handle ecs-back: close employee card if open (ref-based so listener registers once on mount)
+  const selectedEmpRef = useRef(null);
+  selectedEmpRef.current = selectedEmp;
   useEffect(() => {
     const handler = (e) => {
-      if (selectedEmp && !e.detail?.handled) {
+      if (selectedEmpRef.current && !e.detail?.handled) {
         if (e.detail) e.detail.handled = true;
         setSelectedEmp(null);
         setSearch('');
@@ -4688,7 +4692,7 @@ function EmployeeProfiles({ role, perm }) {
     };
     window.addEventListener('ecs-back', handler);
     return () => window.removeEventListener('ecs-back', handler);
-  }, [!!selectedEmp]);
+  }, []);
 
   // Sync editData when selectedEmp changes
   useEffect(() => {
