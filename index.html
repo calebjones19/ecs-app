@@ -3583,14 +3583,16 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [groupBy, setGroupBy] = useState('employee'); // employee, client
   const [showLabor, setShowLabor] = useState(!isMobile);
 
-  // Date helpers
-  const baseDate = new Date(2026, 3, 20); // April 20, 2026 (Mon)
+  // Date helpers — baseDate is always this week's Monday so weekOffset=0 === today's week
+  const baseDate = (() => {
+    const d = new Date();
+    const dow = d.getDay(); // 0=Sun
+    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
 
-  // Init to the current week so the calendar opens on today
-  const [weekOffset, setWeekOffset] = useState(() => {
-    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-    return Math.floor((Date.now() - new Date(2026, 3, 20).getTime()) / msPerWeek);
-  });
+  const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1); // default to today
   const getWeekStart = () => {
     const d = new Date(baseDate);
@@ -3701,14 +3703,11 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     return days;
   };
 
-  // Count shifts for a given calendar date (map to day-of-week index relative to week)
+  // Count shifts for a given calendar date (map to day-of-week index)
   const getShiftsForDate = (date) => {
     const dow = date.getDay();
     const dayIndex = dow === 0 ? 6 : dow - 1;
-    // Only show data for the base week period as demo
-    const baseWeekStart = new Date(2026, 3, 20);
-    const baseWeekEnd = new Date(2026, 3, 27);
-    if (date >= baseWeekStart && date < baseWeekEnd) {
+    {
       let count = 0;
       let clients = new Set();
       Object.values(scheduleData).forEach(shifts => {
