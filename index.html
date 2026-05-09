@@ -4160,7 +4160,7 @@ function Schedule({ role, perm }) {
           <select className="form-input" value={newShift.client} onChange={e => setNewShift({...newShift, client: e.target.value})}
             style={newShift.client ? { borderColor: 'var(--success)' } : {}}>
             <option value="">Select client...</option>
-            {CLIENTS.filter(c => c.status === 'active').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            {CLIENTS.filter(c => c.status === 'active').sort((a,b) => a.name.localeCompare(b.name)).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
           </select>
         </div>
         {(!newShift.employee || !newShift.client) && (
@@ -5599,8 +5599,8 @@ function Checklists({ role, perm, authedUser }) {
   const visibleClients = allClients.filter(c => {
     const hasTasks = (tasksByClient[c.id] || []).length > 0;
     if (!hasTasks && !canEdit) return false;
-    if (filter === 'Homes') return c.type === 'Residential';
-    if (filter === 'Businesses') return c.type !== 'Residential';
+    if (filter === 'Residential') return c.type === 'Residential';
+    if (filter === 'Commercial') return c.type === 'Commercial';
     return true;
   });
 
@@ -5887,7 +5887,7 @@ function Checklists({ role, perm, authedUser }) {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
         <div className="cl-filter-pills" style={{ marginBottom: 0 }}>
-          {['All', 'Homes', 'Businesses'].map(f => (
+          {['All', 'Commercial', 'Residential'].map(f => (
             <button key={f} className={`cl-pill${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>{f}</button>
           ))}
         </div>
