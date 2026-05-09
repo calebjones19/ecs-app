@@ -3563,6 +3563,23 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     return () => unsub();
   }, []);
 
+  // ── One-time migration: shift day indices from Mon-first (0=Mon) to Sun-first (0=Sun) ──
+  useEffect(() => {
+    db.collection('scheduled_shifts').where('dayVersion', '==', null).get()
+      .then(snap => {
+        if (snap.empty) return;
+        const batch = db.batch();
+        snap.docs.forEach(doc => {
+          const oldDay = doc.data().day;
+          if (typeof oldDay === 'number') {
+            batch.update(doc.ref, { day: (oldDay + 1) % 7, dayVersion: 2 });
+          }
+        });
+        return batch.commit();
+      })
+      .catch(() => {});
+  }, []);
+
   const closeAddShift = () => { setShowAddShift(false); setNewShift(EMPTY_SHIFT); setEmpSearch(''); setClientSearch(''); };
 
   // ecs-back: close Add Shift page on swipe/back
@@ -3830,6 +3847,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           recurrenceStart: newShift.recurrenceStart || null,
           recurrenceEnd: newShift.repeats && newShift.recurrenceEndType === 'date' ? newShift.recurrenceEnd : (newShift.repeats ? 'indefinitely' : null),
           status: 'pending',
+          dayVersion: 2,
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         });
       });
