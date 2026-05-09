@@ -346,6 +346,14 @@
   @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes splashFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes splashIconPop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+  @keyframes splashTextSlide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes splashBar { 0% { width: 0%; margin-left: 0; } 50% { width: 100%; margin-left: 0; } 51% { width: 100%; margin-left: 0; } 100% { width: 0%; margin-left: 100%; } }
+  #splash-icon { animation: splashIconPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both; }
+  #splash-wordmark { animation: splashTextSlide 0.4s ease-out 0.22s both; }
+  #splash-sub { animation: splashTextSlide 0.4s ease-out 0.32s both; }
+  .splash-bar { animation: splashBar 1.2s ease-in-out 0.45s infinite; }
   .action-sheet-handle { width: 36px; height: 4px; background: #d0d0d0; border-radius: 2px; margin: 10px auto 6px; }
   .action-sheet-msg-preview { padding: 8px 16px 12px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .action-sheet-reactions { display: flex; gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--border); justify-content: flex-start; overflow-x: auto; }
@@ -884,6 +892,17 @@
 </style>
 </head>
 <body>
+<!-- Instant splash — renders as soon as HTML is parsed, no JS needed -->
+<div id="splash" style="position:fixed;inset:0;background:#2a3328;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.35s ease;">
+  <div id="splash-icon" style="width:72px;height:72px;border-radius:20px;background:#4a6741;display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 8px 32px rgba(0,0,0,0.35);">
+    <i class="fas fa-leaf" style="font-size:32px;color:#fff;"></i>
+  </div>
+  <div id="splash-wordmark" style="color:#fff;font-size:28px;font-weight:700;letter-spacing:1.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Essence</div>
+  <div id="splash-sub" style="color:#7cb342;font-size:12px;font-weight:500;letter-spacing:3px;text-transform:uppercase;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Cleaning Co.</div>
+  <div style="position:absolute;bottom:60px;width:48px;height:3px;border-radius:2px;background:rgba(255,255,255,0.12);overflow:hidden;">
+    <div class="splash-bar" style="height:100%;border-radius:2px;background:#7cb342;"></div>
+  </div>
+</div>
 <div id="root"></div>
 <script>
 // Only JS needed: hide bottom nav when keyboard opens (CSS dvh handles the rest)
@@ -8584,11 +8603,18 @@ function App() {
     }
   };
 
-  if (authLoading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#fff' }}>
-      <i className="fas fa-spinner fa-spin" style={{ fontSize: 28, color: 'var(--primary)' }} />
-    </div>;
-  }
+  // Fade out the HTML splash once auth resolves — it showed instantly before any JS ran
+  useEffect(() => {
+    if (!authLoading) {
+      const splash = document.getElementById('splash');
+      if (splash) {
+        splash.style.opacity = '0';
+        setTimeout(() => { try { splash.parentNode.removeChild(splash); } catch(e) {} }, 380);
+      }
+    }
+  }, [authLoading]);
+
+  if (authLoading) return null; // HTML splash is covering the screen
 
   if (!authedUser) {
     return <LoginScreen onLogin={setAuthedUser} />;
