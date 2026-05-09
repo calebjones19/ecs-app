@@ -1055,6 +1055,24 @@ async function requestNotificationPermission(userId) {
   }
 }
 
+// ── Push notification helper: writes to push_queue (Cloud Function picks it up) ──
+async function sendPushNotification(toUserId, title, body, type = 'general', data = {}) {
+  if (!toUserId) return;
+  try {
+    await db.collection('push_queue').add({
+      toUserId,
+      title,
+      body,
+      type,
+      data,
+      sent: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch(e) {
+    console.warn('[Push] Failed to queue notification:', e);
+  }
+}
+
 // Track unread badge count globally
 let _badgeCount = 0;
 // Track which channel is currently being viewed (set by Chat component)
@@ -3528,6 +3546,22 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [scheduleData, setScheduleData] = useState(SCHEDULE_DATA);
   const ns = (patch) => setNewShift(s => ({...s, ...patch}));
 
+  // ── Live-sync shifts from Firestore ──
+  useEffect(() => {
+    const unsub = db.collection('scheduled_shifts')
+      .orderBy('createdAt', 'asc')
+      .onSnapshot(snap => {
+        const data = {};
+        snap.docs.forEach(doc => {
+          const d = { id: doc.id, ...doc.data() };
+          if (!data[d.employeeId]) data[d.employeeId] = [];
+          data[d.employeeId].push(d);
+        });
+        setScheduleData(data);
+      }, () => {});
+    return () => unsub();
+  }, []);
+
   const closeAddShift = () => { setShowAddShift(false); setNewShift(EMPTY_SHIFT); setEmpSearch(''); setClientSearch(''); };
 
   // ecs-back: close Add Shift page on swipe/back
@@ -3718,14 +3752,13 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   };
 
   // Actually add the shift to local state
-  const confirmAddShift = () => {
+  const confirmAddShift = async () => {
     if (!newShift.employees.length || !newShift.client) return;
     const fmtTime = (t) => {
       const [h] = t.split(':').map(Number);
       if (h === 0) return '12a'; if (h < 12) return `${h}a`; if (h === 12) return '12p'; return `${h-12}p`;
     };
     const clientShort = newShift.client;
-    const updated = { ...scheduleData };
     const days = newShift.scheduleType === 'specific' ? [parseInt(newShift.day)] : newShift.flexDays;
     const timeLabel = newShift.scheduleType === 'specific'
       ? `${fmtTime(newShift.startTime)}-${fmtTime(newShift.endTime)}`
@@ -3734,19 +3767,69 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       : newShift.windowType === 'before' ? `Before ${fmtTime(newShift.windowEnd)}`
       : `${fmtTime(newShift.windowStart)}-${fmtTime(newShift.windowEnd)}`;
     const refH = newShift.scheduleType === 'specific' ? parseInt(newShift.startTime) : parseInt(newShift.windowStart);
-    const type = refH < 12 ? 'morning' : refH < 17 ? 'afternoon' : 'evening';
+    const shiftType = refH < 12 ? 'morning' : refH < 17 ? 'afternoon' : 'evening';
+    const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+    const batch = db.batch();
     newShift.employees.forEach(empId => {
-      if (!updated[empId]) updated[empId] = [];
+      const emp = EMPLOYEES.find(e => e.id === empId);
       days.forEach(dayIdx => {
-        updated[empId] = [...updated[empId], { day: dayIdx, time: timeLabel, client: clientShort, type,
-          repeats: newShift.repeats, frequency: newShift.repeats ? newShift.frequency : null,
-          recurrenceStart: newShift.recurrenceStart, recurrenceEnd: newShift.repeats && newShift.recurrenceEndType === 'date' ? newShift.recurrenceEnd : (newShift.repeats ? 'indefinitely' : null) }];
+        const ref = db.collection('scheduled_shifts').doc();
+        batch.set(ref, {
+          employeeId: empId,
+          employeeName: emp?.name || '',
+          scheduledById: authedUser?.id || '',
+          scheduledByName: authedUser?.name || 'Manager',
+          client: clientShort,
+          day: dayIdx,
+          time: timeLabel,
+          type: shiftType,
+          scheduleType: newShift.scheduleType,
+          repeats: newShift.repeats,
+          frequency: newShift.repeats ? newShift.frequency : null,
+          recurrenceStart: newShift.recurrenceStart || null,
+          recurrenceEnd: newShift.repeats && newShift.recurrenceEndType === 'date' ? newShift.recurrenceEnd : (newShift.repeats ? 'indefinitely' : null),
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
       });
     });
-    setScheduleData(updated);
-    setShowAddShift(false);
-    setNewShift(EMPTY_SHIFT);
-    setEmpSearch(''); setClientSearch('');
+    try {
+      await batch.commit();
+      // Notify each assigned employee
+      newShift.employees.forEach(empId => {
+        const emp = EMPLOYEES.find(e => e.id === empId);
+        const dayStr = days.length === 1 ? DAY_NAMES[days[0]] : `${days.length} days`;
+        sendPushNotification(empId, 'New Shift Scheduled', `${authedUser?.name || 'Your manager'} scheduled you: ${clientShort} on ${dayStr}`, 'schedule', { client: clientShort });
+      });
+    } catch(err) {
+      console.error('Failed to save shifts:', err);
+    }
+    closeAddShift();
+  };
+
+  // ── Respond to a shift (employee accept/decline) ──
+  const respondToShift = async (shiftId, status) => {
+    try {
+      await db.collection('scheduled_shifts').doc(shiftId).update({
+        status,
+        respondedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      // Find the shift to get the scheduler's info
+      const shift = Object.values(scheduleData).flat().find(s => s.id === shiftId);
+      if (shift?.scheduledById) {
+        const verb = status === 'accepted' ? 'accepted' : 'declined';
+        sendPushNotification(
+          shift.scheduledById,
+          `Shift ${status === 'accepted' ? 'Accepted' : 'Declined'}`,
+          `${authedUser?.name || 'An employee'} ${verb} their shift at ${shift.client}`,
+          'schedule',
+          { shiftId, employeeId: authedUser?.id }
+        );
+      }
+    } catch(err) {
+      console.error('Failed to respond to shift:', err);
+    }
   };
 
   // ── My Schedule (personal view — current user's shifts only) ──
@@ -3757,22 +3840,54 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     if (myShifts.length === 0) {
       return <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>You have no shifts scheduled for this day.</p></div>;
     }
+    const iconBg = { morning: '#e8f5e9', afternoon: '#fff8e1', evening: '#f3e5f5' };
+    const iconColor = { morning: '#388e3c', afternoon: '#f57f17', evening: '#7b1fa2' };
+    const iconName = { morning: 'fa-sun', afternoon: 'fa-cloud-sun', evening: 'fa-moon' };
+    const statusCfg = {
+      pending:  { bg: '#fef3c7', color: '#b45309', icon: 'fa-clock',        label: 'Pending' },
+      accepted: { bg: '#dcfce7', color: '#15803d', icon: 'fa-check-circle', label: 'Accepted' },
+      declined: { bg: '#fee2e2', color: '#b91c1c', icon: 'fa-times-circle', label: 'Declined' },
+    };
     return (
       <div>
-        {myShifts.map((s, i) => (
-          <div className="card" key={i} style={{ padding: '14px 16px', marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: s.type === 'morning' ? '#e8f5e9' : s.type === 'afternoon' ? '#fff8e1' : '#f3e5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <i className={`fas ${s.type === 'morning' ? 'fa-sun' : s.type === 'afternoon' ? 'fa-cloud-sun' : 'fa-moon'}`} style={{ color: s.type === 'morning' ? '#388e3c' : s.type === 'afternoon' ? '#f57f17' : '#7b1fa2', fontSize: 16 }} />
+        {myShifts.map((s, i) => {
+          const sc = statusCfg[s.status] || statusCfg.pending;
+          const t = s.type || 'morning';
+          return (
+            <div className="card" key={s.id || i} style={{ padding: '14px 16px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: iconBg[t], display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                  <i className={`fas ${iconName[t]}`} style={{ color: iconColor[t], fontSize: 16 }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>{s.client}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 8, padding: '2px 8px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <i className={`fas ${sc.icon}`} style={{ fontSize: 9 }} />{sc.label}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 3 }}>
+                    {s.time}
+                    {s.repeats && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--primary)', fontWeight: 600, background: 'var(--primary-light)', borderRadius: 8, padding: '2px 7px' }}><i className="fas fa-sync-alt" style={{ marginRight: 3 }} />{s.frequency}</span>}
+                  </div>
+                  {s.scheduledByName && <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>Scheduled by {s.scheduledByName}</div>}
+                  {s.status === 'pending' && s.id && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button onClick={() => respondToShift(s.id, 'accepted')}
+                        style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                        <i className="fas fa-check" style={{ marginRight: 5 }} />Accept
+                      </button>
+                      <button onClick={() => respondToShift(s.id, 'declined')}
+                        style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: '1.5px solid var(--border)', background: 'none', color: 'var(--danger)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                        <i className="fas fa-times" style={{ marginRight: 5 }} />Decline
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{s.client}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 2 }}>{s.time}{s.repeats ? <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--primary)', fontWeight: 600, background: 'var(--primary-light)', borderRadius: 8, padding: '2px 7px' }}><i className="fas fa-sync-alt" style={{ marginRight: 3 }} />{s.frequency}</span> : null}</div>
-              </div>
-              <button className="chat-icon-btn" title="Request swap"><i className="fas fa-exchange-alt" /></button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };

@@ -52,6 +52,13 @@ messaging.onBackgroundMessage((payload) => {
     options.actions = [
       { action: 'view', title: 'View Schedule' }
     ];
+    // Shift assignment: add quick Accept/Decline actions
+    if (payload.data?.shiftId && payload.data?.employeeId === undefined) {
+      options.actions = [
+        { action: 'accept', title: 'Accept' },
+        { action: 'view', title: 'View' },
+      ];
+    }
   }
 
   return self.registration.showNotification(notifTitle, options);
