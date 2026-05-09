@@ -2337,18 +2337,18 @@ function Chat({ role, authedUser, perm }) {
     ? channelMessages.find(m => m.id === openThread.msgId)
     : null;
 
-  const prevChannelRef = useRef(null);
+  // Track the last channel we hard-snapped for so switching back always re-snaps
+  const lastSnappedChannel = useRef(null);
   React.useLayoutEffect(() => {
     const container = chatMessagesRef.current;
     if (!container || !channelMessages.length) return;
-    const channelChanged = activeChannel !== prevChannelRef.current;
-    prevChannelRef.current = activeChannel;
-    if (channelChanged) {
-      // Synchronous jump before browser paints — user never sees the top
+    if (activeChannel !== lastSnappedChannel.current) {
+      // Channel switched (or first load) — always snap to newest message immediately
+      lastSnappedChannel.current = activeChannel;
       container.scrollTop = container.scrollHeight;
     } else {
-      // New message: only scroll if already near the bottom
-      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      // Same channel, new message: only scroll if already near the bottom
+      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
       if (nearBottom) container.scrollTop = container.scrollHeight;
     }
   }, [activeChannel, channelMessages]);
