@@ -856,16 +856,18 @@
 .home-greeting { padding: 4px 0 28px; }
 .home-greeting h2 { font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
 .home-greeting p { font-size: 14px; color: var(--text-light); }
-.home-widgets { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
-.home-widget { background: white; border-radius: 16px; padding: 18px 20px; cursor: pointer; transition: all 0.15s; border: 1.5px solid var(--border); display: flex; align-items: center; gap: 16px; position: relative; }
-.home-widget:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); border-color: var(--primary-light); }
-.home-widget:active { transform: scale(0.98); }
-.home-widget-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0; }
-.home-widget h4 { font-size: 16px; font-weight: 700; color: var(--text); margin: 0; flex: 1; }
-.home-widget-chevron { color: var(--text-light); font-size: 13px; flex-shrink: 0; }
+.home-widgets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 28px; }
+.home-widget { background: none; border: none; border-radius: 20px; padding: 28px 16px 20px; cursor: pointer; transition: all 0.18s; display: flex; flex-direction: column; align-items: center; gap: 14px; position: relative; }
+.home-widget:hover { transform: translateY(-2px); }
+.home-widget:active { transform: scale(0.96); }
+.home-widget-icon { width: 88px; height: 88px; border-radius: 24px; display: flex; align-items: center; justify-content: center; font-size: 36px; color: white; box-shadow: 0 4px 16px rgba(0,0,0,0.15); transition: box-shadow 0.18s; }
+.home-widget:hover .home-widget-icon { box-shadow: 0 8px 24px rgba(0,0,0,0.22); }
+.home-widget h4 { font-size: 15px; font-weight: 700; color: var(--text); margin: 0; text-align: center; }
+.home-widget-chevron { display: none; }
 @media (max-width: 768px) {
-  .home-widget { padding: 16px 18px; }
-  .home-widget h4 { font-size: 15px; }
+  .home-widget { padding: 22px 12px 18px; }
+  .home-widget-icon { width: 80px; height: 80px; font-size: 32px; }
+  .home-widget h4 { font-size: 14px; }
 }
 .home-tasks-section { margin-bottom: 24px; }
 .home-task-client { font-size: 13px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
@@ -1326,22 +1328,18 @@ function Home({ role, perm, authedUser, setPage }) {
         <div className="home-widget" onClick={() => setPage && setPage('dashboard')}>
           <div className="home-widget-icon" style={{ background: 'var(--primary)' }}><i className="fas fa-chart-bar" /></div>
           <h4>Dashboard</h4>
-          <i className="fas fa-chevron-right home-widget-chevron" />
         </div>
         <div className="home-widget" onClick={() => setPage && setPage('my-checklists')}>
           <div className="home-widget-icon" style={{ background: '#b85c4a' }}><i className="fas fa-clipboard-check" /></div>
           <h4>Checklists</h4>
-          <i className="fas fa-chevron-right home-widget-chevron" />
         </div>
         <div className="home-widget" onClick={() => setPage && setPage('schedule')}>
           <div className="home-widget-icon" style={{ background: '#5e8a7a' }}><i className="fas fa-calendar-alt" /></div>
           <h4>{(perm?.canSchedule || perm?.canEdit || perm?.isAdmin) ? 'Schedule' : 'My Schedule'}</h4>
-          <i className="fas fa-chevron-right home-widget-chevron" />
         </div>
         <div className="home-widget" onClick={() => setPage && setPage('timesheets')}>
           <div className="home-widget-icon" style={{ background: '#c8a84e' }}><i className="fas fa-clock" /></div>
           <h4>Time Clock</h4>
-          <i className="fas fa-chevron-right home-widget-chevron" />
         </div>
       </div>
     </div>
