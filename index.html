@@ -7391,13 +7391,13 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
   }, [adminPage]);
 
   const hubItems = [
+    { id: 'announcements', icon: 'fa-bullhorn', label: 'Announcements', desc: 'Post updates to your teams', color: '#4a6741' },
+    { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists', color: '#b85c4a' },
     ...(perm?.canEdit ? [
       { id: 'people', icon: 'fa-users', label: 'People', desc: 'Employees, teams & clients', color: '#7c6f64' },
     ] : []),
-    { id: 'announcements', icon: 'fa-bullhorn', label: 'Announcements', desc: 'Post updates to your teams', color: '#4a6741' },
-    { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Pending swap requests', color: '#c8a84e' },
-    { id: 'checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'Onsite task lists', color: '#b85c4a' },
     { id: 'admin-schedule', icon: 'fa-calendar-alt', label: 'Scheduling', desc: 'Create & manage team shifts', color: '#4a6741' },
+    { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Pending swap requests', color: '#c8a84e' },
     { id: 'admin-timeoff', icon: 'fa-calendar-times', label: 'Time Off Requests', desc: 'Review pending requests', color: '#5e8a7a' },
   ];
 
