@@ -4946,23 +4946,22 @@ function EmployeeProfiles({ role, perm }) {
 
       {!selectedEmp ? (
         <>
-        {/* Toolbar: filter + add on top row, search full-width below */}
+        {/* Toolbar: search + add, then pill filters */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-            <select className="form-input" style={{ flex: 1 }} value={filter} onChange={e => { setFilter(e.target.value); setLetterFilter(''); }}>
-              <option value="all">All</option>
-              <option value="employee">Employees</option>
-              <option value="contractor">Contractors</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            <div className="search-bar" style={{ flex: 1, marginBottom: 0 }}>
+              <i className="fas fa-search" />
+              <input placeholder="Search employees..." value={search} onChange={e => setSearch(e.target.value)} />
+              {search && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)', padding: '0 4px' }} onClick={() => setSearch('')}><i className="fas fa-times" /></button>}
+            </div>
             {canEdit && (
               <button className="topbar-btn primary" onClick={() => setShowAdd(true)} style={{ flexShrink: 0 }}><i className="fas fa-plus" /> Add</button>
             )}
           </div>
-          <div className="search-bar">
-            <i className="fas fa-search" />
-            <input placeholder="Search employees..." value={search} onChange={e => { setSearch(e.target.value); setLetterFilter(''); }} />
-            {search && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)', padding: '0 4px' }} onClick={() => setSearch('')}><i className="fas fa-times" /></button>}
+          <div className="cl-filter-pills">
+            {[['all','All'],['employee','Employees'],['contractor','Contractors'],['inactive','Inactive']].map(([val, label]) => (
+              <button key={val} className={`cl-pill${filter === val ? ' active' : ''}`} onClick={() => setFilter(val)}>{label}</button>
+            ))}
           </div>
         </div>
 
