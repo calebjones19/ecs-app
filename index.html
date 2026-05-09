@@ -4577,9 +4577,19 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                 {/* Row 1: nav arrows + view switcher */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <button className="topbar-btn" onClick={() => setWeekOffset(w => w - 1)} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-left" /></button>
+                    <button className="topbar-btn" onClick={() => {
+                      if (calView === 'day') {
+                        if (selectedDay === 0) { setWeekOffset(w => w - 1); setSelectedDay(6); }
+                        else setSelectedDay(d => d - 1);
+                      } else { setWeekOffset(w => w - 1); }
+                    }} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-left" /></button>
                     <button className="topbar-btn" onClick={goToToday} style={{ padding: '6px 10px', fontWeight: 600, color: isCurrentWeek ? 'var(--primary)' : undefined }}>Today</button>
-                    <button className="topbar-btn" onClick={() => setWeekOffset(w => w + 1)} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-right" /></button>
+                    <button className="topbar-btn" onClick={() => {
+                      if (calView === 'day') {
+                        if (selectedDay === 6) { setWeekOffset(w => w + 1); setSelectedDay(0); }
+                        else setSelectedDay(d => d + 1);
+                      } else { setWeekOffset(w => w + 1); }
+                    }} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-right" /></button>
                   </div>
                   <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, padding: 3, gap: 2 }}>
                     {['day','week','month'].map(v => (
