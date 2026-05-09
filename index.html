@@ -3527,9 +3527,11 @@ function Schedule({ role, perm }) {
   const isAdmin = perm?.isAdmin || role === 'admin';
   const [scheduleTab, setScheduleTab] = useState('schedule');
   const [showAddShift, setShowAddShift] = useState(false);
-  const [newShift, setNewShift] = useState({ employees: [], day: 0, startTime: '08:00', endTime: '12:00', client: '' });
+  const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '' };
+  const [newShift, setNewShift] = useState(EMPTY_SHIFT);
   const [empSearch, setEmpSearch] = useState('');
   const [clientSearch, setClientSearch] = useState('');
+  const ns = (patch) => setNewShift(s => ({...s, ...patch}));
   const [scheduleData, setScheduleData] = useState(SCHEDULE_DATA);
   const isMobile = window.innerWidth <= 768;
   const [calView, setCalView] = useState(isMobile ? 'day' : 'week'); // day, week, month
@@ -3690,8 +3692,8 @@ function Schedule({ role, perm }) {
 
   // Open add-shift modal pre-populated with context from the clicked cell
   const openAddShift = (opts = {}) => {
-    setNewShift({
-      employee: opts.employee || '',
+    setNewShift({ ...EMPTY_SHIFT,
+      employees: opts.employee ? [opts.employee] : [],
       day: opts.day != null ? opts.day : selectedDay,
       startTime: opts.startTime || '08:00',
       endTime: opts.endTime || '12:00',
@@ -3703,30 +3705,33 @@ function Schedule({ role, perm }) {
   // Actually add the shift to local state
   const confirmAddShift = () => {
     if (!newShift.employees.length || !newShift.client) return;
-    const dayIdx = parseInt(newShift.day);
     const fmtTime = (t) => {
       const [h] = t.split(':').map(Number);
-      if (h === 0) return '12a';
-      if (h < 12) return `${h}a`;
-      if (h === 12) return '12p';
-      return `${h - 12}p`;
+      if (h === 0) return '12a'; if (h < 12) return `${h}a`; if (h === 12) return '12p'; return `${h-12}p`;
     };
-    const timeLabel = `${fmtTime(newShift.startTime)}-${fmtTime(newShift.endTime)}`;
-    const startH = parseInt(newShift.startTime.split(':')[0]);
-    const type = startH < 12 ? 'morning' : startH < 17 ? 'afternoon' : 'evening';
-    const clientObj = CLIENTS.find(c => c.name === newShift.client);
-    const clientShort = clientObj ? clientObj.name : newShift.client;
-
+    const clientShort = newShift.client;
     const updated = { ...scheduleData };
+    const days = newShift.scheduleType === 'specific' ? [parseInt(newShift.day)] : newShift.flexDays;
+    const timeLabel = newShift.scheduleType === 'specific'
+      ? `${fmtTime(newShift.startTime)}-${fmtTime(newShift.endTime)}`
+      : newShift.windowType === 'anytime' ? 'Flexible'
+      : newShift.windowType === 'after' ? `After ${fmtTime(newShift.windowStart)}`
+      : newShift.windowType === 'before' ? `Before ${fmtTime(newShift.windowEnd)}`
+      : `${fmtTime(newShift.windowStart)}-${fmtTime(newShift.windowEnd)}`;
+    const refH = newShift.scheduleType === 'specific' ? parseInt(newShift.startTime) : parseInt(newShift.windowStart);
+    const type = refH < 12 ? 'morning' : refH < 17 ? 'afternoon' : 'evening';
     newShift.employees.forEach(empId => {
       if (!updated[empId]) updated[empId] = [];
-      updated[empId] = [...updated[empId], { day: dayIdx, time: timeLabel, client: clientShort, type }];
+      days.forEach(dayIdx => {
+        updated[empId] = [...updated[empId], { day: dayIdx, time: timeLabel, client: clientShort, type,
+          repeats: newShift.repeats, frequency: newShift.repeats ? newShift.frequency : null,
+          recurrenceStart: newShift.recurrenceStart, recurrenceEnd: newShift.repeats && newShift.recurrenceEndType === 'date' ? newShift.recurrenceEnd : (newShift.repeats ? 'indefinitely' : null) }];
+      });
     });
     setScheduleData(updated);
     setShowAddShift(false);
-    setNewShift({ employees: [], day: 0, startTime: '08:00', endTime: '12:00', client: '' });
-    setEmpSearch('');
-    setClientSearch('');
+    setNewShift(EMPTY_SHIFT);
+    setEmpSearch(''); setClientSearch('');
   };
 
   // ── Day View ──
@@ -4134,33 +4139,30 @@ function Schedule({ role, perm }) {
 
 
       {/* Add Shift Modal */}
-      <Modal show={showAddShift} onClose={() => { setShowAddShift(false); setEmpSearch(''); setClientSearch(''); }} title="Add Shift">
-        {/* Employees — multi-select search */}
+      <Modal show={showAddShift} onClose={() => { setShowAddShift(false); setNewShift(EMPTY_SHIFT); setEmpSearch(''); setClientSearch(''); }} title="Add Shift">
+
+        {/* ── Employees ── */}
         <div className="form-group">
           <label className="form-label">Employees</label>
           <div className="search-bar" style={{ marginBottom: newShift.employees.length ? 8 : 0 }}>
             <i className="fas fa-search" />
             <input placeholder="Search employees..." value={empSearch} onChange={e => setEmpSearch(e.target.value)} />
-            {empSearch && <button style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-light)', padding:'0 4px' }} onClick={() => setEmpSearch('')}><i className="fas fa-times" /></button>}
+            {empSearch && <button style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-light)',padding:'0 4px' }} onClick={() => setEmpSearch('')}><i className="fas fa-times" /></button>}
           </div>
           {newShift.employees.length > 0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom: empSearch.trim() ? 8 : 0 }}>
-              {newShift.employees.map(id => {
-                const emp = EMPLOYEES.find(e => e.id === id);
-                return emp ? (
-                  <span key={id} style={{ display:'flex', alignItems:'center', gap:5, background:'var(--primary-light)', color:'var(--primary)', borderRadius:20, padding:'3px 10px', fontSize:13, fontWeight:600 }}>
-                    {emp.name}
-                    <button onClick={() => setNewShift({...newShift, employees: newShift.employees.filter(i => i !== id)})} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--primary)', padding:0, lineHeight:1, fontSize:12 }}><i className="fas fa-times" /></button>
-                  </span>
-                ) : null;
-              })}
+              {newShift.employees.map(id => { const emp = EMPLOYEES.find(e => e.id === id); return emp ? (
+                <span key={id} style={{ display:'flex',alignItems:'center',gap:5,background:'var(--primary-light)',color:'var(--primary)',borderRadius:20,padding:'3px 10px',fontSize:13,fontWeight:600 }}>
+                  {emp.name}
+                  <button onMouseDown={ev=>{ev.preventDefault();ns({employees:newShift.employees.filter(i=>i!==id)});}} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--primary)',padding:0,lineHeight:1,fontSize:12 }}><i className="fas fa-times" /></button>
+                </span>) : null; })}
             </div>
           )}
           {empSearch.trim() && (
-            <div style={{ border:'1px solid var(--border)', borderRadius:8, overflow:'hidden', marginTop:2 }}>
-              {EMPLOYEES.filter(e => e.status === 'active' && !newShift.employees.includes(e.id) && e.name.toLowerCase().includes(empSearch.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).slice(0,6).map(e => (
-                <div key={e.id} style={{ padding:'10px 14px', cursor:'pointer', fontSize:14, borderBottom:'1px solid var(--border)' }}
-                  onMouseDown={ev => { ev.preventDefault(); setNewShift({...newShift, employees:[...newShift.employees, e.id]}); setEmpSearch(''); }}>
+            <div style={{ border:'1px solid var(--border)',borderRadius:8,overflow:'hidden',marginTop:2 }}>
+              {EMPLOYEES.filter(e=>e.status==='active'&&!newShift.employees.includes(e.id)&&e.name.toLowerCase().includes(empSearch.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,6).map(e=>(
+                <div key={e.id} style={{ padding:'10px 14px',cursor:'pointer',fontSize:14,borderBottom:'1px solid var(--border)' }}
+                  onMouseDown={ev=>{ev.preventDefault();ns({employees:[...newShift.employees,e.id]});setEmpSearch('');}}>
                   {e.name}
                 </div>
               ))}
@@ -4168,45 +4170,25 @@ function Schedule({ role, perm }) {
           )}
         </div>
 
-        {/* Day */}
-        <div className="form-group">
-          <label className="form-label">Day</label>
-          <select className="form-input" value={newShift.day} onChange={e => setNewShift({...newShift, day: parseInt(e.target.value)})}>
-            {weekDays.map((d, i) => <option key={i} value={i}>{d.label}</option>)}
-          </select>
-        </div>
-
-        {/* Times */}
-        <div className="grid-2">
-          <div className="form-group">
-            <label className="form-label">Start Time</label>
-            <input type="time" className="form-input" value={newShift.startTime} onChange={e => setNewShift({...newShift, startTime: e.target.value})} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">End Time</label>
-            <input type="time" className="form-input" value={newShift.endTime} onChange={e => setNewShift({...newShift, endTime: e.target.value})} />
-          </div>
-        </div>
-
-        {/* Client — single-select search */}
+        {/* ── Client ── */}
         <div className="form-group">
           <label className="form-label">Client / Location</label>
           <div className="search-bar" style={{ marginBottom: newShift.client ? 8 : 0 }}>
             <i className="fas fa-search" />
             <input placeholder="Search clients..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
-            {clientSearch && <button style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-light)', padding:'0 4px' }} onClick={() => setClientSearch('')}><i className="fas fa-times" /></button>}
+            {clientSearch && <button style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-light)',padding:'0 4px' }} onClick={() => setClientSearch('')}><i className="fas fa-times" /></button>}
           </div>
           {newShift.client && (
-            <span style={{ display:'inline-flex', alignItems:'center', gap:5, background:'var(--primary-light)', color:'var(--primary)', borderRadius:20, padding:'3px 10px', fontSize:13, fontWeight:600, marginBottom: clientSearch.trim() ? 8 : 0 }}>
+            <span style={{ display:'inline-flex',alignItems:'center',gap:5,background:'var(--primary-light)',color:'var(--primary)',borderRadius:20,padding:'3px 10px',fontSize:13,fontWeight:600,marginBottom:clientSearch.trim()?8:0 }}>
               {newShift.client}
-              <button onClick={() => setNewShift({...newShift, client:''})} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--primary)', padding:0, lineHeight:1, fontSize:12 }}><i className="fas fa-times" /></button>
+              <button onMouseDown={ev=>{ev.preventDefault();ns({client:''});}} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--primary)',padding:0,lineHeight:1,fontSize:12 }}><i className="fas fa-times" /></button>
             </span>
           )}
           {clientSearch.trim() && (
-            <div style={{ border:'1px solid var(--border)', borderRadius:8, overflow:'hidden', marginTop:2 }}>
-              {CLIENTS.filter(c => c.status === 'active' && c.name.toLowerCase().includes(clientSearch.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).slice(0,6).map(c => (
-                <div key={c.id} style={{ padding:'10px 14px', cursor:'pointer', fontSize:14, borderBottom:'1px solid var(--border)' }}
-                  onMouseDown={ev => { ev.preventDefault(); setNewShift({...newShift, client:c.name}); setClientSearch(''); }}>
+            <div style={{ border:'1px solid var(--border)',borderRadius:8,overflow:'hidden',marginTop:2 }}>
+              {CLIENTS.filter(c=>c.status==='active'&&c.name.toLowerCase().includes(clientSearch.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,6).map(c=>(
+                <div key={c.id} style={{ padding:'10px 14px',cursor:'pointer',fontSize:14,borderBottom:'1px solid var(--border)' }}
+                  onMouseDown={ev=>{ev.preventDefault();ns({client:c.name});setClientSearch('');}}>
                   {c.name}
                 </div>
               ))}
@@ -4214,16 +4196,125 @@ function Schedule({ role, perm }) {
           )}
         </div>
 
+        {/* ── Schedule Type ── */}
+        <div className="form-group">
+          <label className="form-label">Schedule Type</label>
+          <div style={{ display:'flex', gap:8 }}>
+            {[['specific','Specific Time'],['flexible','Flexible Window']].map(([val,label])=>(
+              <button key={val} type="button"
+                className={`cl-pill${newShift.scheduleType===val?' active':''}`}
+                onClick={()=>ns({scheduleType:val})}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Specific Time */}
+        {newShift.scheduleType==='specific' && (<>
+          <div className="form-group">
+            <label className="form-label">Day</label>
+            <select className="form-input" value={newShift.day} onChange={e=>ns({day:parseInt(e.target.value)})}>
+              {weekDays.map((d,i)=><option key={i} value={i}>{d.label}</option>)}
+            </select>
+          </div>
+          <div className="grid-2">
+            <div className="form-group"><label className="form-label">Start Time</label><input type="time" className="form-input" value={newShift.startTime} onChange={e=>ns({startTime:e.target.value})} /></div>
+            <div className="form-group"><label className="form-label">End Time</label><input type="time" className="form-input" value={newShift.endTime} onChange={e=>ns({endTime:e.target.value})} /></div>
+          </div>
+        </>)}
+
+        {/* Flexible Window */}
+        {newShift.scheduleType==='flexible' && (<>
+          <div className="form-group">
+            <label className="form-label">Days</label>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {weekDays.map((d,i)=>(
+                <button key={i} type="button"
+                  className={`cl-pill${newShift.flexDays.includes(i)?' active':''}`}
+                  style={{ padding:'5px 12px', fontSize:12 }}
+                  onClick={()=>ns({flexDays:newShift.flexDays.includes(i)?newShift.flexDays.filter(x=>x!==i):[...newShift.flexDays,i].sort()})}>
+                  {d.label.slice(0,3)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Time Window</label>
+            <select className="form-input" value={newShift.windowType} onChange={e=>ns({windowType:e.target.value})}>
+              <option value="anytime">Any time</option>
+              <option value="range">Between specific hours</option>
+              <option value="after">After a specific time</option>
+              <option value="before">Before a specific time</option>
+            </select>
+          </div>
+          {newShift.windowType==='range' && (
+            <div className="grid-2">
+              <div className="form-group"><label className="form-label">From</label><input type="time" className="form-input" value={newShift.windowStart} onChange={e=>ns({windowStart:e.target.value})} /></div>
+              <div className="form-group"><label className="form-label">To</label><input type="time" className="form-input" value={newShift.windowEnd} onChange={e=>ns({windowEnd:e.target.value})} /></div>
+            </div>
+          )}
+          {newShift.windowType==='after' && (
+            <div className="form-group"><label className="form-label">After</label><input type="time" className="form-input" value={newShift.windowStart} onChange={e=>ns({windowStart:e.target.value})} /></div>
+          )}
+          {newShift.windowType==='before' && (
+            <div className="form-group"><label className="form-label">Before</label><input type="time" className="form-input" value={newShift.windowEnd} onChange={e=>ns({windowEnd:e.target.value})} /></div>
+          )}
+        </>)}
+
+        {/* ── Recurrence ── */}
+        <div style={{ borderTop:'1px solid var(--border)', paddingTop:14, marginTop:4 }}>
+          <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontWeight:600, fontSize:13, marginBottom: newShift.repeats?12:0 }}>
+            <input type="checkbox" checked={newShift.repeats} onChange={e=>ns({repeats:e.target.checked})} style={{ width:16,height:16,accentColor:'var(--primary)' }} />
+            Repeating schedule
+          </label>
+          {newShift.repeats && (<>
+            <div className="form-group">
+              <label className="form-label">Frequency</label>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {[['daily','Daily'],['weekly','Weekly'],['biweekly','Bi-weekly'],['monthly','Monthly']].map(([val,label])=>(
+                  <button key={val} type="button"
+                    className={`cl-pill${newShift.frequency===val?' active':''}`}
+                    style={{ padding:'5px 12px', fontSize:12 }}
+                    onClick={()=>ns({frequency:val})}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Starting</label>
+              <input type="date" className="form-input" value={newShift.recurrenceStart} onChange={e=>ns({recurrenceStart:e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Ending</label>
+              <div style={{ display:'flex', gap:8, marginBottom: newShift.recurrenceEndType==='date'?8:0 }}>
+                {[['indefinitely','Indefinitely'],['date','On a date']].map(([val,label])=>(
+                  <button key={val} type="button"
+                    className={`cl-pill${newShift.recurrenceEndType===val?' active':''}`}
+                    style={{ padding:'5px 12px', fontSize:12 }}
+                    onClick={()=>ns({recurrenceEndType:val})}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {newShift.recurrenceEndType==='date' && (
+                <input type="date" className="form-input" value={newShift.recurrenceEnd} onChange={e=>ns({recurrenceEnd:e.target.value})} />
+              )}
+            </div>
+          </>)}
+        </div>
+
         {(!newShift.employees.length || !newShift.client) && (
-          <div style={{ padding:'8px 12px', background:'#faf3e0', borderRadius:8, fontSize:12, color:'#8a6d2b', marginBottom:12 }}>
+          <div style={{ padding:'8px 12px',background:'#faf3e0',borderRadius:8,fontSize:12,color:'#8a6d2b',marginBottom:12,marginTop:8 }}>
             <i className="fas fa-info-circle" style={{ marginRight:6 }} />
             Select at least one employee and a client to add the shift.
           </div>
         )}
-        <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button className="topbar-btn" onClick={() => { setShowAddShift(false); setEmpSearch(''); setClientSearch(''); }}>Cancel</button>
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:4 }}>
+          <button className="topbar-btn" onClick={()=>{setShowAddShift(false);setNewShift(EMPTY_SHIFT);setEmpSearch('');setClientSearch('');}}>Cancel</button>
           <button className="topbar-btn primary" onClick={confirmAddShift}
-            style={(!newShift.employees.length || !newShift.client) ? { opacity:0.5, pointerEvents:'none' } : {}}>
+            style={(!newShift.employees.length||!newShift.client||(newShift.scheduleType==='flexible'&&!newShift.flexDays.length))?{opacity:0.5,pointerEvents:'none'}:{}}>
             <i className="fas fa-plus" /> Add Shift
           </button>
         </div>
