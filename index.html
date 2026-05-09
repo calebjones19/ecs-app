@@ -4202,6 +4202,18 @@ function ClientList({ role, perm, onCardOpen }) {
     if (onCardOpen) onCardOpen(!!selectedClient);
   }, [!!selectedClient]);
 
+  // Handle ecs-back: close card if open
+  useEffect(() => {
+    const handler = (e) => {
+      if (selectedClient && !e.detail?.handled) {
+        if (e.detail) e.detail.handled = true;
+        setSelectedClient(null);
+      }
+    };
+    window.addEventListener('ecs-back', handler);
+    return () => window.removeEventListener('ecs-back', handler);
+  }, [!!selectedClient]);
+
   // Sync edit state when selected client changes
   useEffect(() => {
     if (selectedClient) {
@@ -4328,9 +4340,6 @@ function ClientList({ role, perm, onCardOpen }) {
     const c = selectedClient;
     return (
       <div>
-        <button className="topbar-btn" onClick={() => setSelectedClient(null)} style={{ marginBottom: 16 }}>
-          <i className="fas fa-arrow-left" /> Back
-        </button>
         <div className="card" style={{ padding: 20, marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
             <div style={{ width: 52, height: 52, borderRadius: '50%', background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -4668,6 +4677,19 @@ function EmployeeProfiles({ role, perm }) {
   // Managers = employees with scheduler+ permission
   const managers = EMPLOYEES.filter(e => ['scheduler','editor','admin'].includes(e.permission) && e.status !== 'inactive').sort((a,b) => a.name.localeCompare(b.name));
 
+  // Handle ecs-back: close employee card if open
+  useEffect(() => {
+    const handler = (e) => {
+      if (selectedEmp && !e.detail?.handled) {
+        if (e.detail) e.detail.handled = true;
+        setSelectedEmp(null);
+        setSearch('');
+      }
+    };
+    window.addEventListener('ecs-back', handler);
+    return () => window.removeEventListener('ecs-back', handler);
+  }, [!!selectedEmp]);
+
   // Sync editData when selectedEmp changes
   useEffect(() => {
     if (selectedEmp) {
@@ -5000,10 +5022,6 @@ function EmployeeProfiles({ role, perm }) {
         </>
       ) : (
         <div>
-          <button className="topbar-btn" onClick={() => { setSelectedEmp(null); setSearch(''); }} style={{ marginBottom: 16 }}>
-            <i className="fas fa-arrow-left" /> Back
-          </button>
-
           <div className="card">
             <div className="profile-header">
               <div className="profile-avatar" style={{ background: selectedEmp.color }}>{selectedEmp.avatar}</div>
@@ -7413,7 +7431,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
   const setAdminPage = setAdminSubPage;
 
   useEffect(() => {
-    const handler = () => { if (adminPage) setAdminPage(null); };
+    const handler = (e) => { if (!e.detail?.handled && adminPage) { if (e.detail) e.detail.handled = true; setAdminPage(null); } };
     window.addEventListener('ecs-back', handler);
     return () => window.removeEventListener('ecs-back', handler);
   }, [adminPage]);
@@ -7877,7 +7895,7 @@ function App() {
     const dx = e.changedTouches[0].clientX - swipeRef.current.x;
     const dy = Math.abs(e.changedTouches[0].clientY - swipeRef.current.y);
     if (dx > 60 && dy < dx) {
-      window.dispatchEvent(new CustomEvent('ecs-back'));
+      window.dispatchEvent(new CustomEvent('ecs-back', { detail: {} }));
     }
     swipeRef.current = null;
   };
@@ -8014,7 +8032,7 @@ function App() {
       <div className="mobile-header">
         <div className="mobile-header-left">
           {page === 'admin' && adminSubPage && (
-            <button className="mobile-header-back" onClick={() => setAdminSubPage(null)}>
+            <button className="mobile-header-back" onClick={() => window.dispatchEvent(new CustomEvent('ecs-back', { detail: {} }))}>
               <i className="fas fa-chevron-left" /> Back
             </button>
           )}
