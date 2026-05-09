@@ -1,0 +1,26 @@
+{
+  "name": "ecs-app-fresh",
+  "version": "1.0.0",
+  "description": "",
+  "main": "firebase-messaging-sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/calebjones19/ecs-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/calebjones19/ecs-app/issues"
+  },
+  "homepage": "https://github.com/calebjones19/ecs-app#readme",
+  "devDependencies": {
+    "@babel/cli": "^7.28.6",
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.5",
+    "@babel/preset-react": "^7.28.5"
+  }
+}
