@@ -3624,11 +3624,11 @@ function Schedule({ role, perm }) {
   const getClientGroups = () => {
     const clientMap = {};
     Object.entries(scheduleData).forEach(([empId, shifts]) => {
-      const emp = EMPLOYEES.find(e => e.id === parseInt(empId));
+      const emp = EMPLOYEES.find(e => e.id === empId);
       if (!emp || emp.status !== 'active') return;
       shifts.forEach(s => {
         if (!clientMap[s.client]) clientMap[s.client] = [];
-        clientMap[s.client].push({ ...s, empId: parseInt(empId), empName: emp.name, empAvatar: emp.avatar, empColor: emp.color });
+        clientMap[s.client].push({ ...s, empId: empId, empName: emp.name, empAvatar: emp.avatar, empColor: emp.color });
       });
     });
     return clientMap;
@@ -3750,7 +3750,7 @@ function Schedule({ role, perm }) {
     const dayInfo = weekDays[dayIndex];
     const allShifts = [];
     Object.entries(scheduleData).forEach(([empId, shifts]) => {
-      const emp = EMPLOYEES.find(e => e.id === parseInt(empId));
+      const emp = EMPLOYEES.find(e => e.id === empId);
       if (!emp || emp.status !== 'active') return;
       shifts.filter(s => s.day === dayIndex).forEach(s => {
         allShifts.push({ ...s, emp });
