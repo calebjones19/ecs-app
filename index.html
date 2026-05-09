@@ -203,8 +203,8 @@
   /* Time hidden by default, revealed by left swipe */
   .msg-bubble-time { position: absolute; right: -64px; bottom: 4px; width: 60px; text-align: right; font-size: 10px; color: var(--text-light); white-space: nowrap; pointer-events: none; padding-right: 4px; }
   /* Reaction pills — float just below the bubble (iMessage-style) */
-  .msg-reaction-badges { position: absolute; bottom: -13px; right: -2px; display: flex; flex-wrap: nowrap; gap: 3px; z-index: 2; pointer-events: auto; }
-  .message-group.msg-own .msg-reaction-badges { right: auto; left: -2px; }
+  .msg-reaction-badges { position: absolute; top: -11px; right: -2px; display: flex; flex-wrap: nowrap; gap: 3px; z-index: 2; pointer-events: auto; }
+  .message-group.msg-own .msg-reaction-badges { right: -2px; left: auto; }
   .msg-reaction-badge { display: inline-flex; align-items: center; gap: 3px; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 2px 7px; font-size: 13px; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 3px rgba(0,0,0,0.10); -webkit-user-select: none; user-select: none; }
   .msg-reaction-badge.own-react { background: var(--primary-light); border-color: var(--primary); }
   .msg-reaction-badge .badge-count { font-size: 10px; font-weight: 700; color: var(--text-light); }
@@ -2702,8 +2702,8 @@ function Chat({ role, authedUser, perm }) {
             </div>
           )}
 
-          {/* Bubble wrapper — adds bottom clearance when reactions are present */}
-          <div style={{ position: 'relative', marginBottom: msg.reactions && msg.reactions.length > 0 ? 16 : 0 }}>
+          {/* Bubble wrapper — adds top clearance when reactions are present so pills don't overlap the message above */}
+          <div style={{ position: 'relative', marginTop: msg.reactions && msg.reactions.length > 0 ? 14 : 0 }}>
             <div className="msg-bubble">
               {isEditing ? (
                 <div className="msg-edit-wrap">
