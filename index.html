@@ -3527,7 +3527,9 @@ function Schedule({ role, perm }) {
   const isAdmin = perm?.isAdmin || role === 'admin';
   const [scheduleTab, setScheduleTab] = useState('schedule');
   const [showAddShift, setShowAddShift] = useState(false);
-  const [newShift, setNewShift] = useState({ employee: '', day: 0, startTime: '08:00', endTime: '12:00', client: '' });
+  const [newShift, setNewShift] = useState({ employees: [], day: 0, startTime: '08:00', endTime: '12:00', client: '' });
+  const [empSearch, setEmpSearch] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
   const [scheduleData, setScheduleData] = useState(SCHEDULE_DATA);
   const isMobile = window.innerWidth <= 768;
   const [calView, setCalView] = useState(isMobile ? 'day' : 'week'); // day, week, month
@@ -3700,12 +3702,10 @@ function Schedule({ role, perm }) {
 
   // Actually add the shift to local state
   const confirmAddShift = () => {
-    if (!newShift.employee || !newShift.client) return;
-    const empId = parseInt(newShift.employee);
+    if (!newShift.employees.length || !newShift.client) return;
     const dayIdx = parseInt(newShift.day);
-    // Convert 24h times to display format
     const fmtTime = (t) => {
-      const [h, m] = t.split(':').map(Number);
+      const [h] = t.split(':').map(Number);
       if (h === 0) return '12a';
       if (h < 12) return `${h}a`;
       if (h === 12) return '12p';
@@ -3714,15 +3714,19 @@ function Schedule({ role, perm }) {
     const timeLabel = `${fmtTime(newShift.startTime)}-${fmtTime(newShift.endTime)}`;
     const startH = parseInt(newShift.startTime.split(':')[0]);
     const type = startH < 12 ? 'morning' : startH < 17 ? 'afternoon' : 'evening';
-    // Find matching client short name
     const clientObj = CLIENTS.find(c => c.name === newShift.client);
     const clientShort = clientObj ? clientObj.name : newShift.client;
 
     const updated = { ...scheduleData };
-    if (!updated[empId]) updated[empId] = [];
-    updated[empId] = [...updated[empId], { day: dayIdx, time: timeLabel, client: clientShort, type }];
+    newShift.employees.forEach(empId => {
+      if (!updated[empId]) updated[empId] = [];
+      updated[empId] = [...updated[empId], { day: dayIdx, time: timeLabel, client: clientShort, type }];
+    });
     setScheduleData(updated);
     setShowAddShift(false);
+    setNewShift({ employees: [], day: 0, startTime: '08:00', endTime: '12:00', client: '' });
+    setEmpSearch('');
+    setClientSearch('');
   };
 
   // ── Day View ──
@@ -4130,21 +4134,49 @@ function Schedule({ role, perm }) {
 
 
       {/* Add Shift Modal */}
-      <Modal show={showAddShift} onClose={() => setShowAddShift(false)} title="Add Shift">
+      <Modal show={showAddShift} onClose={() => { setShowAddShift(false); setEmpSearch(''); setClientSearch(''); }} title="Add Shift">
+        {/* Employees — multi-select search */}
         <div className="form-group">
-          <label className="form-label">Employee</label>
-          <select className="form-input" value={newShift.employee} onChange={e => setNewShift({...newShift, employee: e.target.value})}
-            style={newShift.employee ? { borderColor: 'var(--success)' } : {}}>
-            <option value="">Select employee...</option>
-            {EMPLOYEES.filter(e => e.status === 'active').sort((a,b) => a.name.localeCompare(b.name)).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
+          <label className="form-label">Employees</label>
+          <div className="search-bar" style={{ marginBottom: newShift.employees.length ? 8 : 0 }}>
+            <i className="fas fa-search" />
+            <input placeholder="Search employees..." value={empSearch} onChange={e => setEmpSearch(e.target.value)} />
+            {empSearch && <button style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-light)', padding:'0 4px' }} onClick={() => setEmpSearch('')}><i className="fas fa-times" /></button>}
+          </div>
+          {newShift.employees.length > 0 && (
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom: empSearch.trim() ? 8 : 0 }}>
+              {newShift.employees.map(id => {
+                const emp = EMPLOYEES.find(e => e.id === id);
+                return emp ? (
+                  <span key={id} style={{ display:'flex', alignItems:'center', gap:5, background:'var(--primary-light)', color:'var(--primary)', borderRadius:20, padding:'3px 10px', fontSize:13, fontWeight:600 }}>
+                    {emp.name}
+                    <button onClick={() => setNewShift({...newShift, employees: newShift.employees.filter(i => i !== id)})} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--primary)', padding:0, lineHeight:1, fontSize:12 }}><i className="fas fa-times" /></button>
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
+          {empSearch.trim() && (
+            <div style={{ border:'1px solid var(--border)', borderRadius:8, overflow:'hidden', marginTop:2 }}>
+              {EMPLOYEES.filter(e => e.status === 'active' && !newShift.employees.includes(e.id) && e.name.toLowerCase().includes(empSearch.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).slice(0,6).map(e => (
+                <div key={e.id} style={{ padding:'10px 14px', cursor:'pointer', fontSize:14, borderBottom:'1px solid var(--border)' }}
+                  onMouseDown={ev => { ev.preventDefault(); setNewShift({...newShift, employees:[...newShift.employees, e.id]}); setEmpSearch(''); }}>
+                  {e.name}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Day */}
         <div className="form-group">
           <label className="form-label">Day</label>
           <select className="form-input" value={newShift.day} onChange={e => setNewShift({...newShift, day: parseInt(e.target.value)})}>
             {weekDays.map((d, i) => <option key={i} value={i}>{d.label}</option>)}
           </select>
         </div>
+
+        {/* Times */}
         <div className="grid-2">
           <div className="form-group">
             <label className="form-label">Start Time</label>
@@ -4155,24 +4187,43 @@ function Schedule({ role, perm }) {
             <input type="time" className="form-input" value={newShift.endTime} onChange={e => setNewShift({...newShift, endTime: e.target.value})} />
           </div>
         </div>
+
+        {/* Client — single-select search */}
         <div className="form-group">
           <label className="form-label">Client / Location</label>
-          <select className="form-input" value={newShift.client} onChange={e => setNewShift({...newShift, client: e.target.value})}
-            style={newShift.client ? { borderColor: 'var(--success)' } : {}}>
-            <option value="">Select client...</option>
-            {CLIENTS.filter(c => c.status === 'active').sort((a,b) => a.name.localeCompare(b.name)).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-          </select>
+          <div className="search-bar" style={{ marginBottom: newShift.client ? 8 : 0 }}>
+            <i className="fas fa-search" />
+            <input placeholder="Search clients..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} />
+            {clientSearch && <button style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-light)', padding:'0 4px' }} onClick={() => setClientSearch('')}><i className="fas fa-times" /></button>}
+          </div>
+          {newShift.client && (
+            <span style={{ display:'inline-flex', alignItems:'center', gap:5, background:'var(--primary-light)', color:'var(--primary)', borderRadius:20, padding:'3px 10px', fontSize:13, fontWeight:600, marginBottom: clientSearch.trim() ? 8 : 0 }}>
+              {newShift.client}
+              <button onClick={() => setNewShift({...newShift, client:''})} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--primary)', padding:0, lineHeight:1, fontSize:12 }}><i className="fas fa-times" /></button>
+            </span>
+          )}
+          {clientSearch.trim() && (
+            <div style={{ border:'1px solid var(--border)', borderRadius:8, overflow:'hidden', marginTop:2 }}>
+              {CLIENTS.filter(c => c.status === 'active' && c.name.toLowerCase().includes(clientSearch.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).slice(0,6).map(c => (
+                <div key={c.id} style={{ padding:'10px 14px', cursor:'pointer', fontSize:14, borderBottom:'1px solid var(--border)' }}
+                  onMouseDown={ev => { ev.preventDefault(); setNewShift({...newShift, client:c.name}); setClientSearch(''); }}>
+                  {c.name}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        {(!newShift.employee || !newShift.client) && (
-          <div style={{ padding: '8px 12px', background: '#faf3e0', borderRadius: 8, fontSize: 12, color: '#8a6d2b', marginBottom: 12 }}>
-            <i className="fas fa-info-circle" style={{ marginRight: 6 }} />
-            Select both an employee and a client to add the shift.
+
+        {(!newShift.employees.length || !newShift.client) && (
+          <div style={{ padding:'8px 12px', background:'#faf3e0', borderRadius:8, fontSize:12, color:'#8a6d2b', marginBottom:12 }}>
+            <i className="fas fa-info-circle" style={{ marginRight:6 }} />
+            Select at least one employee and a client to add the shift.
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="topbar-btn" onClick={() => setShowAddShift(false)}>Cancel</button>
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button className="topbar-btn" onClick={() => { setShowAddShift(false); setEmpSearch(''); setClientSearch(''); }}>Cancel</button>
           <button className="topbar-btn primary" onClick={confirmAddShift}
-            style={(!newShift.employee || !newShift.client) ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
+            style={(!newShift.employees.length || !newShift.client) ? { opacity:0.5, pointerEvents:'none' } : {}}>
             <i className="fas fa-plus" /> Add Shift
           </button>
         </div>
