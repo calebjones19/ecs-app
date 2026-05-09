@@ -809,6 +809,9 @@
     .content * { max-width: 100%; }
     .content img, .content video { max-width: 100%; height: auto; }
 
+    /* Re-assert chat bubble width — overrides the .content * rule above */
+    .chat-messages .msg-content { max-width: 70%; }
+
     /* Safety: prevent any fixed-width inline styles from escaping */
     .grid-2 { overflow: hidden; }
   }
