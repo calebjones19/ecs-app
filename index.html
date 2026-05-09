@@ -202,11 +202,12 @@
   .message-group.msg-other .msg-bubble { background: var(--msg-other); color: var(--text); border-radius: 18px 18px 18px 4px; }
   /* Time hidden by default, revealed by left swipe */
   .msg-bubble-time { position: absolute; right: -64px; bottom: 4px; width: 60px; text-align: right; font-size: 10px; color: var(--text-light); white-space: nowrap; pointer-events: none; padding-right: 4px; }
-  /* Reaction corner badges */
-  .msg-reaction-badges { position: absolute; top: 2px; right: -6px; display: flex; gap: 2px; z-index: 3; flex-direction: row-reverse; }
-  .message-group.msg-own .msg-reaction-badges { right: auto; left: -6px; flex-direction: row; }
-  .msg-reaction-badge { background: white; border: 1.5px solid #e0e0e0; border-radius: 10px; padding: 1px 5px; font-size: 13px; display: inline-flex; align-items: center; gap: 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); cursor: pointer; -webkit-user-select: none; user-select: none; }
-  .msg-reaction-badge .badge-count { font-size: 10px; font-weight: 700; color: #555; }
+  /* Reaction pills — float just below the bubble (iMessage-style) */
+  .msg-reaction-badges { position: absolute; bottom: -13px; right: -2px; display: flex; flex-wrap: nowrap; gap: 3px; z-index: 2; pointer-events: auto; }
+  .message-group.msg-own .msg-reaction-badges { right: auto; left: -2px; }
+  .msg-reaction-badge { display: inline-flex; align-items: center; gap: 3px; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 2px 7px; font-size: 13px; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 3px rgba(0,0,0,0.10); -webkit-user-select: none; user-select: none; }
+  .msg-reaction-badge.own-react { background: var(--primary-light); border-color: var(--primary); }
+  .msg-reaction-badge .badge-count { font-size: 10px; font-weight: 700; color: var(--text-light); }
   .msg-text { font-size: 14px; line-height: 1.5; }
   .message-group.msg-own .msg-text .tag { background: rgba(255,255,255,0.25); color: white; padding: 1px 4px; border-radius: 3px; font-weight: 500; }
   .message-group.msg-other .msg-text .tag { background: var(--primary-light); color: var(--primary); padding: 1px 4px; border-radius: 3px; font-weight: 500; }
@@ -2701,78 +2702,81 @@ function Chat({ role, authedUser, perm }) {
             </div>
           )}
 
-          {/* Bubble */}
-          <div className="msg-bubble">
-            {isEditing ? (
-              <div className="msg-edit-wrap">
-                <textarea className="msg-edit-input" value={editText} onChange={e => setEditText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
-                  ref={el => { if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }}
-                  rows={Math.min(Math.max(2, (editText.match(/\n/g) || []).length + 1), 6)} />
-                <div className="msg-edit-actions">
-                  <button onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); cancelEdit(); }} onClick={cancelEdit}>Cancel</button>
-                  <button className="primary" onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); saveEdit(); }} onClick={saveEdit}>Save</button>
-                </div>
-              </div>
-            ) : msg.text ? (
-              <div className="msg-text" dangerouslySetInnerHTML={{
-                __html: msg.text
-                  .replace(/\n/g, '<br>')
-                  .replace(/@(\w+\s\w+)/g, '<span class="tag">@$1</span>')
-              }} />
-            ) : null}
-            {msg.file && (
-              msg.file.type && msg.file.type.startsWith('image/') && msg.file.url ? (
-                <div>
-                  <a href={msg.file.url} target="_blank" rel="noopener noreferrer">
-                    <img src={msg.file.url} alt={msg.file.name} style={{ maxWidth: 240, maxHeight: 200, borderRadius: 10, cursor: 'pointer', display: 'block' }} />
-                  </a>
-                  <div style={{ fontSize: 10, marginTop: 3, opacity: 0.7 }}>{msg.file.name}</div>
-                </div>
-              ) : (
-                <a href={msg.file.url || '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <div className="msg-file" style={{ background: 'rgba(0,0,0,0.08)', border: 'none' }}>
-                    <i className={`fas ${msg.file.url ? 'fa-download' : 'fa-file'}`} />
-                    <div className="msg-file-info">
-                      <div className="file-name">{msg.file.name}</div>
-                      <div className="file-size">{msg.file.size}</div>
-                    </div>
+          {/* Bubble wrapper — adds bottom clearance when reactions are present */}
+          <div style={{ position: 'relative', marginBottom: msg.reactions && msg.reactions.length > 0 ? 16 : 0 }}>
+            <div className="msg-bubble">
+              {isEditing ? (
+                <div className="msg-edit-wrap">
+                  <textarea className="msg-edit-input" value={editText} onChange={e => setEditText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') cancelEdit(); }}
+                    ref={el => { if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }}
+                    rows={Math.min(Math.max(2, (editText.match(/\n/g) || []).length + 1), 6)} />
+                  <div className="msg-edit-actions">
+                    <button onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); cancelEdit(); }} onClick={cancelEdit}>Cancel</button>
+                    <button className="primary" onMouseDown={(e) => { e.stopPropagation(); }} onTouchEnd={(e) => { e.preventDefault(); saveEdit(); }} onClick={saveEdit}>Save</button>
                   </div>
-                </a>
-              )
-            )}
-            {msg.gif && (
-              <div>
-                <img src={msg.gif.url} alt={msg.gif.title || 'GIF'} style={{ maxWidth: 220, maxHeight: 180, borderRadius: 10, display: 'block' }} />
-                <div style={{ fontSize: 9, marginTop: 2, opacity: 0.6 }}>via GIPHY</div>
-              </div>
-            )}
-            {msg.poll && (
-              <div className="msg-poll" style={{ background: 'rgba(0,0,0,0.08)', border: 'none' }}>
-                <h4><i className="fas fa-poll" style={{ marginRight: 6 }} />{msg.poll.question}</h4>
-                {msg.poll.options.map((opt, i) => {
-                  const pct = msg.poll.totalVotes > 0 ? (opt.votes / msg.poll.totalVotes * 100) : 0;
-                  return (
-                    <div className="poll-option" key={i}>
-                      <div className="poll-bar" style={{ width: `${pct}%` }} />
-                      <span>{opt.text}</span>
-                      <span style={{ marginLeft: 'auto', fontSize: 12 }}>{opt.votes} ({Math.round(pct)}%)</span>
+                </div>
+              ) : msg.text ? (
+                <div className="msg-text" dangerouslySetInnerHTML={{
+                  __html: msg.text
+                    .replace(/\n/g, '<br>')
+                    .replace(/@(\w+\s\w+)/g, '<span class="tag">@$1</span>')
+                }} />
+              ) : null}
+              {msg.file && (
+                msg.file.type && msg.file.type.startsWith('image/') && msg.file.url ? (
+                  <div>
+                    <a href={msg.file.url} target="_blank" rel="noopener noreferrer">
+                      <img src={msg.file.url} alt={msg.file.name} style={{ maxWidth: 240, maxHeight: 200, borderRadius: 10, cursor: 'pointer', display: 'block' }} />
+                    </a>
+                    <div style={{ fontSize: 10, marginTop: 3, opacity: 0.7 }}>{msg.file.name}</div>
+                  </div>
+                ) : (
+                  <a href={msg.file.url || '#'} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <div className="msg-file" style={{ background: 'rgba(0,0,0,0.08)', border: 'none' }}>
+                      <i className={`fas ${msg.file.url ? 'fa-download' : 'fa-file'}`} />
+                      <div className="msg-file-info">
+                        <div className="file-name">{msg.file.name}</div>
+                        <div className="file-size">{msg.file.size}</div>
+                      </div>
                     </div>
-                  );
-                })}
-                <div className="poll-votes">{msg.poll.totalVotes} total votes</div>
-              </div>
-            )}
-            {/* Reaction corner badges on the bubble */}
+                  </a>
+                )
+              )}
+              {msg.gif && (
+                <div>
+                  <img src={msg.gif.url} alt={msg.gif.title || 'GIF'} style={{ maxWidth: 220, maxHeight: 180, borderRadius: 10, display: 'block' }} />
+                  <div style={{ fontSize: 9, marginTop: 2, opacity: 0.6 }}>via GIPHY</div>
+                </div>
+              )}
+              {msg.poll && (
+                <div className="msg-poll" style={{ background: 'rgba(0,0,0,0.08)', border: 'none' }}>
+                  <h4><i className="fas fa-poll" style={{ marginRight: 6 }} />{msg.poll.question}</h4>
+                  {msg.poll.options.map((opt, i) => {
+                    const pct = msg.poll.totalVotes > 0 ? (opt.votes / msg.poll.totalVotes * 100) : 0;
+                    return (
+                      <div className="poll-option" key={i}>
+                        <div className="poll-bar" style={{ width: `${pct}%` }} />
+                        <span>{opt.text}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 12 }}>{opt.votes} ({Math.round(pct)}%)</span>
+                      </div>
+                    );
+                  })}
+                  <div className="poll-votes">{msg.poll.totalVotes} total votes</div>
+                </div>
+              )}
+            </div>
+
+            {/* Reaction pills — float below the bubble, outside it (iMessage-style) */}
             {msg.reactions && msg.reactions.length > 0 && (
               <div className="msg-reaction-badges">
-                {msg.reactions.slice(0, 3).map((r, i) => (
+                {msg.reactions.slice(0, 5).map((r, i) => (
                   <span key={i} className={`msg-reaction-badge${r.myReact ? ' own-react' : ''}`}
                     onClick={() => toggleReaction(chId || activeChannel, msg.id, r.emoji, !!parentMsgId, parentMsgId)}>
                     {r.emoji}{r.count > 1 && <span className="badge-count">{r.count}</span>}
                   </span>
                 ))}
-                {/* Add reaction picker */}
+                {/* Reaction picker popup */}
                 {quickReactMsg === msg.id && (
                   <div className="picker-popup" style={{ width: 340, position: 'absolute', bottom: '100%', left: isOwnMsg ? 'auto' : 0, right: isOwnMsg ? 0 : 'auto', marginBottom: 4, background: '#fff', color: 'var(--text)' }}>
                     <div className="picker-search" style={{ borderBottom: '1px solid var(--border)' }}>
