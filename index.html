@@ -3521,18 +3521,19 @@ function Chat({ role, authedUser, perm }) {
 }
 
 // ─── Schedule ──────────────────────────────────────────────────
+const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '' };
+
 function Schedule({ role, perm }) {
   const canSchedule = perm?.canSchedule || role === 'admin';
   const canEdit = perm?.canEdit || role === 'admin' || role === 'editor';
   const isAdmin = perm?.isAdmin || role === 'admin';
   const [scheduleTab, setScheduleTab] = useState('schedule');
   const [showAddShift, setShowAddShift] = useState(false);
-  const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '' };
   const [newShift, setNewShift] = useState(EMPTY_SHIFT);
   const [empSearch, setEmpSearch] = useState('');
   const [clientSearch, setClientSearch] = useState('');
-  const ns = (patch) => setNewShift(s => ({...s, ...patch}));
   const [scheduleData, setScheduleData] = useState(SCHEDULE_DATA);
+  const ns = (patch) => setNewShift(s => ({...s, ...patch}));
   const isMobile = window.innerWidth <= 768;
   const [calView, setCalView] = useState(isMobile ? 'day' : 'week'); // day, week, month
   const [groupBy, setGroupBy] = useState('employee'); // employee, client
@@ -4144,14 +4145,14 @@ function Schedule({ role, perm }) {
         {/* ── Employees ── */}
         <div className="form-group">
           <label className="form-label">Employees</label>
-          <div className="search-bar" style={{ marginBottom: newShift.employees.length ? 8 : 0 }}>
+          <div className="search-bar" style={{ marginBottom: (newShift.employees||[]).length ? 8 : 0 }}>
             <i className="fas fa-search" />
             <input placeholder="Search employees..." value={empSearch} onChange={e => setEmpSearch(e.target.value)} />
             {empSearch && <button style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-light)',padding:'0 4px' }} onClick={() => setEmpSearch('')}><i className="fas fa-times" /></button>}
           </div>
-          {newShift.employees.length > 0 && (
+          {(newShift.employees||[]).length > 0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom: empSearch.trim() ? 8 : 0 }}>
-              {newShift.employees.map(id => { const emp = EMPLOYEES.find(e => e.id === id); return emp ? (
+              {(newShift.employees||[]).map(id => { const emp = EMPLOYEES.find(e => e.id === id); return emp ? (
                 <span key={id} style={{ display:'flex',alignItems:'center',gap:5,background:'var(--primary-light)',color:'var(--primary)',borderRadius:20,padding:'3px 10px',fontSize:13,fontWeight:600 }}>
                   {emp.name}
                   <button onMouseDown={ev=>{ev.preventDefault();ns({employees:newShift.employees.filter(i=>i!==id)});}} style={{ background:'none',border:'none',cursor:'pointer',color:'var(--primary)',padding:0,lineHeight:1,fontSize:12 }}><i className="fas fa-times" /></button>
