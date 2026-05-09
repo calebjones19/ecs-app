@@ -1283,12 +1283,12 @@ const MESSAGES = {
 
 // Generate current week days dynamically
 const now = new Date();
-const monday = new Date(now);
-monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+const sunday = new Date(now);
+sunday.setDate(now.getDate() - now.getDay());
 const WEEK_DAYS = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date(monday);
-  d.setDate(monday.getDate() + i);
-  return ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i] + ' ' + (d.getMonth()+1) + '/' + d.getDate();
+  const d = new Date(sunday);
+  d.setDate(sunday.getDate() + i);
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i] + ' ' + (d.getMonth()+1) + '/' + d.getDate();
 });
 
 const SCHEDULE_DATA = {};
@@ -1562,7 +1562,7 @@ function Dashboard({ role, perm, authedUser, setPage }) {
   );
 
   // Day names for shift display
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
     <div>
@@ -3587,13 +3587,13 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const baseDate = (() => {
     const d = new Date();
     const dow = d.getDay(); // 0=Sun
-    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    d.setDate(d.getDate() - dow);
     d.setHours(0, 0, 0, 0);
     return d;
   })();
 
   const [weekOffset, setWeekOffset] = useState(0);
-  const [selectedDay, setSelectedDay] = useState(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1); // default to today
+  const [selectedDay, setSelectedDay] = useState(new Date().getDay()); // 0=Sun default to today
   const getWeekStart = () => {
     const d = new Date(baseDate);
     d.setDate(d.getDate() + weekOffset * 7);
@@ -3602,7 +3602,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const weekStart = getWeekStart();
   const isCurrentWeek = weekOffset === 0;
 
-  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   const getWeekDays = () => {
@@ -3682,8 +3682,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     const month = weekStart.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    let startDow = firstDay.getDay();
-    startDow = startDow === 0 ? 6 : startDow - 1; // Mon = 0
+    const startDow = firstDay.getDay(); // Sun = 0
     const days = [];
     // pad start
     for (let i = 0; i < startDow; i++) {
@@ -3706,7 +3705,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   // Count shifts for a given calendar date (map to day-of-week index)
   const getShiftsForDate = (date) => {
     const dow = date.getDay();
-    const dayIndex = dow === 0 ? 6 : dow - 1;
+    const dayIndex = dow;
     {
       let count = 0;
       let clients = new Set();
@@ -3737,17 +3736,16 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     );
   };
 
-  const goToToday = () => { setWeekOffset(0); setSelectedDay(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1); };
+  const goToToday = () => { setWeekOffset(0); setSelectedDay(new Date().getDay()); };
 
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
 
   // Return the Monday of the week containing the 15th of a given month —
   // reliable anchor for month navigation (15th is never in an edge week)
-  const mondayOfMid = (year, month) => {
+  const sundayOfMid = (year, month) => {
     const mid = new Date(year, month, 15);
     const dow = mid.getDay(); // 0=Sun
-    const daysBack = dow === 0 ? 6 : dow - 1;
-    mid.setDate(mid.getDate() - daysBack);
+    mid.setDate(mid.getDate() - dow); // back to Sunday
     return mid;
   };
 
@@ -3758,7 +3756,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     } else if (calView === 'month') {
       const y = weekStart.getMonth() === 0 ? weekStart.getFullYear() - 1 : weekStart.getFullYear();
       const m = weekStart.getMonth() === 0 ? 11 : weekStart.getMonth() - 1;
-      const target = mondayOfMid(y, m);
+      const target = sundayOfMid(y, m);
       const delta = Math.round((target - weekStart) / msPerWeek);
       setWeekOffset(w => w + delta);
     } else {
@@ -3773,7 +3771,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     } else if (calView === 'month') {
       const y = weekStart.getMonth() === 11 ? weekStart.getFullYear() + 1 : weekStart.getFullYear();
       const m = weekStart.getMonth() === 11 ? 0 : weekStart.getMonth() + 1;
-      const target = mondayOfMid(y, m);
+      const target = sundayOfMid(y, m);
       const delta = Math.round((target - weekStart) / msPerWeek);
       setWeekOffset(w => w + delta);
     } else {
@@ -3810,7 +3808,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       : `${fmtTime(newShift.windowStart)}-${fmtTime(newShift.windowEnd)}`;
     const refH = newShift.scheduleType === 'specific' ? parseInt(newShift.startTime) : parseInt(newShift.windowStart);
     const shiftType = refH < 12 ? 'morning' : refH < 17 ? 'afternoon' : 'evening';
-    const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
     const batch = db.batch();
     newShift.employees.forEach(empId => {
@@ -4000,7 +3998,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     const firstDay = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     // Offset: Mon=0 ... Sun=6. JS getDay() is Sun=0, so adjust
-    const startDow = (firstDay.getDay() + 6) % 7; // Mon-based
+    const startDow = firstDay.getDay(); // Sun-based
     const cells = [];
     for (let i = 0; i < startDow; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -4017,7 +4015,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       // For simplicity: show shifts on their day-of-week for every week in the month
       for (let d = 1; d <= daysInMonth; d++) {
         const cellDate = new Date(year, month, d);
-        const cellDow = (cellDate.getDay() + 6) % 7; // Mon=0
+        const cellDow = cellDate.getDay(); // Sun=0
         if (cellDow === s.day) {
           if (!shiftsByDate[d]) shiftsByDate[d] = [];
           shiftsByDate[d].push(s);
@@ -4030,7 +4028,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       <div>
         {/* Grid header */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 4 }}>
-          {['M','T','W','T','F','S','S'].map((d, i) => (
+          {['S','M','T','W','T','F','S'].map((d, i) => (
             <div key={i} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--text-light)', padding: '4px 0' }}>{d}</div>
           ))}
         </div>
@@ -4335,7 +4333,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
             const info = getShiftsForDate(md.date);
             const isToday = md.date.getDate() === today.getDate() && md.date.getMonth() === today.getMonth();
             const dow = md.date.getDay();
-            const dayIdx = dow === 0 ? 6 : dow - 1;
+            const dayIdx = dow;
             return (
               <div key={i} className="month-cell" style={{
                 minHeight: 90, padding: 8, borderBottom: '1px solid var(--border)', borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--border)' : 'none',
@@ -5911,8 +5909,8 @@ function EmployeeProfiles({ role, perm }) {
 // ─── Availability ──────────────────────────────────────────────
 // ── MyAvailabilityEditor: personal availability editor for My Schedule ─────────
 function MyAvailabilityEditor({ authedUser }) {
-  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  const DEFAULT_AVAIL = DAYS.map((_, i) => ({ available: i < 5, start: '08:00', end: '17:00' }));
+  const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const DEFAULT_AVAIL = DAYS.map((_, i) => ({ available: i > 0 && i < 6, start: '08:00', end: '17:00' }));
   const [avail, setAvail] = useState(DEFAULT_AVAIL);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -5985,10 +5983,10 @@ function MyAvailabilityEditor({ authedUser }) {
 
 function AvailabilityView({ role, perm }) {
   const canEdit = perm?.canEdit || role === 'admin';
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const fullDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const fullDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const isMobile = window.innerWidth <= 768;
-  const [selectedDay, setSelectedDay] = useState(Math.min(new Date().getDay() - 1, 6) >= 0 ? Math.min(new Date().getDay() - 1, 6) : 0);
+  const [selectedDay, setSelectedDay] = useState(new Date().getDay());
   const activeEmps = EMPLOYEES.filter(e => e.status !== 'inactive');
 
   const statusIcon = (a) => a === 'available' ? '✓' : a === 'unavailable' ? '✗' : '½';
