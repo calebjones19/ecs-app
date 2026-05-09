@@ -4573,28 +4573,29 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           {scheduleTab === 'schedule' && (
             <div>
               {/* ── View toolbar ── */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 8 }}>
-                {/* Prev / Today / Next */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <button className="topbar-btn" onClick={() => setWeekOffset(w => w - 1)} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-left" /></button>
-                  <button className="topbar-btn" onClick={goToToday} style={{ padding: '6px 10px', fontWeight: 600, color: isCurrentWeek ? 'var(--primary)' : undefined }}>Today</button>
-                  <button className="topbar-btn" onClick={() => setWeekOffset(w => w + 1)} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-right" /></button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                {/* Row 1: nav arrows + view switcher */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <button className="topbar-btn" onClick={() => setWeekOffset(w => w - 1)} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-left" /></button>
+                    <button className="topbar-btn" onClick={goToToday} style={{ padding: '6px 10px', fontWeight: 600, color: isCurrentWeek ? 'var(--primary)' : undefined }}>Today</button>
+                    <button className="topbar-btn" onClick={() => setWeekOffset(w => w + 1)} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-right" /></button>
+                  </div>
+                  <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, padding: 3, gap: 2 }}>
+                    {['day','week','month'].map(v => (
+                      <button key={v} onClick={() => setCalView(v)}
+                        style={{ padding: '5px 10px', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: calView === v ? 700 : 500, cursor: 'pointer', textTransform: 'capitalize',
+                          background: calView === v ? 'white' : 'transparent',
+                          color: calView === v ? 'var(--text)' : 'var(--text-light)',
+                          boxShadow: calView === v ? '0 1px 4px rgba(0,0,0,0.10)' : 'none' }}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {/* Date label */}
-                <span style={{ fontWeight: 700, fontSize: 14, flex: 1, textAlign: 'center' }}>
+                {/* Row 2: date label — full width, no wrapping */}
+                <div style={{ fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {calView === 'day' ? getDayLabel() : calView === 'week' ? getWeekLabel() : getMonthLabel()}
-                </span>
-                {/* View switcher */}
-                <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, padding: 3, gap: 2, flexShrink: 0 }}>
-                  {['day','week','month'].map(v => (
-                    <button key={v} onClick={() => setCalView(v)}
-                      style={{ padding: '5px 10px', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: calView === v ? 700 : 500, cursor: 'pointer', textTransform: 'capitalize',
-                        background: calView === v ? 'white' : 'transparent',
-                        color: calView === v ? 'var(--text)' : 'var(--text-light)',
-                        boxShadow: calView === v ? '0 1px 4px rgba(0,0,0,0.10)' : 'none' }}>
-                      {v}
-                    </button>
-                  ))}
                 </div>
               </div>
               {/* Day picker strip (day view only) */}
