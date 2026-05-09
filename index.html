@@ -4726,7 +4726,9 @@ function EmployeeProfiles({ role, perm }) {
         address: (editData.address || '').trim(),
         emergencyContact: (editData.emergencyContact || '').trim(),
         avatar: initials || selectedEmp.avatar,
-        status: editData.status || selectedEmp.status,
+        status: editData.endDate ? 'inactive' : (editData.status || selectedEmp.status),
+        endDate: editData.endDate || '',
+        startDate: editData.startDate || '',
         teams: editData.teams || [],
         managerId: editData.managerId || '',
         managerName: editData.managerName || '',
@@ -4795,7 +4797,11 @@ function EmployeeProfiles({ role, perm }) {
   const filtered = EMPLOYEES
     .filter(e => {
       const matchSearch = e.name.toLowerCase().includes(search.toLowerCase());
-      const matchFilter = filter === 'all' || e.type === filter || (filter === 'active' && e.status === 'active');
+      const matchFilter =
+        (filter === 'all' && e.status !== 'inactive') ||
+        (filter === 'employee' && e.type === 'employee' && e.status !== 'inactive') ||
+        (filter === 'contractor' && e.type === 'contractor' && e.status !== 'inactive') ||
+        (filter === 'inactive' && e.status === 'inactive');
       return matchSearch && matchFilter;
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -4947,7 +4953,7 @@ function EmployeeProfiles({ role, perm }) {
               <option value="all">All</option>
               <option value="employee">Employees</option>
               <option value="contractor">Contractors</option>
-              <option value="active">Active Only</option>
+              <option value="inactive">Inactive</option>
             </select>
             {canEdit && (
               <button className="topbar-btn primary" onClick={() => setShowAdd(true)} style={{ flexShrink: 0 }}><i className="fas fa-plus" /> Add</button>
@@ -5129,6 +5135,7 @@ function EmployeeProfiles({ role, perm }) {
                         ['Employment Type', selectedEmp.type === 'contractor' ? '1099 Contractor' : 'W-2 Employee'],
                         ['Job Title', selectedEmp.role || '—'],
                         ['Start Date', selectedEmp.startDate || '—'],
+                        ['End Date', selectedEmp.endDate || '—'],
                       ].map(([label, val]) => (
                         <div key={label} className="form-group">
                           <label className="form-label">{label}</label>
@@ -5166,6 +5173,7 @@ function EmployeeProfiles({ role, perm }) {
                         </select>
                       </div>
                       <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
+                      <div className="form-group"><label className="form-label">End Date <span style={{fontWeight:400,fontSize:11,color:'var(--text-light)'}}>— sets status to Inactive</span></label><input className="form-input" type="date" value={editData.endDate || ''} onChange={e => handleEditField('endDate', e.target.value)} /></div>
                     </div>
                     <div className="form-group">
                       <label className="form-label">Teams</label>
