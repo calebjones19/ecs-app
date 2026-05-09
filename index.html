@@ -3739,6 +3739,36 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
   const goToToday = () => { setWeekOffset(0); setSelectedDay(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1); };
 
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+
+  const myNavPrev = () => {
+    if (calView === 'day') {
+      if (selectedDay === 0) { setWeekOffset(w => w - 1); setSelectedDay(6); }
+      else setSelectedDay(d => d - 1);
+    } else if (calView === 'month') {
+      // Jump to the first week that starts in the previous month
+      const prevMonthStart = new Date(weekStart.getFullYear(), weekStart.getMonth() - 1, 1);
+      const weeksBack = Math.ceil((weekStart - prevMonthStart) / msPerWeek);
+      setWeekOffset(w => w - Math.max(weeksBack, 1));
+    } else {
+      setWeekOffset(w => w - 1);
+    }
+  };
+
+  const myNavNext = () => {
+    if (calView === 'day') {
+      if (selectedDay === 6) { setWeekOffset(w => w + 1); setSelectedDay(0); }
+      else setSelectedDay(d => d + 1);
+    } else if (calView === 'month') {
+      // Jump to the first week that starts in the next month
+      const nextMonthStart = new Date(weekStart.getFullYear(), weekStart.getMonth() + 1, 1);
+      const weeksAhead = Math.ceil((nextMonthStart - weekStart) / msPerWeek);
+      setWeekOffset(w => w + Math.max(weeksAhead, 1));
+    } else {
+      setWeekOffset(w => w + 1);
+    }
+  };
+
   // Open add-shift modal pre-populated with context from the clicked cell
   const openAddShift = (opts = {}) => {
     setNewShift({ ...EMPTY_SHIFT,
@@ -4577,19 +4607,9 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                 {/* Row 1: nav arrows + view switcher */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <button className="topbar-btn" onClick={() => {
-                      if (calView === 'day') {
-                        if (selectedDay === 0) { setWeekOffset(w => w - 1); setSelectedDay(6); }
-                        else setSelectedDay(d => d - 1);
-                      } else { setWeekOffset(w => w - 1); }
-                    }} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-left" /></button>
+                    <button className="topbar-btn" onClick={myNavPrev} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-left" /></button>
                     <button className="topbar-btn" onClick={goToToday} style={{ padding: '6px 10px', fontWeight: 600, color: isCurrentWeek ? 'var(--primary)' : undefined }}>Today</button>
-                    <button className="topbar-btn" onClick={() => {
-                      if (calView === 'day') {
-                        if (selectedDay === 6) { setWeekOffset(w => w + 1); setSelectedDay(0); }
-                        else setSelectedDay(d => d + 1);
-                      } else { setWeekOffset(w => w + 1); }
-                    }} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-right" /></button>
+                    <button className="topbar-btn" onClick={myNavNext} style={{ padding: '6px 10px' }}><i className="fas fa-chevron-right" /></button>
                   </div>
                   <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, padding: 3, gap: 2 }}>
                     {['day','week','month'].map(v => (
