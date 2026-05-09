@@ -1335,7 +1335,7 @@ function Home({ role, perm, authedUser, setPage }) {
         </div>
         <div className="home-widget" onClick={() => setPage && setPage('schedule')}>
           <div className="home-widget-icon" style={{ background: '#5e8a7a' }}><i className="fas fa-calendar-alt" /></div>
-          <h4>{(perm?.canSchedule || perm?.canEdit || perm?.isAdmin) ? 'Schedule' : 'My Schedule'}</h4>
+          <h4>My Schedule</h4>
         </div>
         <div className="home-widget" onClick={() => setPage && setPage('timesheets')}>
           <div className="home-widget-icon" style={{ background: '#c8a84e' }}><i className="fas fa-clock" /></div>
@@ -3516,7 +3516,7 @@ function Chat({ role, authedUser, perm }) {
 // ─── Schedule ──────────────────────────────────────────────────
 const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '' };
 
-function Schedule({ role, perm }) {
+function Schedule({ role, perm, authedUser, adminMode = false }) {
   const canSchedule = perm?.canSchedule || role === 'admin';
   const canEdit = perm?.canEdit || role === 'admin' || role === 'editor';
   const isAdmin = perm?.isAdmin || role === 'admin';
@@ -3747,6 +3747,34 @@ function Schedule({ role, perm }) {
     setShowAddShift(false);
     setNewShift(EMPTY_SHIFT);
     setEmpSearch(''); setClientSearch('');
+  };
+
+  // ── My Schedule (personal view — current user's shifts only) ──
+  const renderMySchedule = () => {
+    const dayIndex = selectedDay;
+    const uid = authedUser?.id;
+    const myShifts = uid ? (scheduleData[uid] || []).filter(s => s.day === dayIndex) : [];
+    if (myShifts.length === 0) {
+      return <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>You have no shifts scheduled for this day.</p></div>;
+    }
+    return (
+      <div>
+        {myShifts.map((s, i) => (
+          <div className="card" key={i} style={{ padding: '14px 16px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: s.type === 'morning' ? '#e8f5e9' : s.type === 'afternoon' ? '#fff8e1' : '#f3e5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className={`fas ${s.type === 'morning' ? 'fa-sun' : s.type === 'afternoon' ? 'fa-cloud-sun' : 'fa-moon'}`} style={{ color: s.type === 'morning' ? '#388e3c' : s.type === 'afternoon' ? '#f57f17' : '#7b1fa2', fontSize: 16 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{s.client}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 2 }}>{s.time}{s.repeats ? <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--primary)', fontWeight: 600, background: 'var(--primary-light)', borderRadius: 8, padding: '2px 7px' }}><i className="fas fa-sync-alt" style={{ marginRight: 3 }} />{s.frequency}</span> : null}</div>
+              </div>
+              <button className="chat-icon-btn" title="Request swap"><i className="fas fa-exchange-alt" /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   // ── Day View ──
@@ -4243,8 +4271,8 @@ function Schedule({ role, perm }) {
     );
   }
 
-  // Non-editor/non-admin: show 3-tab view
-  if (!canEdit && !isAdmin) {
+  // Personal My Schedule view — always shown when not in adminMode
+  if (!adminMode) {
     return (
       <div>
         <div className="tabs" style={{ marginBottom: 0, borderBottom: '2px solid var(--border)', display: 'flex', gap: 0 }}>
@@ -4262,11 +4290,11 @@ function Schedule({ role, perm }) {
         </div>
         <div style={{ paddingTop: 16 }}>
           {scheduleTab === 'availability' && <AvailabilityView role={role} perm={perm} />}
-          {scheduleTab === 'timeoff' && <EmployeeTimeOff authedUser={null} />}
+          {scheduleTab === 'timeoff' && <EmployeeTimeOff authedUser={authedUser} />}
           {scheduleTab === 'schedule' && (
             <div>
               <DayTabs />
-              {renderDayView(false)}
+              {renderMySchedule()}
             </div>
           )}
         </div>
@@ -7380,7 +7408,7 @@ function AdminTimeOff({ role, perm, authedUser }) {
 
 // ── AdminSchedule: scheduling wrapper for admins ──────────────────────────────
 function AdminSchedule({ role, perm }) {
-  return <Schedule role={role} perm={perm} />;
+  return <Schedule role={role} perm={perm} adminMode={true} />;
 }
 
 // ── Teams Management ─────────────────────────────────────────────────────────
@@ -7955,7 +7983,7 @@ function App() {
     if (canSchedule) {
       // Scheduler+ sees Operations group
       const opsChildren = [
-        { id: 'schedule', icon: 'fa-calendar-alt', label: 'Manage Schedule', desc: 'Assign shifts & manage the team calendar', color: '#4a6741' },
+        { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule', desc: 'View your upcoming shifts', color: '#4a6741' },
         { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets', desc: 'Clock in/out records & payroll hours', color: '#5a8a4a' },
         { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Swap requests & open shift pickups', color: '#c8a84e', badge: 2 },
         { id: 'checklists', icon: 'fa-clipboard-check', label: 'Manage Checklists', desc: 'Create and manage job site task lists', color: '#b85c4a' },
@@ -7993,7 +8021,7 @@ function App() {
     ];
     if (canSchedule) {
       sections.push({ section: "Operations", items: [
-        { id: 'schedule', icon: 'fa-calendar-alt', label: 'Manage Schedule' },
+        { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule' },
         { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets' },
         { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', badge: 2 },
         { id: 'checklists', icon: 'fa-clipboard-check', label: 'Manage Checklists' },
@@ -8027,7 +8055,7 @@ function App() {
     dashboard: 'Dashboard',
     'my-checklists': 'Checklists',
     chat: 'Chat',
-    schedule: (canSchedule || canEdit || isAdmin) ? 'Manage Schedule' : 'My Schedule',
+    schedule: 'My Schedule',
     timesheets: 'Timesheets',
     shifts: 'Shift Swaps',
     checklists: 'Manage Checklists',
@@ -8043,7 +8071,7 @@ function App() {
       case 'dashboard': return <Dashboard role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       case 'my-checklists': return <HomeChecklists role={role} perm={perm} authedUser={authedUser} />;
       case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm} />;
-      case 'schedule': return <Schedule role={role} perm={perm} />;
+      case 'schedule': return <Schedule role={role} perm={perm} authedUser={authedUser} />;
       case 'timesheets': return <Timesheets role={role} authedUser={authedUser} perm={perm} />;
       case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
       case 'checklists': return <Checklists role={role} perm={perm} authedUser={authedUser} />;
@@ -8270,7 +8298,7 @@ function App() {
       <div className="mobile-bottom-nav">
         {[
           { id: 'home', icon: 'fa-home', label: 'Home' },
-          { id: 'schedule', icon: 'fa-calendar-alt', label: (canSchedule || canEdit || isAdmin) ? 'Schedule' : 'My Schedule' },
+          { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule' },
           { id: 'timesheets', icon: 'fa-clock', label: 'Time' },
           ...(canSchedule ? [{ id: 'admin', icon: 'fa-crown', label: 'Admin' }] : []),
         ].map(item => (
