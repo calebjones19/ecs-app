@@ -4182,7 +4182,7 @@ function Schedule({ role, perm }) {
 }
 
 // ─── Clients ───────────────────────────────────────────────────
-function ClientList({ role, perm }) {
+function ClientList({ role, perm, onCardOpen }) {
   const canEdit = perm?.canEdit || role === 'admin';
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -4196,6 +4196,11 @@ function ClientList({ role, perm }) {
   const [approvedEditMode, setApprovedEditMode] = useState(false);
   const [approvedSearch, setApprovedSearch] = useState('');
   const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
+
+  // Notify parent when a client card is open/closed
+  useEffect(() => {
+    if (onCardOpen) onCardOpen(!!selectedClient);
+  }, [!!selectedClient]);
 
   // Sync edit state when selected client changes
   useEffect(() => {
@@ -4324,7 +4329,7 @@ function ClientList({ role, perm }) {
     return (
       <div>
         <button className="topbar-btn" onClick={() => setSelectedClient(null)} style={{ marginBottom: 16 }}>
-          <i className="fas fa-arrow-left" /> Back to Clients
+          <i className="fas fa-arrow-left" /> Back
         </button>
         <div className="card" style={{ padding: 20, marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
@@ -4648,6 +4653,7 @@ function EmployeeProfiles({ role, perm }) {
   const [editMode, setEditMode] = useState(false);
   const [accountsEditMode, setAccountsEditMode] = useState(false);
   const [accountsSearch, setAccountsSearch] = useState('');
+  const [clientCardOpen, setClientCardOpen] = useState(false);
   const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '', teams: [], managerId: '', managerName: '' });
   const [availableTeams, setAvailableTeams] = useState([]);
 
@@ -4781,15 +4787,17 @@ function EmployeeProfiles({ role, perm }) {
 
   return (
     <div>
-      {/* Tab bar */}
-      <div className="tabs" style={{ marginBottom: 20 }}>
-        <div className={`tab ${mainTab === 'employees' ? 'active' : ''}`} onClick={() => { setMainTab('employees'); setSelectedEmp(null); }}>Employees</div>
-        {canEdit && <div className={`tab ${mainTab === 'teams' ? 'active' : ''}`} onClick={() => { setMainTab('teams'); setSelectedEmp(null); }}>Teams</div>}
-        {canEdit && <div className={`tab ${mainTab === 'clients' ? 'active' : ''}`} onClick={() => { setMainTab('clients'); setSelectedEmp(null); }}>Clients</div>}
-      </div>
+      {/* Tab bar — hidden when a card is open */}
+      {!selectedEmp && !clientCardOpen && (
+        <div className="tabs" style={{ marginBottom: 20 }}>
+          <div className={`tab ${mainTab === 'employees' ? 'active' : ''}`} onClick={() => { setMainTab('employees'); setSelectedEmp(null); }}>Employees</div>
+          {canEdit && <div className={`tab ${mainTab === 'teams' ? 'active' : ''}`} onClick={() => { setMainTab('teams'); setSelectedEmp(null); }}>Teams</div>}
+          {canEdit && <div className={`tab ${mainTab === 'clients' ? 'active' : ''}`} onClick={() => { setMainTab('clients'); setSelectedEmp(null); }}>Clients</div>}
+        </div>
+      )}
 
       {mainTab === 'teams' && <TeamsManager role={role} perm={perm} />}
-      {mainTab === 'clients' && <ClientList role={role} perm={perm} />}
+      {mainTab === 'clients' && <ClientList role={role} perm={perm} onCardOpen={setClientCardOpen} />}
 
       {mainTab === 'employees' && <>
 
@@ -4992,9 +5000,8 @@ function EmployeeProfiles({ role, perm }) {
         </>
       ) : (
         <div>
-          {/* Profile detail — back button only, no search */}
           <button className="topbar-btn" onClick={() => { setSelectedEmp(null); setSearch(''); }} style={{ marginBottom: 16 }}>
-            <i className="fas fa-arrow-left" /> Back to Employees
+            <i className="fas fa-arrow-left" /> Back
           </button>
 
           <div className="card">
