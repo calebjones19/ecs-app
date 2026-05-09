@@ -2338,12 +2338,19 @@ function Chat({ role, authedUser, perm }) {
     : null;
 
   const prevChannelRef = useRef(null);
-  useEffect(() => {
-    if (!messagesEndRef.current) return;
+  React.useLayoutEffect(() => {
+    const container = chatMessagesRef.current;
+    if (!container || !channelMessages.length) return;
     const channelChanged = activeChannel !== prevChannelRef.current;
     prevChannelRef.current = activeChannel;
-    // Jump instantly when opening a channel; smooth-scroll only for new messages
-    messagesEndRef.current.scrollIntoView({ behavior: channelChanged ? 'instant' : 'smooth' });
+    if (channelChanged) {
+      // Synchronous jump before browser paints — user never sees the top
+      container.scrollTop = container.scrollHeight;
+    } else {
+      // New message: only scroll if already near the bottom
+      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      if (nearBottom) container.scrollTop = container.scrollHeight;
+    }
   }, [activeChannel, channelMessages]);
 
   React.useLayoutEffect(() => {
@@ -7021,60 +7028,22 @@ function AppUpdateButton() {
 
   const checkForUpdates = async () => {
     setChecking(true);
-    setStatus(null);
+    setStatus('updating');
     try {
+      // Clear all caches so the next load fetches fresh assets
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map(n => caches.delete(n)));
+      }
+      // Tell any waiting service worker to take over immediately
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          // Force the SW to check the server for a new version
-          await reg.update();
-          // If a new worker is waiting, activate it
-          if (reg.waiting) {
-            setStatus('updating');
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            // Reload once the new SW takes over
-            let refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-              if (!refreshing) { refreshing = true; window.location.reload(); }
-            });
-            // Fallback reload after 2s
-            setTimeout(() => { if (!refreshing) window.location.reload(); }, 2000);
-            return;
-          }
-          // If there's an installing worker, wait for it
-          if (reg.installing) {
-            setStatus('updating');
-            reg.installing.addEventListener('statechange', (e) => {
-              if (e.target.state === 'installed') {
-                if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                setTimeout(() => window.location.reload(), 500);
-              }
-            });
-            return;
-          }
-        }
-        // No new SW found — clear all caches and hard reload
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-        setStatus('updated');
-        setTimeout(() => window.location.reload(), 800);
-      } else {
-        // No SW support, just clear caches and reload
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-        setStatus('updated');
-        setTimeout(() => window.location.reload(), 800);
+        if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       }
-    } catch (err) {
-      console.error('Update check failed:', err);
-      // Fallback: clear caches and reload
-      try {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-      } catch(e) {}
-      setStatus('updated');
-      setTimeout(() => window.location.reload(), 800);
-    }
+    } catch(e) {}
+    setStatus('updated');
+    // Short pause so the user sees "Reloading..." then hard-reload
+    setTimeout(() => window.location.reload(), 500);
   };
 
   return (
