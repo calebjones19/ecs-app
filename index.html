@@ -4849,12 +4849,12 @@ function EmployeeProfiles({ role, perm }) {
           <input className="form-input" placeholder="Name — Phone" value={newEmp.emergencyContact} onChange={e => setNewEmp({...newEmp, emergencyContact: e.target.value})} />
         </div>
         <div className="form-group">
-          <label className="form-label">Manager</label>
+          <label className="form-label">Direct Report</label>
           <select className="form-input" value={newEmp.managerId} onChange={e => {
             const mgr = managers.find(m => m.id === e.target.value);
             setNewEmp({...newEmp, managerId: e.target.value, managerName: mgr?.name || ''});
           }}>
-            <option value="">No manager assigned</option>
+            <option value="">No direct report assigned</option>
             {managers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </div>
@@ -5014,12 +5014,12 @@ function EmployeeProfiles({ role, perm }) {
             <div className="tabs" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               {profileTabs.map(t => (
                 <div key={t} className={`tab ${profileTab === t ? 'active' : ''}`} onClick={() => { setProfileTab(t); setEditMode(false); setEditData({ ...selectedEmp }); setEditDirty(false); }} style={{ whiteSpace: 'nowrap' }}>
-                  {t === 'info' ? 'Personal Info' : t === 'tax' ? 'Tax & Pay' : t === 'accounts' ? 'Accounts' : t === 'schedule' ? 'Schedule' : t === 'timesheets' ? 'Timesheets' : 'Permission'}
+                  {t === 'info' ? 'General' : t === 'tax' ? 'Tax & Pay' : t === 'accounts' ? 'Accounts' : t === 'schedule' ? 'Schedule' : t === 'timesheets' ? 'Timesheets' : 'Permission'}
                 </div>
               ))}
             </div>
 
-            {/* ── Personal Info Tab ── */}
+            {/* ── General Tab ── */}
             {profileTab === 'info' && (
               <div>
                 {!editMode ? (
@@ -5034,6 +5034,7 @@ function EmployeeProfiles({ role, perm }) {
                     <div>
                       {[['Name', selectedEmp.name], ['Phone', selectedEmp.phone], ['Email', selectedEmp.email],
                         ['Address', selectedEmp.address], ['Emergency Contact', selectedEmp.emergencyContact],
+                        ['Direct Report', selectedEmp.managerName || '—'],
                         ['Status', (selectedEmp.status || 'active').charAt(0).toUpperCase() + (selectedEmp.status || 'active').slice(1)]
                       ].map(([label, val]) => (
                         <div key={label} className="form-group">
@@ -5051,6 +5052,17 @@ function EmployeeProfiles({ role, perm }) {
                       <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editData.email || ''} onChange={e => handleEditField('email', e.target.value)} /></div>
                       <div className="form-group"><label className="form-label">Address</label><input className="form-input" value={editData.address || ''} onChange={e => handleEditField('address', e.target.value)} /></div>
                       <div className="form-group"><label className="form-label">Emergency Contact</label><input className="form-input" value={editData.emergencyContact || ''} onChange={e => handleEditField('emergencyContact', e.target.value)} /></div>
+                      <div className="form-group">
+                        <label className="form-label">Direct Report</label>
+                        <select className="form-input" value={editData.managerId || ''} onChange={e => {
+                          const mgr = managers.find(m => m.id === e.target.value);
+                          handleEditField('managerId', e.target.value);
+                          handleEditField('managerName', mgr?.name || '');
+                        }}>
+                          <option value="">No direct report assigned</option>
+                          {managers.filter(m => m.id !== selectedEmp?.id).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                      </div>
                       <div className="form-group">
                         <label className="form-label">Status</label>
                         <select className="form-input" value={editData.status || 'active'} onChange={e => handleEditField('status', e.target.value)}>
@@ -5088,7 +5100,6 @@ function EmployeeProfiles({ role, perm }) {
                         ['Employment Type', selectedEmp.type === 'contractor' ? '1099 Contractor' : 'W-2 Employee'],
                         ['Job Title', selectedEmp.role || '—'],
                         ['Start Date', selectedEmp.startDate || '—'],
-                        ['Manager', selectedEmp.managerName || '—'],
                       ].map(([label, val]) => (
                         <div key={label} className="form-group">
                           <label className="form-label">{label}</label>
@@ -5126,17 +5137,6 @@ function EmployeeProfiles({ role, perm }) {
                         </select>
                       </div>
                       <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={editData.startDate || ''} onChange={e => handleEditField('startDate', e.target.value)} /></div>
-                    </div>
-                    <div className="form-group" style={{ marginTop: 4 }}>
-                      <label className="form-label">Manager</label>
-                      <select className="form-input" value={editData.managerId || ''} onChange={e => {
-                        const mgr = managers.find(m => m.id === e.target.value);
-                        handleEditField('managerId', e.target.value);
-                        handleEditField('managerName', mgr?.name || '');
-                      }}>
-                        <option value="">No manager assigned</option>
-                        {managers.filter(m => m.id !== selectedEmp?.id).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
                     </div>
                     <div className="form-group">
                       <label className="form-label">Teams</label>
@@ -7002,31 +7002,46 @@ function LoginScreen({ onLogin, onNotFound }) {
 // ── EmployeeTimeOff: employee time-off request form ──────────────────────────
 function EmployeeTimeOff({ authedUser }) {
   const [form, setForm] = useState({ type: 'Vacation', startDate: '', endDate: '', reason: '' });
-  const [submitted, setSubmitted] = useState(false);
-  const [myRequests] = useState([
-    { id: 1, type: 'Vacation', startDate: '2026-04-01', endDate: '2026-04-03', days: 3, status: 'approved' },
-    { id: 2, type: 'Sick Time', startDate: '2026-03-15', endDate: '2026-03-15', days: 1, status: 'approved' },
-  ]);
+  const [saving, setSaving] = useState(false);
+  const [myRequests, setMyRequests] = useState([]);
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    if (!authedUser?.id) return;
+    const unsub = db.collection('timeoff_requests')
+      .where('employeeId', '==', authedUser.id)
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snap => setMyRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    return () => unsub();
+  }, [authedUser?.id]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (!authedUser?.id) return;
+    setSaving(true);
+    try {
+      const emp = EMPLOYEES.find(e => e.id === authedUser.id);
+      await db.collection('timeoff_requests').add({
+        employeeId: authedUser.id,
+        employeeName: authedUser.name,
+        employeeAvatar: authedUser.avatar || authedUser.name?.slice(0,2).toUpperCase(),
+        employeeColor: authedUser.color || '#7c6f64',
+        managerId: emp?.managerId || null,
+        managerName: emp?.managerName || null,
+        type: form.type,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        reason: form.reason,
+        status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      setForm({ type: 'Vacation', startDate: '', endDate: '', reason: '' });
+    } catch(err) {
+      alert('Error submitting request: ' + err.message);
+    }
+    setSaving(false);
   };
 
-  const statusColor = { approved: 'var(--success)', pending: 'var(--warning)', denied: 'var(--danger)' };
-
-  if (submitted) {
-    return (
-      <div style={{ padding: '24px 0' }}>
-        <div style={{ background: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: 12, padding: '20px 24px', textAlign: 'center', marginBottom: 24 }}>
-          <i className="fas fa-check-circle" style={{ fontSize: 28, color: 'var(--primary)', marginBottom: 10, display: 'block' }} />
-          <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--primary)', marginBottom: 4 }}>Request Submitted</div>
-          <div style={{ fontSize: 13, color: 'var(--text-light)' }}>Your request has been submitted and your manager will be notified.</div>
-        </div>
-        <button className="topbar-btn" onClick={() => setSubmitted(false)} style={{ width: '100%', justifyContent: 'center' }}>Submit Another Request</button>
-      </div>
-    );
-  }
+  const statusColor = { approved: 'var(--success)', pending: '#f59e0b', denied: 'var(--danger)' };
 
   return (
     <div>
@@ -7041,35 +7056,39 @@ function EmployeeTimeOff({ authedUser }) {
               <option>Personal Day</option>
             </select>
           </div>
-          <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">Start Date</label>
-              <input type="date" className="form-input" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">End Date</label>
-              <input type="date" className="form-input" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} required />
-            </div>
+          <div className="form-group">
+            <label className="form-label">Start Date</label>
+            <input type="date" className="form-input" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">End Date</label>
+            <input type="date" className="form-input" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} required />
           </div>
           <div className="form-group">
             <label className="form-label">Reason (optional)</label>
             <textarea className="form-input" rows={3} style={{ resize: 'vertical' }} value={form.reason} onChange={e => setForm({...form, reason: e.target.value})} placeholder="Briefly describe your reason..." />
           </div>
-          <button type="submit" className="topbar-btn primary" style={{ width: '100%', justifyContent: 'center' }}>Submit Request</button>
+          <button type="submit" className="topbar-btn primary" style={{ width: '100%', justifyContent: 'center' }} disabled={saving}>
+            {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Submitting...</> : 'Submit Request'}
+          </button>
         </form>
       </div>
 
       <div className="card">
         <div className="card-header"><div className="card-title">My Requests</div></div>
         {myRequests.length === 0 ? (
-          <div className="empty-state"><i className="fas fa-calendar-times" /><p>No past requests</p></div>
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
+            <i className="fas fa-calendar-times" style={{ fontSize: 28, opacity: 0.2, display: 'block', marginBottom: 10 }} />
+            No requests yet
+          </div>
         ) : myRequests.map(r => (
           <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{r.type}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{r.startDate} – {r.endDate} · {r.days} day{r.days !== 1 ? 's' : ''}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{r.startDate} – {r.endDate}</div>
+              {r.reason && <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>{r.reason}</div>}
             </div>
-            <span style={{ fontSize: 12, fontWeight: 600, color: statusColor[r.status], textTransform: 'capitalize' }}>{r.status}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: statusColor[r.status] || 'var(--text-light)', textTransform: 'capitalize' }}>{r.status}</span>
           </div>
         ))}
       </div>
@@ -7078,23 +7097,29 @@ function EmployeeTimeOff({ authedUser }) {
 }
 
 // ── AdminTimeOff: admin view of pending time-off requests ─────────────────────
-const MOCK_TIME_OFF_REQUESTS = [
-  { id: 1, employee: 'Maria Garcia', type: 'Vacation', startDate: '2026-05-10', endDate: '2026-05-14', days: 5, reason: 'Family trip', status: 'pending', avatar: 'MG', color: '#7c6f64' },
-  { id: 2, employee: 'James Wilson', type: 'Sick Time', startDate: '2026-05-06', endDate: '2026-05-06', days: 1, reason: 'Not feeling well', status: 'pending', avatar: 'JW', color: '#4a6741' },
-  { id: 3, employee: 'Ashley Brown', type: 'Vacation', startDate: '2026-05-20', endDate: '2026-05-22', days: 3, reason: 'Long weekend', status: 'pending', avatar: 'AB', color: '#c8a84e' },
-];
-
 function AdminTimeOff({ role, perm, authedUser }) {
-  const [requests, setRequests] = useState(MOCK_TIME_OFF_REQUESTS);
+  const [requests, setRequests] = useState([]);
   const [activeTab, setActiveTab] = useState('pending');
+
+  useEffect(() => {
+    if (!authedUser?.id) return;
+    // Show requests where this user is the assigned manager (direct report)
+    // Admins see all; managers see only their direct reports
+    let query = db.collection('timeoff_requests').orderBy('createdAt', 'desc');
+    if (!perm?.isAdmin) {
+      query = query.where('managerId', '==', authedUser.id);
+    }
+    const unsub = query.onSnapshot(snap => setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    return () => unsub();
+  }, [authedUser?.id, perm?.isAdmin]);
+
+  const handleStatus = async (id, status) => {
+    await db.collection('timeoff_requests').doc(id).update({ status });
+  };
 
   const filtered = requests.filter(r => r.status === activeTab);
   const tabs = ['pending', 'approved', 'denied'];
   const typeBadgeColor = { Vacation: { bg: '#faf3e0', color: '#c8a84e' }, 'Sick Time': { bg: '#e8f0fe', color: '#4a70c4' }, 'Personal Day': { bg: '#f0f4ff', color: '#7c6f64' } };
-
-  const updateStatus = (id, status) => {
-    setRequests(prev => prev.map(r => r.id === id ? {...r, status} : r));
-  };
 
   return (
     <div>
@@ -7119,25 +7144,21 @@ function AdminTimeOff({ role, perm, authedUser }) {
       ) : filtered.map(r => (
         <div key={r.id} className="card" style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-            <div className="avatar" style={{ background: r.color, width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>{r.avatar}</div>
+            <div className="avatar" style={{ background: r.employeeColor || r.color, width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>{r.employeeAvatar || r.avatar}</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>{r.employee}</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{r.employeeName || r.employee}</div>
               <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: (typeBadgeColor[r.type] || {bg:'#eee',color:'#666'}).bg, color: (typeBadgeColor[r.type] || {bg:'#eee',color:'#666'}).color }}>{r.type}</span>
             </div>
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 4 }}>
             <i className="fas fa-calendar-alt" style={{ marginRight: 6, color: 'var(--primary)' }} />
-            {r.startDate} – {r.endDate} · <strong>{r.days} day{r.days !== 1 ? 's' : ''}</strong>
+            {r.startDate} – {r.endDate}
           </div>
           {r.reason && <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10, fontStyle: 'italic' }}>"{r.reason}"</div>}
           {activeTab === 'pending' && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => updateStatus(r.id, 'approved')} style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, background: '#e8f5e9', color: 'var(--success)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                <i className="fas fa-check" style={{ marginRight: 6 }} />Approve
-              </button>
-              <button onClick={() => updateStatus(r.id, 'denied')} style={{ flex: 1, padding: '8px 0', border: 'none', borderRadius: 8, background: '#fce8e6', color: 'var(--danger)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                <i className="fas fa-times" style={{ marginRight: 6 }} />Deny
-              </button>
+              <button className="topbar-btn primary" style={{ fontSize: 12 }} onClick={() => handleStatus(r.id, 'approved')}>Approve</button>
+              <button className="topbar-btn" style={{ fontSize: 12, color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => handleStatus(r.id, 'denied')}>Deny</button>
             </div>
           )}
         </div>
