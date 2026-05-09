@@ -3547,37 +3547,30 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const ns = (patch) => setNewShift(s => ({...s, ...patch}));
   const [selectedMonthDay, setSelectedMonthDay] = useState(null);
 
-  // ── Live-sync shifts from Firestore ──
+  // ── Live-sync shifts from Firestore (with inline Mon→Sun migration) ──
   useEffect(() => {
     const unsub = db.collection('scheduled_shifts')
       .orderBy('createdAt', 'asc')
       .onSnapshot(snap => {
         const data = {};
+        const migBatch = db.batch();
+        let needsMig = false;
         snap.docs.forEach(doc => {
-          const d = { id: doc.id, ...doc.data() };
+          const raw = doc.data();
+          let d = { id: doc.id, ...raw };
+          // If dayVersion < 2 the day was stored with Mon=0; fix to Sun=0
+          if (!d.dayVersion || d.dayVersion < 2) {
+            d = { ...d, day: (d.day + 1) % 7, dayVersion: 2 };
+            migBatch.update(doc.ref, { day: d.day, dayVersion: 2 });
+            needsMig = true;
+          }
           if (!data[d.employeeId]) data[d.employeeId] = [];
           data[d.employeeId].push(d);
         });
+        if (needsMig) migBatch.commit().catch(() => {});
         setScheduleData(data);
       }, () => {});
     return () => unsub();
-  }, []);
-
-  // ── One-time migration: shift day indices from Mon-first (0=Mon) to Sun-first (0=Sun) ──
-  useEffect(() => {
-    db.collection('scheduled_shifts').where('dayVersion', '==', null).get()
-      .then(snap => {
-        if (snap.empty) return;
-        const batch = db.batch();
-        snap.docs.forEach(doc => {
-          const oldDay = doc.data().day;
-          if (typeof oldDay === 'number') {
-            batch.update(doc.ref, { day: (oldDay + 1) % 7, dayVersion: 2 });
-          }
-        });
-        return batch.commit();
-      })
-      .catch(() => {});
   }, []);
 
   const closeAddShift = () => { setShowAddShift(false); setNewShift(EMPTY_SHIFT); setEmpSearch(''); setClientSearch(''); };
