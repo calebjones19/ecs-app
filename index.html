@@ -3741,15 +3741,26 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
 
+  // Return the Monday of the week containing the 15th of a given month —
+  // reliable anchor for month navigation (15th is never in an edge week)
+  const mondayOfMid = (year, month) => {
+    const mid = new Date(year, month, 15);
+    const dow = mid.getDay(); // 0=Sun
+    const daysBack = dow === 0 ? 6 : dow - 1;
+    mid.setDate(mid.getDate() - daysBack);
+    return mid;
+  };
+
   const myNavPrev = () => {
     if (calView === 'day') {
       if (selectedDay === 0) { setWeekOffset(w => w - 1); setSelectedDay(6); }
       else setSelectedDay(d => d - 1);
     } else if (calView === 'month') {
-      // Jump to the first week that starts in the previous month
-      const prevMonthStart = new Date(weekStart.getFullYear(), weekStart.getMonth() - 1, 1);
-      const weeksBack = Math.ceil((weekStart - prevMonthStart) / msPerWeek);
-      setWeekOffset(w => w - Math.max(weeksBack, 1));
+      const y = weekStart.getMonth() === 0 ? weekStart.getFullYear() - 1 : weekStart.getFullYear();
+      const m = weekStart.getMonth() === 0 ? 11 : weekStart.getMonth() - 1;
+      const target = mondayOfMid(y, m);
+      const delta = Math.round((target - weekStart) / msPerWeek);
+      setWeekOffset(w => w + delta);
     } else {
       setWeekOffset(w => w - 1);
     }
@@ -3760,10 +3771,11 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       if (selectedDay === 6) { setWeekOffset(w => w + 1); setSelectedDay(0); }
       else setSelectedDay(d => d + 1);
     } else if (calView === 'month') {
-      // Jump to the first week that starts in the next month
-      const nextMonthStart = new Date(weekStart.getFullYear(), weekStart.getMonth() + 1, 1);
-      const weeksAhead = Math.ceil((nextMonthStart - weekStart) / msPerWeek);
-      setWeekOffset(w => w + Math.max(weeksAhead, 1));
+      const y = weekStart.getMonth() === 11 ? weekStart.getFullYear() + 1 : weekStart.getFullYear();
+      const m = weekStart.getMonth() === 11 ? 0 : weekStart.getMonth() + 1;
+      const target = mondayOfMid(y, m);
+      const delta = Math.round((target - weekStart) / msPerWeek);
+      setWeekOffset(w => w + delta);
     } else {
       setWeekOffset(w => w + 1);
     }
