@@ -2741,6 +2741,605 @@ function ShiftNotesEditor({ notes, onChange }) {
   );
 }
 
+// ─── ScheduleTemplates ─────────────────────────────────────────
+function ScheduleTemplates({ role, perm, authedUser, onClose }) {
+  const canEdit = perm?.canEdit || role === 'admin';
+  const isAdmin = perm?.isAdmin || role === 'admin';
+  const canSchedule = perm?.canSchedule || role === 'admin';
+  const [templates, setTemplates] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingTpl, setEditingTpl] = useState(null);
+  const [tplName, setTplName] = useState('');
+  const [tplClientSearch, setTplClientSearch] = useState('');
+  const [tplClientPick, setTplClientPick] = useState(null);
+  const [tplDay, setTplDay] = useState(0);
+  const [tplShifts, setTplShifts] = useState([{ id: Date.now(), startTime: '08:00', endTime: '16:00', workerCount: 1, label: '' }]);
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  const schedulableIds = authedUser?.schedulableAccounts || [];
+
+  useEffect(() => {
+    const unsub = db.collection('schedule_templates').orderBy('createdAt', 'asc').onSnapshot(snap => {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (isAdmin || canEdit) {
+        setTemplates(all);
+      } else if (canSchedule) {
+        setTemplates(all.filter(t => t.createdBy === authedUser?.id || schedulableIds.includes(t.clientId)));
+      } else {
+        setTemplates([]);
+      }
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  const resetForm = () => {
+    setTplName(''); setTplClientSearch(''); setTplClientPick(null); setTplDay(0);
+    setTplShifts([{ id: Date.now(), startTime: '08:00', endTime: '16:00', workerCount: 1, label: '' }]);
+    setEditingTpl(null);
+  };
+
+  const openNew = () => { resetForm(); setShowForm(true); };
+  const openEdit = (tpl) => {
+    setTplName(tpl.name);
+    setTplClientSearch(tpl.clientName || '');
+    setTplClientPick({ id: tpl.clientId, name: tpl.clientName });
+    setTplDay(tpl.dayOfWeek ?? 0);
+    setTplShifts((tpl.shifts || []).map(s => ({ ...s, id: s.id || Date.now() + Math.random() })));
+    setEditingTpl(tpl);
+    setShowForm(true);
+  };
+
+  const saveTpl = async () => {
+    if (!tplName.trim() || !tplClientPick) return;
+    setSaving(true);
+    const data = {
+      name: tplName.trim(),
+      clientId: tplClientPick.id,
+      clientName: tplClientPick.name,
+      dayOfWeek: tplDay,
+      shifts: tplShifts.map(({ id, ...rest }) => ({ ...rest, id: String(id) })),
+      createdBy: authedUser?.id || '',
+      createdByName: authedUser?.name || '',
+    };
+    try {
+      if (editingTpl) {
+        await db.collection('schedule_templates').doc(editingTpl.id).update(data);
+      } else {
+        await db.collection('schedule_templates').add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+      setShowForm(false); resetForm();
+    } catch(e) { alert('Error: ' + e.message); }
+    setSaving(false);
+  };
+
+  const deleteTpl = async (tpl) => {
+    try { await db.collection('schedule_templates').doc(tpl.id).delete(); setDeleteConfirm(null); }
+    catch(e) { alert('Error: ' + e.message); }
+  };
+
+  const addShift = () => setTplShifts(s => [...s, { id: Date.now(), startTime: '08:00', endTime: '16:00', workerCount: 1, label: '' }]);
+  const updateShift = (id, field, val) => setTplShifts(s => s.map(sh => sh.id === id ? { ...sh, [field]: val } : sh));
+  const removeShift = (id) => setTplShifts(s => s.filter(sh => sh.id !== id));
+
+  // Group by client
+  const grouped = {};
+  templates.forEach(t => {
+    if (!grouped[t.clientId]) grouped[t.clientId] = { clientName: t.clientName, items: [] };
+    grouped[t.clientId].items.push(t);
+  });
+
+  const availableClients = (isAdmin || canEdit)
+    ? CLIENTS.filter(c => c.status !== 'inactive')
+    : CLIENTS.filter(c => c.status !== 'inactive' && schedulableIds.includes(c.id));
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 600, display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'white' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: 4 }}>
+            <i className="fas fa-arrow-left" />
+          </button>
+          <span style={{ fontWeight: 800, fontSize: 17 }}>Schedule Templates</span>
+        </div>
+        {(canEdit || isAdmin) && (
+          <button className="topbar-btn primary" onClick={openNew}>
+            <i className="fas fa-plus" /> New Template
+          </button>
+        )}
+      </div>
+
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        {Object.keys(grouped).length === 0 && !showForm && (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-light)' }}>
+            <i className="fas fa-layer-group" style={{ fontSize: 40, opacity: 0.2, display: 'block', marginBottom: 14 }} />
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>No templates yet</div>
+            <div style={{ fontSize: 14 }}>Create a template to quickly fill a schedule week.</div>
+          </div>
+        )}
+        {Object.entries(grouped).map(([clientId, { clientName, items }]) => (
+          <div key={clientId} style={{ marginBottom: 24 }}>
+            <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>{clientName}</div>
+            {items.map(tpl => (
+              <div key={tpl.id} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>{tpl.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 8 }}>{dayNames[tpl.dayOfWeek ?? 0]}</div>
+                    {(tpl.shifts || []).map((s, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 4 }}>
+                        <i className="fas fa-clock" style={{ fontSize: 11, color: 'var(--text-light)' }} />
+                        <span>{s.startTime} – {s.endTime}</span>
+                        <span style={{ background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 4, padding: '1px 7px', fontWeight: 600, fontSize: 12 }}>{s.workerCount} worker{s.workerCount !== 1 ? 's' : ''}</span>
+                        {s.label && <span style={{ color: 'var(--text-light)', fontSize: 12 }}>{s.label}</span>}
+                      </div>
+                    ))}
+                  </div>
+                  {(canEdit || isAdmin) && (
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button className="chat-icon-btn" onClick={() => openEdit(tpl)} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>
+                      <button className="chat-icon-btn" style={{ color: 'var(--danger)' }} onClick={() => setDeleteConfirm(tpl)}><i className="fas fa-trash" /></button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* New/Edit Form bottom sheet */}
+      {showForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 700 }} onClick={() => { setShowForm(false); resetForm(); }}>
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', maxHeight: '85vh', overflowY: 'auto', zIndex: 701 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, background: '#ddd', borderRadius: 2, margin: '0 auto 18px' }} />
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 16 }}>{editingTpl ? 'Edit Template' : 'New Template'}</div>
+
+            <div className="form-group">
+              <label className="form-label">Template Name</label>
+              <input className="form-input" placeholder="e.g. Morning Crew" value={tplName} onChange={e => setTplName(e.target.value)} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Client</label>
+              <div className="search-bar" style={{ marginBottom: tplClientPick ? 6 : 0 }}>
+                <i className="fas fa-search" />
+                <input placeholder="Search clients..." value={tplClientSearch} onChange={e => { setTplClientSearch(e.target.value); setTplClientPick(null); }} />
+                {tplClientSearch && <button onClick={() => { setTplClientSearch(''); setTplClientPick(null); }}><i className="fas fa-times" /></button>}
+              </div>
+              {tplClientPick && <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600, padding: '4px 0' }}><i className="fas fa-check-circle" style={{ marginRight: 4 }} />{tplClientPick.name}</div>}
+              {tplClientSearch.trim() && !tplClientPick && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, maxHeight: 140, overflowY: 'auto' }}>
+                  {availableClients.filter(c => c.name.toLowerCase().includes(tplClientSearch.toLowerCase())).slice(0, 8).map(c => (
+                    <div key={c.id} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 14 }}
+                      onClick={() => { setTplClientPick(c); setTplClientSearch(c.name); }}>
+                      {c.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Day of Week</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {dayNames.map((d, i) => (
+                  <button key={i} type="button"
+                    style={{ padding: '5px 10px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      background: tplDay === i ? 'var(--primary)' : 'transparent',
+                      color: tplDay === i ? 'white' : 'var(--text)',
+                      border: `1.5px solid ${tplDay === i ? 'var(--primary)' : 'var(--border)'}` }}
+                    onClick={() => setTplDay(i)}>{d}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>Shifts</div>
+              {tplShifts.map(sh => (
+                <div key={sh.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, background: 'var(--bg)', borderRadius: 8, padding: '8px 10px' }}>
+                  <input className="form-input" type="time" value={sh.startTime} onChange={e => updateShift(sh.id, 'startTime', e.target.value)} style={{ flex: 1 }} />
+                  <span style={{ color: 'var(--text-light)', fontSize: 13 }}>–</span>
+                  <input className="form-input" type="time" value={sh.endTime} onChange={e => updateShift(sh.id, 'endTime', e.target.value)} style={{ flex: 1 }} />
+                  <input className="form-input" type="number" min="1" max="20" value={sh.workerCount} onChange={e => updateShift(sh.id, 'workerCount', parseInt(e.target.value) || 1)} style={{ width: 60 }} />
+                  {tplShifts.length > 1 && <button className="chat-icon-btn" style={{ color: 'var(--danger)' }} onClick={() => removeShift(sh.id)}><i className="fas fa-times" /></button>}
+                </div>
+              ))}
+              <button type="button" className="topbar-btn" style={{ width: '100%', justifyContent: 'center' }} onClick={addShift}>
+                <i className="fas fa-plus" /> Add Shift
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="topbar-btn" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</button>
+              <button className="topbar-btn primary" onClick={saveTpl} disabled={!tplName.trim() || !tplClientPick || saving}>
+                {saving ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {deleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: '24px 20px', maxWidth: 320, width: '100%' }}>
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Delete Template?</div>
+            <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 20 }}>"{deleteConfirm.name}" will be permanently removed.</div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="topbar-btn" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="topbar-btn" style={{ color: 'white', background: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => deleteTpl(deleteConfirm)}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── AutoScheduler ─────────────────────────────────────────────
+function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClose, onConfirm }) {
+  const canEdit = perm?.canEdit || role === 'admin';
+  const isAdmin = perm?.isAdmin || role === 'admin';
+  const canSchedule = perm?.canSchedule || role === 'admin';
+  const [step, setStep] = useState(1);
+  const [selectedClients, setSelectedClients] = useState(new Set());
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [method, setMethod] = useState('smart-fill');
+  const [draft, setDraft] = useState([]);
+  const [generating, setGenerating] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmedCount, setConfirmedCount] = useState(0);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  const schedulableIds = authedUser?.schedulableAccounts || [];
+  const availableClients = (isAdmin || canEdit)
+    ? CLIENTS.filter(c => c.status !== 'inactive')
+    : CLIENTS.filter(c => c.status !== 'inactive' && schedulableIds.includes(c.id));
+
+  const getWeekDays = () => {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(d.getDate() + weekOffset * 7 + i);
+      days.push(d);
+    }
+    return days;
+  };
+  const weekDays = getWeekDays();
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const toggleClient = (id) => {
+    setSelectedClients(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const generateDraft = async () => {
+    setGenerating(true);
+    const result = [];
+    try {
+      // Load primary_assignments for selected clients
+      const paSnap = await db.collection('primary_assignments')
+        .where('clientId', 'in', [...selectedClients].slice(0, 10))
+        .get();
+      const primaries = paSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Load templates if method is 'template'
+      let templatesMap = {}; // clientId+dayOfWeek -> template
+      if (method === 'template') {
+        const tplSnap = await db.collection('schedule_templates').get();
+        tplSnap.docs.forEach(d => {
+          const t = { id: d.id, ...d.data() };
+          const key = `${t.clientId}_${t.dayOfWeek}`;
+          if (!templatesMap[key]) templatesMap[key] = [];
+          templatesMap[key].push(t);
+        });
+      }
+
+      for (const clientId of selectedClients) {
+        const client = CLIENTS.find(c => c.id === clientId);
+        if (!client) continue;
+        const workerCount = client.budgetedWorkers || 1;
+        const budgetedHours = client.budgetedHours || 8;
+
+        for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+          const dayDate = weekDays[dayIdx];
+          const dateStr = dayDate.toISOString().slice(0, 10);
+          let shifts = [];
+
+          if (method === 'template') {
+            const key = `${clientId}_${dayIdx}`;
+            const tpls = templatesMap[key] || [];
+            for (const tpl of tpls) {
+              for (const sh of (tpl.shifts || [])) {
+                const needed = sh.workerCount || workerCount;
+                const workers = [];
+                // Find primary workers matching this day + time window
+                const matching = primaries.filter(pa =>
+                  pa.clientId === clientId && (pa.days || []).includes(dayIdx)
+                );
+                for (const pa of matching) {
+                  if (workers.length >= needed) break;
+                  const emp = EMPLOYEES.find(e => e.id === pa.employeeId);
+                  if (!emp) continue;
+                  // Check conflict
+                  const empShifts = scheduleData[pa.employeeId] || [];
+                  const conflict = empShifts.some(s => s.date === dateStr || (s.day === dayIdx && !s.date));
+                  if (!conflict) workers.push({ empId: pa.employeeId, name: emp.name, source: 'primary' });
+                }
+                // Fill with approved if still needed
+                const approved = (client.approvedEmployeeIds || []);
+                for (const empId of approved) {
+                  if (workers.length >= needed) break;
+                  if (workers.find(w => w.empId === empId)) continue;
+                  const emp = EMPLOYEES.find(e => e.id === empId);
+                  if (!emp) continue;
+                  const empShifts = scheduleData[empId] || [];
+                  const conflict = empShifts.some(s => s.date === dateStr || (s.day === dayIdx && !s.date));
+                  if (!conflict) workers.push({ empId, name: emp.name, source: 'approved' });
+                }
+                const gaps = Math.max(0, needed - workers.length);
+                for (let g = 0; g < gaps; g++) workers.push({ empId: null, name: 'Gap', source: 'gap' });
+                shifts.push({ startTime: sh.startTime, endTime: sh.endTime, workerCount: needed, workers, label: sh.label || '' });
+              }
+            }
+          } else {
+            // Smart fill
+            const needed = workerCount;
+            const workers = [];
+            const matching = primaries.filter(pa => pa.clientId === clientId && (pa.days || []).includes(dayIdx));
+            for (const pa of matching) {
+              if (workers.length >= needed) break;
+              const emp = EMPLOYEES.find(e => e.id === pa.employeeId);
+              if (!emp) continue;
+              const empShifts = scheduleData[pa.employeeId] || [];
+              const conflict = empShifts.some(s => s.date === dateStr || (s.day === dayIdx && !s.date));
+              if (!conflict) workers.push({ empId: pa.employeeId, name: emp.name, source: 'primary' });
+            }
+            const approved = (client.approvedEmployeeIds || []);
+            for (const empId of approved) {
+              if (workers.length >= needed) break;
+              if (workers.find(w => w.empId === empId)) continue;
+              const emp = EMPLOYEES.find(e => e.id === empId);
+              if (!emp) continue;
+              const empShifts = scheduleData[empId] || [];
+              const conflict = empShifts.some(s => s.date === dateStr || (s.day === dayIdx && !s.date));
+              if (!conflict) workers.push({ empId, name: emp.name, source: 'approved' });
+            }
+            const gaps = Math.max(0, needed - workers.length);
+            for (let g = 0; g < gaps; g++) workers.push({ empId: null, name: 'Gap', source: 'gap' });
+            if (workers.length > 0) {
+              shifts.push({ startTime: '08:00', endTime: `${8 + (budgetedHours || 8)}:00`.replace(/(\d+):/, h => `${String(parseInt(h)).padStart(2,'0')}:`), workerCount: needed, workers, label: '' });
+            }
+          }
+
+          if (shifts.length > 0) {
+            result.push({ clientId, clientName: client.name, dayIdx, dateStr, budgetedWorkers: workerCount, budgetedHours, shifts });
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('Draft gen error:', e);
+    }
+    setDraft(result);
+    setGenerating(false);
+  };
+
+  const confirmSchedule = async () => {
+    setConfirming(true);
+    let count = 0;
+    const batch = db.batch();
+    try {
+      for (const entry of draft) {
+        for (const sh of entry.shifts) {
+          const realWorkers = sh.workers.filter(w => w.empId);
+          for (const w of realWorkers) {
+            const ref = db.collection('scheduled_shifts').doc();
+            batch.set(ref, {
+              employeeId: w.empId,
+              client: entry.clientName,
+              clientId: entry.clientId,
+              scheduleType: 'specific',
+              date: entry.dateStr,
+              day: entry.dayIdx,
+              dayVersion: 2,
+              startTime: sh.startTime,
+              endTime: sh.endTime,
+              repeats: false,
+              shiftNotes: [],
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            count++;
+          }
+        }
+      }
+      await batch.commit();
+      setConfirmedCount(count);
+      setStep(4);
+    } catch(e) {
+      alert('Error saving shifts: ' + e.message);
+    }
+    setConfirming(false);
+  };
+
+  const totalGaps = draft.reduce((sum, e) => sum + e.shifts.reduce((s2, sh) => s2 + sh.workers.filter(w => w.source === 'gap').length, 0), 0);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 600, display: 'flex', flexDirection: 'column' }}>
+      {/* Step 1 — Select Accounts */}
+      {step === 1 && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'white' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: 4 }}><i className="fas fa-times" /></button>
+              <span style={{ fontWeight: 800, fontSize: 17 }}>Auto Schedule <span style={{ fontWeight: 400, color: 'var(--text-light)', fontSize: 14 }}>· Step 1 of 4</span></span>
+            </div>
+            <button className="topbar-btn primary" onClick={() => setStep(2)} disabled={selectedClients.size === 0}>Next →</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+            <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 16 }}>Select accounts to auto-schedule</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+              {availableClients.map(c => {
+                const sel = selectedClients.has(c.id);
+                return (
+                  <div key={c.id} onClick={() => toggleClient(c.id)}
+                    style={{ padding: '14px 12px', borderRadius: 12, cursor: 'pointer', position: 'relative',
+                      background: sel ? 'var(--primary-light)' : 'white',
+                      border: `2px solid ${sel ? 'var(--primary)' : 'var(--border)'}` }}>
+                    {sel && <i className="fas fa-check-circle" style={{ position: 'absolute', top: 8, right: 8, color: 'var(--primary)', fontSize: 14 }} />}
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                      <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 14, color: c.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>{c.type}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Step 2 — Week & Method */}
+      {step === 2 && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'white' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button onClick={() => setStep(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: 4 }}><i className="fas fa-arrow-left" /></button>
+              <span style={{ fontWeight: 800, fontSize: 17 }}>Auto Schedule <span style={{ fontWeight: 400, color: 'var(--text-light)', fontSize: 14 }}>· Step 2 of 4</span></span>
+            </div>
+            <button className="topbar-btn primary" onClick={() => { setStep(3); generateDraft(); }}>Next →</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+              {[...selectedClients].map(id => {
+                const c = CLIENTS.find(x => x.id === id);
+                return c ? <span key={id} style={{ fontSize: 13, background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 6, padding: '3px 10px', fontWeight: 600 }}>{c.name}</span> : null;
+              })}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Week</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w - 1)}><i className="fas fa-chevron-left" /></button>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>
+                  {weekDays[0] && `${monthNames[weekDays[0].getMonth()]} ${weekDays[0].getDate()} – ${monthNames[weekDays[6].getMonth()]} ${weekDays[6].getDate()}, ${weekDays[6].getFullYear()}`}
+                </span>
+                <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w + 1)}><i className="fas fa-chevron-right" /></button>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Method</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['smart-fill', 'Smart Fill'], ['template', 'From Template']].map(([val, label]) => (
+                  <button key={val} type="button"
+                    style={{ padding: '8px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                      background: method === val ? 'var(--primary)' : 'transparent',
+                      color: method === val ? 'white' : 'var(--text)',
+                      border: `2px solid ${method === val ? 'var(--primary)' : 'var(--border)'}` }}
+                    onClick={() => setMethod(val)}>{label}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 8 }}>
+                {method === 'template' ? 'Uses saved shift templates for each client + day' : 'Uses primary assignments and approved employees to fill shifts'}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Step 3 — Draft Preview */}
+      {step === 3 && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'white' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button onClick={() => setStep(2)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: 4 }}><i className="fas fa-arrow-left" /></button>
+              <span style={{ fontWeight: 800, fontSize: 17 }}>Auto Schedule <span style={{ fontWeight: 400, color: 'var(--text-light)', fontSize: 14 }}>· Step 3 of 4{generating ? ' · Generating...' : ''}</span></span>
+            </div>
+            <button className="topbar-btn primary" onClick={confirmSchedule} disabled={generating || draft.length === 0 || confirming}>
+              {confirming ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : 'Confirm & Schedule →'}
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+            {generating && (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-light)' }}>
+                <i className="fas fa-spinner fa-spin" style={{ fontSize: 32, marginBottom: 14, display: 'block' }} />
+                <div style={{ fontWeight: 700 }}>Generating draft...</div>
+              </div>
+            )}
+            {!generating && draft.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-light)' }}>
+                <i className="fas fa-calendar-times" style={{ fontSize: 32, opacity: 0.3, display: 'block', marginBottom: 14 }} />
+                <div style={{ fontWeight: 700 }}>No shifts to schedule</div>
+                <div style={{ fontSize: 14, marginTop: 6 }}>No primary assignments or approved employees found for the selected accounts and week.</div>
+              </div>
+            )}
+            {!generating && draft.length > 0 && (
+              <>
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 8, padding: '6px 14px', fontWeight: 700, fontSize: 13 }}>{draft.reduce((s, e) => s + e.shifts.length, 0)} shifts</div>
+                  {totalGaps > 0 && <div style={{ background: '#fef2f2', color: 'var(--danger)', borderRadius: 8, padding: '6px 14px', fontWeight: 700, fontSize: 13 }}>{totalGaps} gap{totalGaps !== 1 ? 's' : ''} ⚠️</div>}
+                </div>
+                {draft.map((entry, ei) => (
+                  <div key={ei} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '14px', marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{entry.clientName}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 10 }}>{dayNames[entry.dayIdx]} · {entry.dateStr}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 10 }}>
+                      {entry.budgetedWorkers} worker{entry.budgetedWorkers !== 1 ? 's' : ''} needed · {entry.budgetedHours}h budgeted
+                    </div>
+                    {entry.shifts.map((sh, si) => (
+                      <div key={si} style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{sh.startTime} – {sh.endTime}</div>
+                        {sh.workers.map((w, wi) => (
+                          <div key={wi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 3 }}>
+                            <span style={{ padding: '1px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                              background: w.source === 'primary' ? '#e8f5e9' : w.source === 'approved' ? '#e3f2fd' : '#fef2f2',
+                              color: w.source === 'primary' ? '#2e7d32' : w.source === 'approved' ? '#1565c0' : 'var(--danger)' }}>
+                              {w.source === 'primary' ? 'Primary' : w.source === 'approved' ? 'Approved' : 'Gap ⚠️'}
+                            </span>
+                            <span>{w.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Step 4 — Confirmed */}
+      {step === 4 && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'white' }}>
+            <span style={{ fontWeight: 800, fontSize: 17 }}>Scheduled!</span>
+            <button className="topbar-btn primary" onClick={onClose}>Done</button>
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <i className="fas fa-check" style={{ fontSize: 32, color: 'var(--primary)' }} />
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 22, marginBottom: 8 }}>All done!</div>
+            <div style={{ fontSize: 15, color: 'var(--text-light)', textAlign: 'center' }}>
+              {confirmedCount} shift{confirmedCount !== 1 ? 's' : ''} have been created and added to the schedule.
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Schedule ──────────────────────────────────────────────────
 const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', date: '', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '', shiftNotes: [] };
 
@@ -2758,6 +3357,8 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [selectedMonthDay, setSelectedMonthDay] = useState(null);
   const [editingShift, setEditingShift] = useState(null); // shift being edited
   const [savingShift, setSavingShift] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
 
   // ── Live-sync shifts from Firestore (with inline Mon→Sun migration) ──
   useEffect(() => {
@@ -4177,6 +4778,17 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           )}
 
           {(canEdit || isAdmin) && (
+            <button className="topbar-btn" onClick={() => setShowTemplates(true)}>
+              <i className="fas fa-layer-group" /> {!isMobile && 'Templates'}
+            </button>
+          )}
+          {canSchedule && (
+            <button className="topbar-btn" style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }}
+              onClick={() => setShowAutoSchedule(true)}>
+              <i className="fas fa-magic" /> {!isMobile && 'Auto Schedule'}
+            </button>
+          )}
+          {(canEdit || isAdmin) && (
             <button className="topbar-btn primary" onClick={() => openAddShift()}><i className="fas fa-plus" />{isMobile ? '' : ' Add Shift'}</button>
           )}
           {(canEdit || isAdmin) && !isMobile && (
@@ -4265,6 +4877,8 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
         </div>
       )}
 
+      {showTemplates && <ScheduleTemplates role={role} perm={perm} authedUser={authedUser} onClose={() => setShowTemplates(false)} />}
+      {showAutoSchedule && <AutoScheduler role={role} perm={perm} authedUser={authedUser} scheduleData={scheduleData} weekStart={weekStart} onClose={() => setShowAutoSchedule(false)} onConfirm={() => setShowAutoSchedule(false)} />}
 
     </div>
   );
@@ -4285,7 +4899,7 @@ function ClientList({ role, perm, onCardOpen }) {
   const [clientTab, setClientTab] = useState('info');
   const [approvedEditMode, setApprovedEditMode] = useState(false);
   const [approvedSearch, setApprovedSearch] = useState('');
-  const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
+  const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', budgetedWorkers:'', notes:'' });
 
   // Notify parent when a client card is open/closed
   useEffect(() => {
@@ -4336,6 +4950,7 @@ function ClientList({ role, perm, onCardOpen }) {
         frequency: editClient.frequency || 'Weekly',
         rate: parseFloat(editClient.rate) || 0,
         budgetedHours: parseFloat(editClient.budgetedHours) || 0,
+        budgetedWorkers: parseFloat(editClient.budgetedWorkers) || 0,
         notes: (editClient.notes || '').trim(),
         status: editClient.status || 'active',
       });
@@ -4368,11 +4983,12 @@ function ClientList({ role, perm, onCardOpen }) {
         name: newClient.name.trim(),
         rate: parseFloat(newClient.rate) || 0,
         budgetedHours: parseFloat(newClient.budgetedHours) || 0,
+        budgetedWorkers: parseFloat(newClient.budgetedWorkers) || 0,
         status: 'active',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
       setShowAdd(false);
-      setNewClient({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', notes:'' });
+      setNewClient({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', budgetedWorkers:'', notes:'' });
     } catch (err) {
       alert('Error adding client: ' + err.message);
     }
@@ -4507,7 +5123,7 @@ function ClientList({ role, perm, onCardOpen }) {
           {clientTab === 'details' && (!editClientMode ? (
             <div>
               {canEdit && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><button className="chat-icon-btn" onClick={() => setEditClientMode(true)} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button></div>}
-              {[['Type', c.type], ['Frequency', c.frequency], ['Rate', c.rate ? `$${c.rate}` : '—'], ['Budgeted Hrs/Week', c.budgetedHours ? `${c.budgetedHours}h` : '—'], ['Status', (c.status || 'active').charAt(0).toUpperCase() + (c.status || 'active').slice(1)]].map(([label, val]) => (
+              {[['Type', c.type], ['Frequency', c.frequency], ['Rate', c.rate ? `$${c.rate}` : '—'], ['Budgeted Hrs/Week', c.budgetedHours ? `${c.budgetedHours}h` : '—'], ['Budgeted Workers/Shift', c.budgetedWorkers ? `${c.budgetedWorkers}` : '—'], ['Status', (c.status || 'active').charAt(0).toUpperCase() + (c.status || 'active').slice(1)]].map(([label, val]) => (
                 <div key={label} className="form-group"><label className="form-label">{label}</label><div style={{ fontSize: 14, padding: '6px 0', color: val && val !== '—' ? 'var(--text)' : 'var(--text-light)' }}>{val || '—'}</div></div>
               ))}
               {c.notes && <div className="form-group"><label className="form-label">Notes</label><div style={{ fontSize: 14, padding: '6px 0', whiteSpace: 'pre-wrap' }}>{c.notes}</div></div>}
@@ -4518,6 +5134,7 @@ function ClientList({ role, perm, onCardOpen }) {
               <div className="form-group"><label className="form-label">Frequency</label><select className="form-input" value={editClient.frequency || 'Weekly'} onChange={e => handleEditClientField('frequency', e.target.value)}><option>Daily</option><option>Weekly</option><option>Bi-weekly</option><option>Monthly</option><option>On-demand</option></select></div>
               <div className="form-group"><label className="form-label">Rate ($)</label><input className="form-input" type="number" value={editClient.rate || ''} onChange={e => handleEditClientField('rate', e.target.value)} /></div>
               <div className="form-group"><label className="form-label">Budgeted Hours/Week</label><input className="form-input" type="number" value={editClient.budgetedHours || ''} onChange={e => handleEditClientField('budgetedHours', e.target.value)} placeholder="0" /></div>
+              <div className="form-group"><label className="form-label">Budgeted Workers/Shift</label><input className="form-input" type="number" value={editClient.budgetedWorkers || ''} onChange={e => handleEditClientField('budgetedWorkers', e.target.value)} placeholder="0" /></div>
               <div className="form-group"><label className="form-label">Status</label><select className="form-input" value={editClient.status || 'active'} onChange={e => handleEditClientField('status', e.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
               <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={3} value={editClient.notes || ''} onChange={e => handleEditClientField('notes', e.target.value)} /></div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -4731,6 +5348,10 @@ function ClientList({ role, perm, onCardOpen }) {
             <label className="form-label">Budgeted Hours/Week</label>
             <input className="form-input" type="number" placeholder="0" value={newClient.budgetedHours} onChange={e => setNewClient({...newClient, budgetedHours: e.target.value})} />
           </div>
+          <div className="form-group">
+            <label className="form-label">Budgeted Workers/Shift</label>
+            <input className="form-input" type="number" placeholder="0" value={newClient.budgetedWorkers} onChange={e => setNewClient({...newClient, budgetedWorkers: e.target.value})} />
+          </div>
         </div>
         <div className="form-group">
           <label className="form-label">Notes</label>
@@ -4766,6 +5387,13 @@ function EmployeeProfiles({ role, perm }) {
   const [accountsEditMode, setAccountsEditMode] = useState(false);
   const [accountsSearch, setAccountsSearch] = useState('');
   const [clientCardOpen, setClientCardOpen] = useState(false);
+  const [primaryAssignments, setPrimaryAssignments] = useState([]);
+  const [showAddPrimary, setShowAddPrimary] = useState(false);
+  const [primarySearch, setPrimarySearch] = useState('');
+  const [primaryPickDays, setPrimaryPickDays] = useState(new Set());
+  const [primaryTimeWindow, setPrimaryTimeWindow] = useState('morning');
+  const [primaryClientPick, setPrimaryClientPick] = useState(null);
+  const [savingPrimary, setSavingPrimary] = useState(false);
   const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '', teams: [], managerId: '', managerName: '' });
   const [availableTeams, setAvailableTeams] = useState([]);
 
@@ -4776,6 +5404,17 @@ function EmployeeProfiles({ role, perm }) {
     }, () => {});
     return () => unsub();
   }, []);
+
+  // Load primary_assignments for selected employee
+  useEffect(() => {
+    if (!selectedEmp?.id) { setPrimaryAssignments([]); return; }
+    const unsub = db.collection('primary_assignments')
+      .where('employeeId', '==', selectedEmp.id)
+      .onSnapshot(snap => {
+        setPrimaryAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, () => {});
+    return () => unsub();
+  }, [selectedEmp?.id]);
 
   // Managers = employees with scheduler+ permission
   const managers = EMPLOYEES.filter(e => ['scheduler','editor','admin'].includes(e.permission) && e.status !== 'inactive').sort((a,b) => a.name.localeCompare(b.name));
@@ -4833,6 +5472,7 @@ function EmployeeProfiles({ role, perm }) {
         teams: editData.teams || [],
         managerId: editData.managerId || '',
         managerName: editData.managerName || '',
+        schedulableAccounts: (editData.permission === 'viewer') ? [] : (editData.schedulableAccounts || selectedEmp.schedulableAccounts || []),
       });
       setEditDirty(false);
       setEditMode(false);
@@ -5304,73 +5944,208 @@ function EmployeeProfiles({ role, perm }) {
             {/* ── Accounts Tab ── */}
             {profileTab === 'accounts' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 13, color: 'var(--text-light)' }}>Accounts this employee is approved for</div>
-                  {canEdit && !accountsEditMode && <button className="chat-icon-btn" onClick={() => { setAccountsEditMode(true); setAccountsSearch(''); }} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>}
-                  {canEdit && accountsEditMode && <button className="topbar-btn" onClick={() => { setAccountsEditMode(false); setAccountsSearch(''); }}>Done</button>}
-                </div>
-                {/* Approved clients list */}
-                {CLIENTS.filter(c => (c.approvedEmployeeIds || []).includes(selectedEmp.id)).length === 0 && !accountsEditMode && (
-                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
-                    <i className="fas fa-building" style={{ fontSize: 28, opacity: 0.2, display: 'block', marginBottom: 10 }} />
-                    Not approved for any accounts yet
+                {/* ── My Accounts (Primary Assignments) ── */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>My Accounts</div>
+                    {canEdit && <button className="chat-icon-btn" onClick={() => { setShowAddPrimary(!showAddPrimary); setPrimarySearch(''); setPrimaryPickDays(new Set()); setPrimaryTimeWindow('morning'); setPrimaryClientPick(null); }} style={{ fontSize: 14 }}><i className={showAddPrimary ? 'fas fa-times' : 'fas fa-plus'} /></button>}
                   </div>
-                )}
-                {CLIENTS.filter(c => (c.approvedEmployeeIds || []).includes(selectedEmp.id)).sort((a,b) => a.name.localeCompare(b.name)).map(client => (
-                  <div key={client.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: client.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <i className={`fas ${client.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 12, color: client.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{client.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{client.type}</div>
-                      </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 10 }}>Accounts this employee regularly works</div>
+
+                  {primaryAssignments.length === 0 && !showAddPrimary && (
+                    <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-light)' }}>
+                      <i className="fas fa-star" style={{ fontSize: 24, opacity: 0.2, display: 'block', marginBottom: 8 }} />
+                      No primary accounts yet
                     </div>
-                    {accountsEditMode && (
-                      <button className="chat-icon-btn" style={{ color: 'var(--danger)' }}
-                        onClick={async () => {
-                          const next = (client.approvedEmployeeIds || []).filter(id => id !== selectedEmp.id);
-                          await db.collection('clients').doc(client.id).update({ approvedEmployeeIds: next });
-                        }}>
-                        <i className="fas fa-times" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {/* Search to add */}
-                {accountsEditMode && (
-                  <div style={{ marginTop: 16 }}>
-                    <div className="search-bar" style={{ marginBottom: 8 }}>
-                      <i className="fas fa-search" />
-                      <input placeholder="Search accounts to add..." value={accountsSearch} onChange={e => setAccountsSearch(e.target.value)} autoFocus />
-                      {accountsSearch && <button onClick={() => setAccountsSearch('')}><i className="fas fa-times" /></button>}
-                    </div>
-                    {accountsSearch.trim() && CLIENTS
-                      .filter(c => !(c.approvedEmployeeIds || []).includes(selectedEmp.id) && c.name.toLowerCase().includes(accountsSearch.toLowerCase()))
-                      .sort((a,b) => a.name.localeCompare(b.name))
-                      .map(client => (
-                        <div key={client.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
-                          onClick={async () => {
-                            const next = [...(client.approvedEmployeeIds || []), selectedEmp.id];
-                            await db.collection('clients').doc(client.id).update({ approvedEmployeeIds: next });
-                            setAccountsSearch('');
-                          }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: client.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <i className={`fas ${client.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 12, color: client.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 14 }}>{client.name}</div>
-                              <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{client.type}</div>
+                  )}
+
+                  {primaryAssignments.map(pa => {
+                    const DAY_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                    const twColors = { morning: '#fff3e0', afternoon: '#e3f2fd', evening: '#f3e5f5', any: '#e8f5e9' };
+                    const twText = { morning: '#e65100', afternoon: '#1565c0', evening: '#6a1b9a', any: '#2e7d32' };
+                    return (
+                      <div key={pa.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <i className="fas fa-star" style={{ fontSize: 12, color: '#2e7d32' }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{pa.clientName}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                              {(pa.days || []).map(d => (
+                                <span key={d} style={{ fontSize: 11, background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>{DAY_SHORT[d]}</span>
+                              ))}
+                              {pa.timeWindow && (
+                                <span style={{ fontSize: 11, background: twColors[pa.timeWindow] || '#f5f5f5', color: twText[pa.timeWindow] || 'var(--text)', borderRadius: 4, padding: '1px 6px', fontWeight: 600, textTransform: 'capitalize' }}>{pa.timeWindow}</span>
+                              )}
                             </div>
                           </div>
-                          <i className="fas fa-plus" style={{ color: 'var(--primary)', fontSize: 13 }} />
                         </div>
-                      ))
-                    }
+                        {canEdit && (
+                          <button className="chat-icon-btn" style={{ color: 'var(--danger)', flexShrink: 0 }}
+                            onClick={async () => { await db.collection('primary_assignments').doc(pa.id).delete(); }}>
+                            <i className="fas fa-times" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Add primary assignment form */}
+                  {showAddPrimary && canEdit && (
+                    <div style={{ marginTop: 12, padding: '14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                      <div className="form-group">
+                        <label className="form-label">Account</label>
+                        <div className="search-bar" style={{ marginBottom: primaryClientPick ? 6 : 0 }}>
+                          <i className="fas fa-search" />
+                          <input placeholder="Search accounts..." value={primarySearch} onChange={e => { setPrimarySearch(e.target.value); setPrimaryClientPick(null); }} />
+                          {primarySearch && <button onClick={() => { setPrimarySearch(''); setPrimaryClientPick(null); }}><i className="fas fa-times" /></button>}
+                        </div>
+                        {primaryClientPick && <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600, padding: '4px 0' }}><i className="fas fa-check-circle" style={{ marginRight: 4 }} />{primaryClientPick.name}</div>}
+                        {primarySearch.trim() && !primaryClientPick && (
+                          <div style={{ border: '1px solid var(--border)', borderRadius: 8, maxHeight: 140, overflowY: 'auto', background: 'white' }}>
+                            {CLIENTS.filter(c => c.status !== 'inactive' && c.name.toLowerCase().includes(primarySearch.toLowerCase())).slice(0, 8).map(c => (
+                              <div key={c.id} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: 14 }}
+                                onClick={() => { setPrimaryClientPick(c); setPrimarySearch(c.name); }}>
+                                {c.name} <span style={{ fontSize: 12, color: 'var(--text-light)' }}>{c.type}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Days</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => (
+                            <button key={i} type="button"
+                              style={{ padding: '4px 10px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                                background: primaryPickDays.has(i) ? 'var(--primary)' : 'transparent',
+                                color: primaryPickDays.has(i) ? 'white' : 'var(--text)',
+                                border: `1.5px solid ${primaryPickDays.has(i) ? 'var(--primary)' : 'var(--border)'}` }}
+                              onClick={() => {
+                                const next = new Set(primaryPickDays);
+                                if (next.has(i)) next.delete(i); else next.add(i);
+                                setPrimaryPickDays(next);
+                              }}>{d}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Time Window</label>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {['morning','afternoon','evening','any'].map(tw => (
+                            <button key={tw} type="button"
+                              style={{ padding: '4px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize',
+                                background: primaryTimeWindow === tw ? 'var(--primary)' : 'transparent',
+                                color: primaryTimeWindow === tw ? 'white' : 'var(--text)',
+                                border: `1.5px solid ${primaryTimeWindow === tw ? 'var(--primary)' : 'var(--border)'}` }}
+                              onClick={() => setPrimaryTimeWindow(tw)}>{tw}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                        <button className="topbar-btn" onClick={() => { setShowAddPrimary(false); setPrimarySearch(''); setPrimaryClientPick(null); setPrimaryPickDays(new Set()); }}>Cancel</button>
+                        <button className="topbar-btn primary" disabled={!primaryClientPick || savingPrimary}
+                          onClick={async () => {
+                            if (!primaryClientPick) return;
+                            setSavingPrimary(true);
+                            try {
+                              await db.collection('primary_assignments').add({
+                                employeeId: selectedEmp.id,
+                                clientId: primaryClientPick.id,
+                                clientName: primaryClientPick.name,
+                                days: [...primaryPickDays].sort(),
+                                timeWindow: primaryTimeWindow,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                              });
+                              setShowAddPrimary(false);
+                              setPrimarySearch('');
+                              setPrimaryClientPick(null);
+                              setPrimaryPickDays(new Set());
+                              setPrimaryTimeWindow('morning');
+                            } catch(e) { alert('Error: ' + e.message); }
+                            setSavingPrimary(false);
+                          }}>
+                          {savingPrimary ? <><i className="fas fa-spinner fa-spin" style={{marginRight:6}}/> Saving...</> : <><i className="fas fa-check" style={{marginRight:4}} /> Save</>}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ borderTop: '2px solid var(--border)', marginBottom: 20 }} />
+
+                {/* ── Qualified Accounts ── */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>Qualified Accounts</div>
+                    {canEdit && !accountsEditMode && <button className="chat-icon-btn" onClick={() => { setAccountsEditMode(true); setAccountsSearch(''); }} style={{ fontSize: 14 }}><i className="fas fa-pen" /></button>}
+                    {canEdit && accountsEditMode && <button className="topbar-btn" onClick={() => { setAccountsEditMode(false); setAccountsSearch(''); }}>Done</button>}
                   </div>
-                )}
+                  <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 10 }}>Accounts this employee is approved to sub for</div>
+
+                  {CLIENTS.filter(c => (c.approvedEmployeeIds || []).includes(selectedEmp.id)).length === 0 && !accountsEditMode && (
+                    <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-light)' }}>
+                      <i className="fas fa-building" style={{ fontSize: 24, opacity: 0.2, display: 'block', marginBottom: 8 }} />
+                      Not approved for any accounts yet
+                    </div>
+                  )}
+                  {CLIENTS.filter(c => (c.approvedEmployeeIds || []).includes(selectedEmp.id)).sort((a,b) => a.name.localeCompare(b.name)).map(client => (
+                    <div key={client.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: client.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <i className={`fas ${client.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 12, color: client.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{client.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{client.type}</div>
+                        </div>
+                      </div>
+                      {accountsEditMode && (
+                        <button className="chat-icon-btn" style={{ color: 'var(--danger)' }}
+                          onClick={async () => {
+                            const next = (client.approvedEmployeeIds || []).filter(id => id !== selectedEmp.id);
+                            await db.collection('clients').doc(client.id).update({ approvedEmployeeIds: next });
+                          }}>
+                          <i className="fas fa-times" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {/* Search to add */}
+                  {accountsEditMode && (
+                    <div style={{ marginTop: 16 }}>
+                      <div className="search-bar" style={{ marginBottom: 8 }}>
+                        <i className="fas fa-search" />
+                        <input placeholder="Search accounts to add..." value={accountsSearch} onChange={e => setAccountsSearch(e.target.value)} autoFocus />
+                        {accountsSearch && <button onClick={() => setAccountsSearch('')}><i className="fas fa-times" /></button>}
+                      </div>
+                      {accountsSearch.trim() && CLIENTS
+                        .filter(c => !(c.approvedEmployeeIds || []).includes(selectedEmp.id) && c.name.toLowerCase().includes(accountsSearch.toLowerCase()))
+                        .sort((a,b) => a.name.localeCompare(b.name))
+                        .map(client => (
+                          <div key={client.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
+                            onClick={async () => {
+                              const next = [...(client.approvedEmployeeIds || []), selectedEmp.id];
+                              await db.collection('clients').doc(client.id).update({ approvedEmployeeIds: next });
+                              setAccountsSearch('');
+                            }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: client.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <i className={`fas ${client.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 12, color: client.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: 14 }}>{client.name}</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{client.type}</div>
+                              </div>
+                            </div>
+                            <i className="fas fa-plus" style={{ color: 'var(--primary)', fontSize: 13 }} />
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {profileTab === 'schedule' && <p style={{ color: 'var(--text-light)', padding: 20, textAlign: 'center' }}>View this employee's schedule in the Schedule tab.</p>}
@@ -5398,7 +6173,7 @@ function EmployeeProfiles({ role, perm }) {
                   <div>
                     <div style={{ marginBottom: 16 }}>
                       <label className="form-label">Permission Level</label>
-                      <select className="form-input" value={editData.permission || 'viewer'} onChange={e => handleEditField('permission', e.target.value)}
+                      <select className="form-input" value={editData.permission || 'viewer'} onChange={e => { handleEditField('permission', e.target.value); if (e.target.value === 'viewer') handleEditField('schedulableAccounts', []); }}
                         style={{ maxWidth: 280 }}>
                         <option value="viewer">Schedule Viewer</option>
                         <option value="scheduler">Scheduler</option>
@@ -5432,6 +6207,52 @@ function EmployeeProfiles({ role, perm }) {
                     );
                   })}
                 </div>
+
+                {/* ── Scheduling Access (schedulableAccounts) ── */}
+                {['scheduler','editor','admin'].includes(editMode ? (editData.permission || selectedEmp.permission) : (selectedEmp.permission || 'viewer')) && (
+                  <div style={{ marginTop: 24 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Scheduling Access</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 12 }}>Accounts this employee can schedule</div>
+                    {!editMode ? (
+                      <div>
+                        {(selectedEmp.schedulableAccounts || []).length === 0 ? (
+                          <div style={{ color: 'var(--text-light)', fontSize: 14 }}>No scheduling access assigned</div>
+                        ) : (
+                          CLIENTS.filter(c => (selectedEmp.schedulableAccounts || []).includes(c.id)).sort((a,b) => a.name.localeCompare(b.name)).map(c => (
+                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                              <div style={{ width: 28, height: 28, borderRadius: '50%', background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 11, color: c.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+                              </div>
+                              <div style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {CLIENTS.filter(c => c.status !== 'inactive').sort((a,b) => a.name.localeCompare(b.name)).map(c => {
+                          const checked = (editData.schedulableAccounts || []).includes(c.id);
+                          return (
+                            <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: checked ? 'var(--primary-light)' : 'transparent', border: `1.5px solid ${checked ? 'var(--primary)' : 'var(--border)'}` }}>
+                              <input type="checkbox" checked={checked} style={{ width: 16, height: 16, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                onChange={() => {
+                                  const cur = editData.schedulableAccounts || [];
+                                  const next = checked ? cur.filter(id => id !== c.id) : [...cur, c.id];
+                                  handleEditField('schedulableAccounts', next);
+                                }} />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                                <div style={{ width: 26, height: 26, borderRadius: '50%', background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 10, color: c.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+                                </div>
+                                <span style={{ fontSize: 14 }}>{c.name}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -9268,7 +10089,7 @@ function App() {
               const batch = db.batch();
               chunk.forEach(seed => {
                 const ref = db.collection('clients').doc();
-                batch.set(ref, { name: seed.name, address: seed.address, type: seed.type, contact: '', phone: '', email: '', frequency: 'Weekly', rate: 0, budgetedHours: 0, notes: '', status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                batch.set(ref, { name: seed.name, address: seed.address, type: seed.type, contact: '', phone: '', email: '', frequency: 'Weekly', rate: 0, budgetedHours: 0, budgetedWorkers: 0, notes: '', status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
               });
               await batch.commit();
             }
