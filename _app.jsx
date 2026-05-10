@@ -4869,16 +4869,13 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
         {/* Row 2: nav + date label — left; filter + actions — right */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          {/* Left: back / today / forward + date */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
+          {/* Left: back / today / forward */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button className="topbar-btn" onClick={myNavPrev}><i className="fas fa-chevron-left" /></button>
             <button className="topbar-btn" onClick={goToToday} style={{ fontWeight: 600, color: isCurrentWeek ? 'var(--primary)' : undefined }}>
               Today
             </button>
             <button className="topbar-btn" onClick={myNavNext}><i className="fas fa-chevron-right" /></button>
-            <span style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, marginLeft: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {calView === 'day' ? getDayLabel() : calView === 'week' ? getWeekLabel() : getMonthLabel()}
-            </span>
           </div>
 
           {/* Right: filter + actions (+ group-by + labor on desktop) */}
@@ -4994,10 +4991,15 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
         </div>
       </div>
 
+      {/* ── Date label ── */}
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: isMobile ? 14 : 16, marginBottom: 12, color: 'var(--text)' }}>
+        {calView === 'day' ? getDayLabel() : calView === 'week' ? getWeekLabel() : getMonthLabel()}
+      </div>
+
       {/* ── Calendar Body ── */}
       {calView === 'day' && <DayTabs />}
       {calView === 'day' && renderDayView()}
-      {calView === 'week' && renderWeekView()}
+      {calView === 'week' && <div className="schedule-grid-scroll">{renderWeekView()}</div>}
       {calView === 'month' && renderMonthView()}
       {editShiftSheet}
 
