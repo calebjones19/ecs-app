@@ -2605,7 +2605,7 @@ function Chat({ role, authedUser, perm, channels, setChannels, activeChannel, se
 }
 
 // ─── Schedule ──────────────────────────────────────────────────
-const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '' };
+const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', date: '', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '' };
 
 function Schedule({ role, perm, authedUser, adminMode = false }) {
   const canSchedule = perm?.canSchedule || role === 'admin';
@@ -2619,6 +2619,8 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [scheduleData, setScheduleData] = useState(SCHEDULE_DATA);
   const ns = (patch) => setNewShift(s => ({...s, ...patch}));
   const [selectedMonthDay, setSelectedMonthDay] = useState(null);
+  const [editingShift, setEditingShift] = useState(null); // shift being edited
+  const [savingShift, setSavingShift] = useState(false);
 
   // ── Live-sync shifts from Firestore (with inline Mon→Sun migration) ──
   useEffect(() => {
@@ -2863,10 +2865,21 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   };
 
   // Open add-shift modal pre-populated with context from the clicked cell
+  const toDateStr = (d) => {
+    if (!d) return '';
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+  };
   const openAddShift = (opts = {}) => {
+    let dateVal = '';
+    if (opts.day != null) {
+      dateVal = toDateStr(weekDays[opts.day]?.date);
+    } else {
+      dateVal = toDateStr(weekDays[selectedDay]?.date) || toDateStr(new Date());
+    }
     setNewShift({ ...EMPTY_SHIFT,
       employees: opts.employee ? [opts.employee] : [],
-      day: opts.day != null ? opts.day : selectedDay,
+      date: dateVal,
       startTime: opts.startTime || '08:00',
       endTime: opts.endTime || '12:00',
       client: opts.client || '',
@@ -2882,7 +2895,10 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       if (h === 0) return '12a'; if (h < 12) return `${h}a`; if (h === 12) return '12p'; return `${h-12}p`;
     };
     const clientShort = newShift.client;
-    const days = newShift.scheduleType === 'specific' ? [parseInt(newShift.day)] : newShift.flexDays;
+    const derivedDay = newShift.scheduleType === 'specific' && newShift.date
+      ? new Date(newShift.date + 'T12:00').getDay()
+      : (newShift.day || 0);
+    const days = newShift.scheduleType === 'specific' ? [derivedDay] : newShift.flexDays;
     const timeLabel = newShift.scheduleType === 'specific'
       ? `${fmtTime(newShift.startTime)}-${fmtTime(newShift.endTime)}`
       : newShift.windowType === 'anytime' ? 'Flexible'
@@ -2905,6 +2921,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           scheduledByName: authedUser?.name || 'Manager',
           client: clientShort,
           day: dayIdx,
+          date: newShift.scheduleType === 'specific' ? (newShift.date || null) : null,
           time: timeLabel,
           type: shiftType,
           scheduleType: newShift.scheduleType,
@@ -2930,6 +2947,85 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       console.error('Failed to save shifts:', err);
     }
     closeAddShift();
+  };
+
+  // ── Parse formatted time string back to HH:MM inputs ──
+  const parseTimeStr = (timeStr) => {
+    if (!timeStr) return { start: '08:00', end: '12:00' };
+    const parseHalf = (s) => {
+      if (!s) return '08:00';
+      s = s.trim();
+      const isAm = s.endsWith('a');
+      const isPm = s.endsWith('p');
+      const h = parseInt(s);
+      if (isNaN(h)) return '08:00';
+      if (isAm) return h === 12 ? '00:00' : `${h.toString().padStart(2,'0')}:00`;
+      if (isPm) return h === 12 ? '12:00' : `${(h + 12).toString().padStart(2,'0')}:00`;
+      return `${h.toString().padStart(2,'0')}:00`;
+    };
+    const parts = timeStr.split('-');
+    return { start: parseHalf(parts[0]), end: parseHalf(parts[1]) };
+  };
+
+  // ── Open edit sheet for an existing shift ──
+  const openEditShift = (shift) => {
+    const parsed = parseTimeStr(shift.time);
+    // Derive actual date: use stored date, or find matching weekday in current view
+    let dateVal = shift.date || '';
+    if (!dateVal && shift.day != null && weekDays[shift.day]) {
+      const d = weekDays[shift.day].date;
+      const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+      dateVal = `${y}-${m}-${dd}`;
+    }
+    setEditingShift({
+      ...shift,
+      date: dateVal,
+      startTime: shift.startTime || parsed.start,
+      endTime: shift.endTime || parsed.end,
+      notes: shift.notes || '',
+    });
+  };
+
+  // ── Save edits to a shift ──
+  const handleSaveShift = async () => {
+    if (!editingShift) return;
+    setSavingShift(true);
+    const fmtT = (t) => {
+      const [h] = t.split(':').map(Number);
+      if (h === 0) return '12a'; if (h < 12) return `${h}a`; if (h === 12) return '12p'; return `${h - 12}p`;
+    };
+    const timeLabel = `${fmtT(editingShift.startTime)}-${fmtT(editingShift.endTime)}`;
+    const refH = parseInt(editingShift.startTime);
+    const shiftType = refH < 12 ? 'morning' : refH < 17 ? 'afternoon' : 'evening';
+    const derivedDay = editingShift.date
+      ? new Date(editingShift.date + 'T12:00').getDay()
+      : (editingShift.day || 0);
+    try {
+      await db.collection('scheduled_shifts').doc(editingShift.id).update({
+        client: editingShift.client,
+        day: derivedDay,
+        date: editingShift.date || null,
+        time: timeLabel,
+        type: shiftType,
+        startTime: editingShift.startTime,
+        endTime: editingShift.endTime,
+        notes: editingShift.notes || '',
+        dayVersion: 2,
+      });
+    } catch(e) { console.error(e); }
+    setSavingShift(false);
+    setEditingShift(null);
+  };
+
+  // ── Delete a shift ──
+  const handleDeleteShift = async () => {
+    if (!editingShift) return;
+    setSavingShift(true);
+    try {
+      await db.collection('scheduled_shifts').doc(editingShift.id).delete();
+    } catch(e) { console.error(e); }
+    setSavingShift(false);
+    setEditingShift(null);
   };
 
   // ── Respond to a shift (employee accept/decline) ──
@@ -3267,7 +3363,8 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           );
         })()}
         {allShifts.map((s, i) => (
-          <div className="card" key={i} style={{ padding: '14px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="card" key={i} style={{ padding: '14px 16px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 14, cursor: canCreate ? 'pointer' : 'default' }}
+            onClick={() => canCreate && openEditShift(s)}>
             <div className="avatar" style={{ background: s.emp.color }}>{s.emp.avatar}</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{s.emp.name}</div>
@@ -3280,6 +3377,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
             <div className={`schedule-shift ${s.type}`} style={{ margin: 0, minWidth: 80 }}>
               <div className="shift-time">{s.time}</div>
             </div>
+            {canCreate && <i className="fas fa-pen" style={{ fontSize: 12, color: 'var(--text-light)' }} />}
             {!canCreate && (
               <button className="chat-icon-btn" title="Request swap"><i className="fas fa-exchange-alt" /></button>
             )}
@@ -3332,7 +3430,9 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                   <div className="schedule-cell" key={day}
                     onClick={(e) => { if (canSchedule && e.target === e.currentTarget) openAddShift({ day, client: clientName }); }}>
                     {dayShifts.map((s, i) => (
-                      <div className={`schedule-shift ${s.type}`} key={i} title={s.empName}>
+                      <div className={`schedule-shift ${s.type}`} key={i} title={s.empName}
+                        onClick={(e) => { e.stopPropagation(); canSchedule && openEditShift(s); }}
+                        style={{ cursor: canSchedule ? 'pointer' : 'default' }}>
                         <div className="shift-time">{s.time}</div>
                         <div className="shift-client">{s.empName.split(' ')[0]}</div>
                       </div>
@@ -3377,7 +3477,9 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                 <div className="schedule-cell" key={day}
                   onClick={(e) => { if (canSchedule && e.target === e.currentTarget) openAddShift({ day, employee: String(emp.id) }); }}>
                   {shifts.map((s, i) => (
-                    <div className={`schedule-shift ${s.type}`} key={i}>
+                    <div className={`schedule-shift ${s.type}`} key={i}
+                      onClick={(e) => { e.stopPropagation(); canSchedule && openEditShift(s); }}
+                      style={{ cursor: canSchedule ? 'pointer' : 'default' }}>
                       <div className="shift-time">{s.time}</div>
                       <div className="shift-client">{s.client}</div>
                       {!canSchedule && <span className="swap-icon" title="Request swap"><i className="fas fa-exchange-alt" /></span>}
@@ -3477,6 +3579,88 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     </div>
   );
 
+  // ── Edit Shift bottom sheet ──
+  const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const editShiftSheet = editingShift ? (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 500 }}
+      onClick={() => setEditingShift(null)}>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px 36px', zIndex: 501, maxHeight: '85vh', overflowY: 'auto' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ width: 36, height: 4, background: '#ddd', borderRadius: 2, margin: '0 auto 16px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ fontWeight: 800, fontSize: 17 }}>Edit Shift</div>
+          <button className="topbar-btn" style={{ color: 'var(--danger)', borderColor: 'var(--danger)', fontSize: 13 }}
+            onClick={handleDeleteShift} disabled={savingShift}>
+            <i className="fas fa-trash" style={{ marginRight: 5 }} />Delete
+          </button>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Employee</label>
+          <select className="form-input"
+            value={editingShift.employeeId}
+            onChange={e => {
+              const emp = EMPLOYEES.find(em => em.id === e.target.value);
+              setEditingShift(s => ({ ...s, employeeId: e.target.value, employeeName: emp?.name || '' }));
+            }}>
+            {EMPLOYEES.filter(e => e.status === 'active').sort((a,b) => a.name.localeCompare(b.name)).map(e => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Client / Location</label>
+          <select className="form-input"
+            value={editingShift.client}
+            onChange={e => setEditingShift(s => ({ ...s, client: e.target.value }))}>
+            {[...CLIENTS].filter(c => c.status === 'active').sort((a,b) => a.name.localeCompare(b.name)).map(c => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Date</label>
+          <input type="date" className="form-input"
+            value={editingShift.date || ''}
+            onChange={e => setEditingShift(s => ({ ...s, date: e.target.value }))} />
+          {editingShift.date && (() => {
+            const d = new Date(editingShift.date + 'T12:00');
+            return <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 4 }}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()]}</div>;
+          })()}
+        </div>
+
+        <div className="grid-2">
+          <div className="form-group">
+            <label className="form-label">Start Time</label>
+            <input type="time" className="form-input" value={editingShift.startTime}
+              onChange={e => setEditingShift(s => ({ ...s, startTime: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">End Time</label>
+            <input type="time" className="form-input" value={editingShift.endTime}
+              onChange={e => setEditingShift(s => ({ ...s, endTime: e.target.value }))} />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Notes <span style={{ color: 'var(--text-light)', fontWeight: 400 }}>(optional)</span></label>
+          <textarea className="form-input" rows={2} placeholder="Instructions for this shift..."
+            value={editingShift.notes}
+            onChange={e => setEditingShift(s => ({ ...s, notes: e.target.value }))} />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button className="topbar-btn" style={{ flex: 1 }} onClick={() => setEditingShift(null)}>Cancel</button>
+          <button className="topbar-btn primary" style={{ flex: 1 }} onClick={handleSaveShift} disabled={savingShift}>
+            {savingShift ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-check" style={{ marginRight: 5 }} />Save</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // ── Add Shift full-page view ──
   if (showAddShift) {
     return (
@@ -3568,10 +3752,12 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           {/* Specific Time */}
           {newShift.scheduleType==='specific' && (<>
             <div className="form-group">
-              <label className="form-label">Day</label>
-              <select className="form-input" value={newShift.day} onChange={e=>ns({day:parseInt(e.target.value)})}>
-                {weekDays.map((d,i)=><option key={i} value={i}>{d.label}</option>)}
-              </select>
+              <label className="form-label">Date</label>
+              <input type="date" className="form-input" value={newShift.date || ''} onChange={e=>ns({date:e.target.value})} />
+              {newShift.date && (() => {
+                const d = new Date(newShift.date + 'T12:00');
+                return <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 4 }}>{['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()]}</div>;
+              })()}
             </div>
             <div className="grid-2">
               <div className="form-group"><label className="form-label">Start Time</label><input type="time" className="form-input" value={newShift.startTime} onChange={e=>ns({startTime:e.target.value})} /></div>
@@ -3741,32 +3927,30 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         {/* Left: navigation */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-          <button className="topbar-btn" onClick={() => setWeekOffset(w => w - 1)}><i className="fas fa-chevron-left" /></button>
+          <button className="topbar-btn" onClick={myNavPrev}><i className="fas fa-chevron-left" /></button>
           <button className="topbar-btn" onClick={goToToday} style={{ fontWeight: 600, color: isCurrentWeek ? 'var(--primary)' : undefined }}>
             Today
           </button>
-          <button className="topbar-btn" onClick={() => setWeekOffset(w => w + 1)}><i className="fas fa-chevron-right" /></button>
+          <button className="topbar-btn" onClick={myNavNext}><i className="fas fa-chevron-right" /></button>
           <span style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, marginLeft: 4 }}>
             {calView === 'day' ? getDayLabel() : calView === 'week' ? getWeekLabel() : getMonthLabel()}
           </span>
         </div>
 
-        {/* Right: controls — simplified on mobile */}
+        {/* Right: controls */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* View mode toggle — desktop only */}
-          {!isMobile && (
-            <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
-              {['day', 'week', 'month'].map(v => (
-                <button key={v} onClick={() => setCalView(v)} style={{
-                  padding: '6px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: calView === v ? 700 : 400,
-                  background: calView === v ? 'var(--primary)' : 'transparent', color: calView === v ? 'white' : 'var(--text)',
-                  transition: 'all 0.15s',
-                }}>
-                  {v.charAt(0).toUpperCase() + v.slice(1)}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* View mode toggle — day/week on mobile, day/week/month on desktop */}
+          <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            {(isMobile ? ['day', 'week'] : ['day', 'week', 'month']).map(v => (
+              <button key={v} onClick={() => setCalView(v)} style={{
+                padding: '6px 12px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: calView === v ? 700 : 400,
+                background: calView === v ? 'var(--primary)' : 'transparent', color: calView === v ? 'white' : 'var(--text)',
+                transition: 'all 0.15s',
+              }}>
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+          </div>
 
           {/* Group by toggle — desktop only */}
           {!isMobile && (
@@ -3806,8 +3990,9 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       {/* ── Calendar Body ── */}
       {calView === 'day' && <DayTabs />}
       {calView === 'day' && renderDayView()}
-      {calView === 'week' && !isMobile && renderWeekView()}
+      {calView === 'week' && renderWeekView()}
       {calView === 'month' && !isMobile && renderMonthView()}
+      {editShiftSheet}
 
 
     </div>
@@ -5332,6 +5517,9 @@ function Checklists({ role, perm, authedUser }) {
   const [showAddChecklist, setShowAddChecklist] = useState(false);
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [savingChecklist, setSavingChecklist] = useState(false);
+  const [showNewChecklistPicker, setShowNewChecklistPicker] = useState(false); // 'choice'|'new'|'template'
+  const [checklistTemplates, setChecklistTemplates] = useState([]);
+  const [savingAsTemplate, setSavingAsTemplate] = useState(false);
 
   // ── Firestore listeners — tasks & completions (global, always on) ──
   useEffect(() => {
@@ -5345,7 +5533,10 @@ function Checklists({ role, perm, authedUser }) {
       .onSnapshot(snap => {
         setCompletions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }, () => {});
-    return () => { unsubTasks(); unsubComp(); };
+    const unsubTemplates = db.collection('checklistTemplates')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snap => setChecklistTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+    return () => { unsubTasks(); unsubComp(); unsubTemplates(); };
   }, []);
 
   // ── Firestore listeners — per-client submissions & audits ──
@@ -5361,8 +5552,11 @@ function Checklists({ role, perm, authedUser }) {
     const unsubChecklists = db.collection('checklists')
       .where('clientId', '==', selectedClient.id)
       .where('active', '==', true)
-      .orderBy('sortOrder', 'asc')
-      .onSnapshot(snap => setChecklists(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
+      .onSnapshot(snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        setChecklists(docs);
+      }, () => {});
     const unsubSubs = db.collection('checklistSubmissions')
       .where('clientId', '==', selectedClient.id)
       .orderBy('submittedAt', 'desc')
@@ -5516,7 +5710,7 @@ function Checklists({ role, perm, authedUser }) {
       createdBy: authedUser?.id || '',
     });
     setNewChecklistTitle('');
-    setShowAddChecklist(false);
+    setShowNewChecklistPicker(false);
     setSavingChecklist(false);
   };
 
@@ -5524,6 +5718,63 @@ function Checklists({ role, perm, authedUser }) {
   const handleDeleteChecklist = async (checklistId) => {
     await db.collection('checklists').doc(checklistId).update({ active: false });
     if (selectedChecklist?.id === checklistId) setSelectedChecklist(null);
+  };
+
+  // ── Create checklist from template ──
+  const handleCreateFromTemplate = async (template) => {
+    if (!selectedClient) return;
+    setSavingChecklist(true);
+    const clRef = db.collection('checklists').doc();
+    const batch = db.batch();
+    batch.set(clRef, {
+      clientId: selectedClient.id,
+      clientName: selectedClient.name,
+      title: template.title,
+      sortOrder: checklists.length,
+      active: true,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: authedUser?.id || '',
+    });
+    (template.tasks || []).forEach((t, i) => {
+      const tRef = db.collection('checklist_tasks').doc();
+      batch.set(tRef, {
+        clientId: selectedClient.id,
+        clientName: selectedClient.name,
+        checklistId: clRef.id,
+        checklistTitle: template.title,
+        text: t.text,
+        notes: t.notes || '',
+        subtasks: t.subtasks || [],
+        sortOrder: i,
+        active: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: authedUser?.id || '',
+      });
+    });
+    await batch.commit();
+    setShowNewChecklistPicker(false);
+    setNewChecklistTitle('');
+    setSavingChecklist(false);
+  };
+
+  // ── Save current checklist as a template ──
+  const handleSaveAsTemplate = async () => {
+    if (!selectedChecklist) return;
+    setSavingAsTemplate(true);
+    const clTasks = tasksByChecklist[selectedChecklist.id] || [];
+    await db.collection('checklistTemplates').add({
+      title: selectedChecklist.title,
+      tasks: clTasks.map(t => ({
+        text: t.text,
+        notes: t.notes || '',
+        subtasks: t.subtasks || [],
+      })),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: authedUser?.id || '',
+      createdByName: authedUser?.name || '',
+    });
+    setSavingAsTemplate(false);
+    alert(`"${selectedChecklist.title}" saved as a template!`);
   };
 
   // ── Reset completions for a specific checklist ──
@@ -5927,35 +6178,114 @@ function Checklists({ role, perm, authedUser }) {
             {/* ── CHECKLIST LIST (no checklist selected) ── */}
             {!selectedChecklist ? (
               <div>
-                {/* Add checklist form */}
-                {canEdit && showAddChecklist && (
-                  <div className="cl-add-task-form" style={{ marginBottom: 14 }}>
-                    <label className="form-label">Checklist Name</label>
-                    <input className="form-input" autoFocus placeholder="e.g. Morning Walkthrough"
-                      value={newChecklistTitle} onChange={e => setNewChecklistTitle(e.target.value)}
-                      style={{ marginBottom: 10 }} />
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="topbar-btn" onClick={() => { setShowAddChecklist(false); setNewChecklistTitle(''); }}>Cancel</button>
-                      <button className="topbar-btn primary" onClick={handleAddChecklist}
-                        disabled={!newChecklistTitle.trim() || savingChecklist}>
-                        {savingChecklist ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-check" /> Save</>}
-                      </button>
+                {/* New checklist picker sheet */}
+                {canEdit && showNewChecklistPicker && (
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 400 }}
+                    onClick={() => { setShowNewChecklistPicker(false); setNewChecklistTitle(''); }}>
+                    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px 36px', zIndex: 401 }}
+                      onClick={e => e.stopPropagation()}>
+                      <div style={{ width: 36, height: 4, background: '#ddd', borderRadius: 2, margin: '0 auto 16px' }} />
+
+                      {/* Choice screen */}
+                      {showNewChecklistPicker === 'choice' && (
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 4 }}>New Checklist</div>
+                          <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 20 }}>Start fresh or use a saved template</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <button style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: 'white', border: '1.5px solid var(--border)', borderRadius: 14, cursor: 'pointer', textAlign: 'left' }}
+                              onClick={() => setShowNewChecklistPicker('new')}>
+                              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <i className="fas fa-plus" style={{ color: 'var(--primary)', fontSize: 18 }} />
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>Create New</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>Start with a blank checklist</div>
+                              </div>
+                            </button>
+                            <button style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: 'white', border: '1.5px solid var(--border)', borderRadius: 14, cursor: 'pointer', textAlign: 'left' }}
+                              onClick={() => setShowNewChecklistPicker('template')}>
+                              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fff8e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <i className="fas fa-layer-group" style={{ color: '#f59e0b', fontSize: 18 }} />
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>From Template</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>{checklistTemplates.length} template{checklistTemplates.length !== 1 ? 's' : ''} saved</div>
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Create new screen */}
+                      {showNewChecklistPicker === 'new' && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                            <button className="chat-icon-btn" onClick={() => setShowNewChecklistPicker('choice')}><i className="fas fa-arrow-left" /></button>
+                            <div style={{ fontWeight: 800, fontSize: 17 }}>Create New</div>
+                          </div>
+                          <label className="form-label">Checklist Name</label>
+                          <input className="form-input" autoFocus placeholder="e.g. Morning Walkthrough"
+                            value={newChecklistTitle} onChange={e => setNewChecklistTitle(e.target.value)}
+                            style={{ marginBottom: 14 }} />
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="topbar-btn" style={{ flex: 1 }} onClick={() => { setShowNewChecklistPicker(false); setNewChecklistTitle(''); }}>Cancel</button>
+                            <button className="topbar-btn primary" style={{ flex: 1 }} onClick={handleAddChecklist}
+                              disabled={!newChecklistTitle.trim() || savingChecklist}>
+                              {savingChecklist ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-check" /> Create</>}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* From template screen */}
+                      {showNewChecklistPicker === 'template' && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                            <button className="chat-icon-btn" onClick={() => setShowNewChecklistPicker('choice')}><i className="fas fa-arrow-left" /></button>
+                            <div style={{ fontWeight: 800, fontSize: 17 }}>From Template</div>
+                          </div>
+                          {checklistTemplates.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-light)' }}>
+                              <i className="fas fa-layer-group" style={{ fontSize: 32, opacity: 0.2, display: 'block', marginBottom: 10 }} />
+                              No templates saved yet.<br />
+                              <span style={{ fontSize: 13 }}>Open a checklist and tap "Save as Template".</span>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '50vh', overflowY: 'auto' }}>
+                              {checklistTemplates.map(tmpl => (
+                                <button key={tmpl.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: 'white', border: '1.5px solid var(--border)', borderRadius: 12, cursor: 'pointer', textAlign: 'left' }}
+                                  onClick={() => handleCreateFromTemplate(tmpl)}
+                                  disabled={savingChecklist}>
+                                  <div style={{ width: 38, height: 38, borderRadius: 10, background: '#fff8e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <i className="fas fa-clipboard-check" style={{ color: '#f59e0b', fontSize: 16 }} />
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{tmpl.title}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 2 }}>{(tmpl.tasks || []).length} task{(tmpl.tasks || []).length !== 1 ? 's' : ''} · by {tmpl.createdByName}</div>
+                                  </div>
+                                  {savingChecklist ? <i className="fas fa-spinner fa-spin" style={{ color: 'var(--primary)' }} /> : <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* Add checklist button */}
-                {canEdit && !showAddChecklist && (
+                {canEdit && !showNewChecklistPicker && (
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
                     <button className="topbar-btn primary" style={{ padding: '5px 12px', fontSize: 13 }}
-                      onClick={() => setShowAddChecklist(true)}>
+                      onClick={() => setShowNewChecklistPicker('choice')}>
                       <i className="fas fa-plus" /> New Checklist
                     </button>
                   </div>
                 )}
 
                 {/* Empty state */}
-                {checklists.length === 0 && !showAddChecklist && (
+                {checklists.length === 0 && !showNewChecklistPicker && (
                   <div className="card" style={{ textAlign: 'center', padding: 32, color: 'var(--text-light)' }}>
                     <i className="fas fa-clipboard-list" style={{ fontSize: 32, opacity: 0.2, display: 'block', marginBottom: 8 }} />
                     No checklists yet{canEdit ? ' — create one above' : ''}
@@ -6019,10 +6349,17 @@ function Checklists({ role, perm, authedUser }) {
                     )}
                   </div>
                   {canEdit && (
-                    <button className="chat-icon-btn" style={{ color: 'var(--danger)' }}
-                      onClick={() => { if (confirm(`Delete "${selectedChecklist.title}"?`)) handleDeleteChecklist(selectedChecklist.id); }}>
-                      <i className="fas fa-trash" style={{ fontSize: 14 }} />
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="topbar-btn" style={{ fontSize: 12, padding: '5px 10px' }}
+                        onClick={handleSaveAsTemplate} disabled={savingAsTemplate}
+                        title="Save as Template">
+                        {savingAsTemplate ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-layer-group" style={{ marginRight: 4 }} />Template</>}
+                      </button>
+                      <button className="chat-icon-btn" style={{ color: 'var(--danger)' }}
+                        onClick={() => { if (confirm(`Delete "${selectedChecklist.title}"?`)) handleDeleteChecklist(selectedChecklist.id); }}>
+                        <i className="fas fa-trash" style={{ fontSize: 14 }} />
+                      </button>
+                    </div>
                   )}
                 </div>
 
