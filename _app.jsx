@@ -3403,7 +3403,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   }, []);
   const isMobile = window.innerWidth <= 768;
   const [calView, setCalView] = useState(isMobile ? 'day' : 'week'); // day, week, month
-  const [groupBy, setGroupBy] = useState('employee'); // employee, client
+  const [groupBy, setGroupBy] = useState('client'); // employee, client
   const [showLabor, setShowLabor] = useState(!isMobile);
 
   // ── Schedule filter ──
