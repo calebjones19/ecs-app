@@ -7172,10 +7172,10 @@ function Today({ role, perm, authedUser }) {
   const [tasks, setTasks] = useState({});         // keyed by clientName (lowercased)
   const [completions, setCompletions] = useState({});  // keyed by taskId
   const [toggling, setToggling] = useState({});
-  const [expanded, setExpanded] = useState({});      // keyed by shiftId, which section is open
   const [expandedTasks, setExpandedTasks] = useState({}); // keyed by taskId
   const [checklistsByClient, setChecklistsByClient] = useState({}); // keyed by clientId
   const [lastSubsByChecklist, setLastSubsByChecklist] = useState({}); // keyed by checklistId
+  const [fullScreen, setFullScreen] = useState(null); // { type: 'checklist'|'details'|'notes', shift, clientObj }
 
   // Load today's shifts for this user
   useEffect(() => {
@@ -7313,22 +7313,180 @@ function Today({ role, perm, authedUser }) {
     setToggling(t => { const n = { ...t }; delete n[syntheticId]; return n; });
   };
 
-  const toggleSection = (shiftId, section) => {
-    setExpanded(e => {
-      const key = `${shiftId}-${section}`;
-      return { ...e, [key]: !e[key] };
-    });
-  };
-  const isSectionOpen = (shiftId, section) => !!expanded[`${shiftId}-${section}`];
-
   const DOW_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const now = new Date();
   const dateLabel = `${DOW_NAMES[now.getDay()]}, ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`;
 
   const TYPE_LABELS = { morning: '🌅 Morning', afternoon: '☀️ Afternoon', evening: '🌙 Evening' };
 
+  // ── Full-screen resource view ──
+  const renderFullScreen = () => {
+    if (!fullScreen) return null;
+    const { type, shift, clientObj } = fullScreen;
+    const clientKey = (shift.client || '').toLowerCase();
+    const clientTasks = tasks[clientKey] || [];
+    const shiftChecklists = clientObj ? (checklistsByClient[clientObj.id] || []) : [];
+
+    let title = '';
+    let icon = '';
+    let iconColor = '';
+    if (type === 'checklist') { title = 'Checklists'; icon = 'fa-clipboard-check'; iconColor = 'var(--primary)'; }
+    else if (type === 'details') { title = 'Job Details'; icon = 'fa-info-circle'; iconColor = '#1976d2'; }
+    else if (type === 'notes') { title = 'Manager Notes'; icon = 'fa-sticky-note'; iconColor = '#f57f17'; }
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 600, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        {/* Header */}
+        <div style={{ position: 'sticky', top: 0, background: 'white', borderBottom: '1px solid var(--border)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, zIndex: 1, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <button onClick={() => setFullScreen(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text)', display: 'flex', alignItems: 'center' }}>
+            <i className="fas fa-arrow-left" style={{ fontSize: 18 }} />
+          </button>
+          <i className={`fas ${icon}`} style={{ color: iconColor, fontSize: 16 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{title}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{shift.client}</div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: '20px 16px 48px' }}>
+          {type === 'checklist' && (() => {
+            if (shiftChecklists.length === 0 && clientTasks.length === 0) {
+              return <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--text-light)' }}><i className="fas fa-clipboard" style={{ fontSize: 36, opacity: 0.2, display: 'block', marginBottom: 12 }} /><div>No checklists set up for this account</div></div>;
+            }
+            const listsToShow = shiftChecklists.length > 0 ? shiftChecklists : [{ id: '__legacy__', title: 'Tasks', _tasks: clientTasks }];
+            return listsToShow.map(cl => {
+              const clTasks = cl._tasks || clientTasks.filter(t => t.checklistId === cl.id);
+              const clDone = clTasks.filter(t => !!completions[t.id]).length;
+              const clTotal = clTasks.length;
+              const lastSub = cl.id !== '__legacy__' ? lastSubsByChecklist[cl.id] : null;
+              const pctCl = clTotal > 0 ? Math.round(clDone / clTotal * 100) : 0;
+              return (
+                <div key={cl.id} style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: 16, marginBottom: 16, overflow: 'hidden' }}>
+                  <div style={{ padding: '14px 16px 12px', borderBottom: clTasks.length > 0 ? '1px solid var(--border)' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: clTotal > 0 ? 10 : 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{cl.title}</div>
+                      {clTotal > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: pctCl === 100 ? 'var(--primary)' : 'var(--text-light)' }}>{clDone}/{clTotal} {pctCl === 100 && '✓'}</span>}
+                    </div>
+                    {clTotal > 0 && (
+                      <div style={{ height: 5, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pctCl}%`, background: pctCl === 100 ? 'var(--primary)' : '#66bb6a', borderRadius: 3, transition: 'width 0.3s' }} />
+                      </div>
+                    )}
+                    {lastSub && <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 6 }}>Last completed: {new Date(lastSub.submittedAt?.toDate ? lastSub.submittedAt.toDate() : lastSub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>}
+                  </div>
+                  <div style={{ padding: '8px 12px 12px' }}>
+                    {clTasks.length === 0 && <div style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-light)', textAlign: 'center' }}>No tasks</div>}
+                    {clTasks.map(task => {
+                      const done = !!completions[task.id];
+                      const subtasks = task.subtasks || [];
+                      const hasExtras = subtasks.length > 0 || !!task.notes;
+                      const isExp = !!expandedTasks[task.id];
+                      const subDone = subtasks.filter(s => !!completions[`${task.id}_sub_${s.id}`]).length;
+                      return (
+                        <div key={task.id} style={{ marginBottom: 6 }}>
+                          <div className={`cl-task-row${done ? ' done' : ''}`}
+                            style={{ marginBottom: 0, borderRadius: isExp && hasExtras ? '10px 10px 0 0' : 10, opacity: toggling[task.id] ? 0.6 : (done ? 0.7 : 1) }}>
+                            <div className="cl-task-check" onClick={() => toggleTask(task)}>
+                              {done && <i className="fas fa-check" style={{ fontSize: 11 }} />}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }} onClick={() => hasExtras && setExpandedTasks(e => ({ ...e, [task.id]: !e[task.id] }))}>
+                              <span className="cl-task-text">{task.text}</span>
+                              {!isExp && task.notes && <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.notes}</div>}
+                            </div>
+                            {hasExtras && (
+                              <div onClick={() => setExpandedTasks(e => ({ ...e, [task.id]: !e[task.id] }))} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, cursor: 'pointer' }}>
+                                {subtasks.length > 0 && !isExp && <span style={{ fontSize: 11, fontWeight: 700, color: subDone === subtasks.length ? 'var(--primary)' : 'var(--text-light)', background: 'var(--bg)', borderRadius: 8, padding: '2px 7px' }}>{subDone}/{subtasks.length}</span>}
+                                <i className={`fas fa-chevron-${isExp ? 'up' : 'down'}`} style={{ fontSize: 10, color: 'var(--text-light)' }} />
+                              </div>
+                            )}
+                          </div>
+                          {isExp && hasExtras && (
+                            <div style={{ background: '#f9fafb', border: '1.5px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '10px 12px' }}>
+                              {task.notes && <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: subtasks.length > 0 ? 10 : 0, lineHeight: 1.5, fontStyle: 'italic' }}><i className="fas fa-sticky-note" style={{ marginRight: 5, color: '#f59e0b' }} />{task.notes}</div>}
+                              {subtasks.map(sub => {
+                                const sd = !!completions[`${task.id}_sub_${sub.id}`];
+                                return (
+                                  <div key={sub.id} className={`cl-task-row${sd ? ' done' : ''}`} style={{ marginBottom: 4, padding: '8px 10px' }} onClick={() => toggleSubTask(task, sub)}>
+                                    <div className="cl-task-check" style={{ width: 18, height: 18 }}>{sd && <i className="fas fa-check" style={{ fontSize: 9 }} />}</div>
+                                    <span className="cl-task-text" style={{ fontSize: 13 }}>{sub.text}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+
+          {type === 'details' && (
+            <div style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: 16, padding: '16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {clientObj?.address && (
+                <a href={`https://maps.apple.com/?q=${encodeURIComponent(clientObj.address)}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'flex-start', gap: 12, textDecoration: 'none', color: 'inherit' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <i className="fas fa-map-marker-alt" style={{ color: '#1976d2', fontSize: 16 }} />
+                  </div>
+                  <div><div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600, marginBottom: 2 }}>Address</div><div style={{ fontSize: 14, color: '#1976d2', fontWeight: 600 }}>{clientObj.address}</div></div>
+                </a>
+              )}
+              {clientObj?.contact && (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f3e5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <i className="fas fa-user" style={{ color: '#7b1fa2', fontSize: 16 }} />
+                  </div>
+                  <div><div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600, marginBottom: 2 }}>Contact</div><div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 600 }}>{clientObj.contact}</div></div>
+                </div>
+              )}
+              {clientObj?.phone && (
+                <a href={`tel:${clientObj.phone}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, textDecoration: 'none', color: 'inherit' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <i className="fas fa-phone" style={{ color: 'var(--primary)', fontSize: 16 }} />
+                  </div>
+                  <div><div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600, marginBottom: 2 }}>Phone</div><div style={{ fontSize: 14, color: 'var(--primary)', fontWeight: 600 }}>{clientObj.phone}</div></div>
+                </a>
+              )}
+              {clientObj?.email && (
+                <a href={`mailto:${clientObj.email}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, textDecoration: 'none', color: 'inherit' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fff8e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <i className="fas fa-envelope" style={{ color: '#f57f17', fontSize: 16 }} />
+                  </div>
+                  <div><div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600, marginBottom: 2 }}>Email</div><div style={{ fontSize: 14, color: '#f57f17', fontWeight: 600 }}>{clientObj.email}</div></div>
+                </a>
+              )}
+            </div>
+          )}
+
+          {type === 'notes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {clientObj?.notes && (
+                <div style={{ background: '#fff8e1', border: '1.5px solid #ffe082', borderRadius: 16, padding: '16px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f57f17', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Account Notes</div>
+                  <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{clientObj.notes}</div>
+                </div>
+              )}
+              {shift.notes && (
+                <div style={{ background: '#f3e5f5', border: '1.5px solid #ce93d8', borderRadius: 16, padding: '16px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#7b1fa2', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>From {shift.scheduledByName || 'Manager'}</div>
+                  <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{shift.notes}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ padding: '0 0 32px' }}>
+      {/* Full-screen resource overlay */}
+      {renderFullScreen()}
+
       {/* Header */}
       <div style={{ padding: '20px 20px 8px', background: 'linear-gradient(135deg, #2a3328 0%, #4a6741 100%)', borderRadius: '0 0 20px 20px', marginBottom: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{dateLabel}</div>
@@ -7374,14 +7532,26 @@ function Today({ role, perm, authedUser }) {
           const budgeted = clientObj ? (parseFloat(clientObj.budgetedHours) || 0) : 0;
           const hasDetails = !!(clientObj?.address || clientObj?.contact || clientObj?.phone || clientObj?.email);
           const hasNotes = !!(clientObj?.notes || shift.notes);
-          const checklistOpen = isSectionOpen(shift.id, 'checklist');
-          const detailsOpen = isSectionOpen(shift.id, 'details');
-          const notesOpen = isSectionOpen(shift.id, 'notes');
+          const shiftChecklists = clientObj ? (checklistsByClient[clientObj.id] || []) : [];
+          const checklistCount = shiftChecklists.length || (totalTasks > 0 ? 1 : 0);
+
+          const ResourceRow = ({ icon, color, label, sublabel, onPress }) => (
+            <button onClick={onPress} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderTop: '1px solid var(--border)' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className={`fas ${icon}`} style={{ color, fontSize: 15 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{label}</div>
+                {sublabel && <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 1 }}>{sublabel}</div>}
+              </div>
+              <i className="fas fa-chevron-right" style={{ fontSize: 12, color: 'var(--text-light)' }} />
+            </button>
+          );
 
           return (
             <div key={shift.id} style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: 18, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               {/* Job header */}
-              <div style={{ padding: '16px 18px 14px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ padding: '16px 18px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ width: 44, height: 44, borderRadius: 12, background: clientObj?.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>
                     <i className={`fas ${clientObj?.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ color: clientObj?.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
@@ -7403,12 +7573,11 @@ function Today({ role, perm, authedUser }) {
                     </div>
                   </div>
                 </div>
-
-                {/* Progress bar if tasks exist */}
+                {/* Progress bar */}
                 {totalTasks > 0 && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)' }}>Checklist</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)' }}>Tasks</span>
                       <span style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? 'var(--primary)' : 'var(--text-light)' }}>{doneTasks}/{totalTasks} {pct === 100 && '✓'}</span>
                     </div>
                     <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
@@ -7418,238 +7587,28 @@ function Today({ role, perm, authedUser }) {
                 )}
               </div>
 
-              {/* Checklist accordion */}
-              <div style={{ borderBottom: totalTasks > 0 ? '1px solid var(--border)' : 'none' }}>
-                <button onClick={() => toggleSection(shift.id, 'checklist')} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                  <i className="fas fa-clipboard-check" style={{ color: 'var(--primary)', width: 18, textAlign: 'center' }} />
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-                    Checklist {totalTasks === 0 ? <span style={{ color: 'var(--text-light)', fontWeight: 400 }}>(no tasks)</span> : ''}
-                  </span>
-                  <i className={`fas fa-chevron-${checklistOpen ? 'up' : 'down'}`} style={{ fontSize: 11, color: 'var(--text-light)' }} />
-                </button>
-                {checklistOpen && (
-                  <div style={{ padding: '0 18px 14px' }}>
-                    {(() => {
-                      const clientObjForShift = CLIENTS.find(c => c.name.toLowerCase() === (shift.client || '').toLowerCase());
-                      const shiftChecklists = clientObjForShift ? (checklistsByClient[clientObjForShift.id] || []) : [];
-                      if (shiftChecklists.length === 0 && totalTasks === 0) {
-                        return <div style={{ padding: '12px 0', fontSize: 13, color: 'var(--text-light)', textAlign: 'center' }}>No checklists set up for this account</div>;
-                      }
-                      if (shiftChecklists.length === 0) {
-                        // Legacy flat tasks (no checklistId)
-                        return clientTasks.map(task => {
-                          const done = !!completions[task.id];
-                          const subtasks = task.subtasks || [];
-                          const hasExtras = subtasks.length > 0 || !!task.notes;
-                          const isTaskExpanded = !!expandedTasks[task.id];
-                          const subDone = subtasks.filter(s => !!completions[`${task.id}_sub_${s.id}`]).length;
-                          return (
-                            <div key={task.id} style={{ marginBottom: 6 }}>
-                              <div className={`cl-task-row${done ? ' done' : ''}`}
-                                style={{ marginBottom: 0, borderRadius: isTaskExpanded && hasExtras ? '10px 10px 0 0' : 10, opacity: toggling[task.id] ? 0.6 : (done ? 0.6 : 1) }}>
-                                <div className="cl-task-check" onClick={() => toggleTask(task)}>
-                                  {done && <i className="fas fa-check" style={{ fontSize: 11 }} />}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }} onClick={() => hasExtras && setExpandedTasks(e => ({ ...e, [task.id]: !e[task.id] }))}>
-                                  <span className="cl-task-text">{task.text}</span>
-                                  {!isTaskExpanded && task.notes && (
-                                    <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.notes}</div>
-                                  )}
-                                </div>
-                                {hasExtras && (
-                                  <div onClick={() => setExpandedTasks(e => ({ ...e, [task.id]: !e[task.id] }))} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, cursor: 'pointer' }}>
-                                    {subtasks.length > 0 && !isTaskExpanded && (
-                                      <span style={{ fontSize: 11, fontWeight: 700, color: subDone === subtasks.length ? 'var(--primary)' : 'var(--text-light)', background: 'var(--bg)', borderRadius: 8, padding: '2px 7px' }}>
-                                        {subDone}/{subtasks.length}
-                                      </span>
-                                    )}
-                                    <i className={`fas fa-chevron-${isTaskExpanded ? 'up' : 'down'}`} style={{ fontSize: 10, color: 'var(--text-light)' }} />
-                                  </div>
-                                )}
-                              </div>
-                              {isTaskExpanded && hasExtras && (
-                                <div style={{ background: '#f9fafb', border: '1.5px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '10px 12px' }}>
-                                  {task.notes && (
-                                    <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: subtasks.length > 0 ? 10 : 0, lineHeight: 1.5, fontStyle: 'italic' }}>
-                                      <i className="fas fa-sticky-note" style={{ marginRight: 5, color: '#f59e0b' }} />{task.notes}
-                                    </div>
-                                  )}
-                                  {subtasks.map(sub => {
-                                    const subDoneThis = !!completions[`${task.id}_sub_${sub.id}`];
-                                    return (
-                                      <div key={sub.id}
-                                        className={`cl-task-row${subDoneThis ? ' done' : ''}`}
-                                        style={{ marginBottom: 4, padding: '8px 10px' }}
-                                        onClick={() => toggleSubTask(task, sub)}>
-                                        <div className="cl-task-check" style={{ width: 18, height: 18 }}>
-                                          {subDoneThis && <i className="fas fa-check" style={{ fontSize: 9 }} />}
-                                        </div>
-                                        <span className="cl-task-text" style={{ fontSize: 13 }}>{sub.text}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        });
-                      }
-                      return shiftChecklists.map(cl => {
-                        const clTasks = (tasks[clientKey] || []).filter(t => t.checklistId === cl.id);
-                        const clDone = clTasks.filter(t => !!completions[t.id]).length;
-                        const clTotal = clTasks.length;
-                        const lastSub = lastSubsByChecklist[cl.id];
-                        const isClOpen = !!expandedTasks[`cl_${cl.id}`];
-                        return (
-                          <div key={cl.id} style={{ marginBottom: 8 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: isClOpen ? 'var(--primary-light)' : 'var(--bg)', borderRadius: isClOpen ? '10px 10px 0 0' : 10, border: '1.5px solid var(--border)', cursor: 'pointer' }}
-                              onClick={() => setExpandedTasks(e => ({ ...e, [`cl_${cl.id}`]: !e[`cl_${cl.id}`] }))}>
-                              <i className="fas fa-clipboard-check" style={{ color: 'var(--primary)', fontSize: 14 }} />
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{cl.title}</div>
-                                {lastSub && <div style={{ fontSize: 11, color: 'var(--text-light)' }}>Last: {new Date(lastSub.submittedAt?.toDate ? lastSub.submittedAt.toDate() : lastSub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>}
-                              </div>
-                              {clTotal > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: clDone === clTotal && clTotal > 0 ? 'var(--primary)' : 'var(--text-light)', background: 'white', borderRadius: 8, padding: '2px 7px' }}>{clDone}/{clTotal}</span>}
-                              <i className={`fas fa-chevron-${isClOpen ? 'up' : 'down'}`} style={{ fontSize: 10, color: 'var(--text-light)' }} />
-                            </div>
-                            {isClOpen && (
-                              <div style={{ border: '1.5px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '8px 10px' }}>
-                                {clTasks.length === 0 && <div style={{ padding: '8px 0', fontSize: 13, color: 'var(--text-light)', textAlign: 'center' }}>No tasks</div>}
-                                {clTasks.map(task => {
-                                  const done = !!completions[task.id];
-                                  const subtasks = task.subtasks || [];
-                                  const hasExtras = subtasks.length > 0 || !!task.notes;
-                                  const isTaskExpanded = !!expandedTasks[task.id];
-                                  const subDone = subtasks.filter(s => !!completions[`${task.id}_sub_${s.id}`]).length;
-                                  return (
-                                    <div key={task.id} style={{ marginBottom: 4 }}>
-                                      <div className={`cl-task-row${done ? ' done' : ''}`}
-                                        style={{ marginBottom: 0, borderRadius: isTaskExpanded && hasExtras ? '10px 10px 0 0' : 10, opacity: toggling[task.id] ? 0.6 : (done ? 0.6 : 1) }}>
-                                        <div className="cl-task-check" onClick={() => toggleTask(task)}>
-                                          {done && <i className="fas fa-check" style={{ fontSize: 11 }} />}
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }} onClick={() => hasExtras && setExpandedTasks(e => ({ ...e, [task.id]: !e[task.id] }))}>
-                                          <span className="cl-task-text">{task.text}</span>
-                                          {!isTaskExpanded && task.notes && <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.notes}</div>}
-                                        </div>
-                                        {hasExtras && (
-                                          <div onClick={() => setExpandedTasks(e => ({ ...e, [task.id]: !e[task.id] }))} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, cursor: 'pointer' }}>
-                                            {subtasks.length > 0 && !isTaskExpanded && <span style={{ fontSize: 11, fontWeight: 700, color: subDone === subtasks.length ? 'var(--primary)' : 'var(--text-light)', background: 'var(--bg)', borderRadius: 8, padding: '2px 7px' }}>{subDone}/{subtasks.length}</span>}
-                                            <i className={`fas fa-chevron-${isTaskExpanded ? 'up' : 'down'}`} style={{ fontSize: 10, color: 'var(--text-light)' }} />
-                                          </div>
-                                        )}
-                                      </div>
-                                      {isTaskExpanded && hasExtras && (
-                                        <div style={{ background: '#f9fafb', border: '1.5px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '8px 10px' }}>
-                                          {task.notes && <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: subtasks.length > 0 ? 8 : 0, lineHeight: 1.5, fontStyle: 'italic' }}><i className="fas fa-sticky-note" style={{ marginRight: 5, color: '#f59e0b' }} />{task.notes}</div>}
-                                          {subtasks.map(sub => {
-                                            const sd = !!completions[`${task.id}_sub_${sub.id}`];
-                                            return (
-                                              <div key={sub.id} className={`cl-task-row${sd ? ' done' : ''}`} style={{ marginBottom: 4, padding: '6px 8px' }} onClick={() => toggleSubTask(task, sub)}>
-                                                <div className="cl-task-check" style={{ width: 18, height: 18 }}>{sd && <i className="fas fa-check" style={{ fontSize: 9 }} />}</div>
-                                                <span className="cl-task-text" style={{ fontSize: 13 }}>{sub.text}</span>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                )}
-              </div>
-
-              {/* Details accordion */}
+              {/* Resource buttons */}
+              <ResourceRow
+                icon="fa-clipboard-check" color="var(--primary)"
+                label="Checklists"
+                sublabel={checklistCount > 0 ? `${checklistCount} checklist${checklistCount !== 1 ? 's' : ''}${totalTasks > 0 ? ` · ${doneTasks}/${totalTasks} done` : ''}` : 'No checklists set up'}
+                onPress={() => setFullScreen({ type: 'checklist', shift, clientObj })}
+              />
               {hasDetails && (
-                <div style={{ borderBottom: hasNotes ? '1px solid var(--border)' : 'none' }}>
-                  <button onClick={() => toggleSection(shift.id, 'details')} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                    <i className="fas fa-info-circle" style={{ color: '#1976d2', width: 18, textAlign: 'center' }} />
-                    <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Job Details</span>
-                    <i className={`fas fa-chevron-${detailsOpen ? 'up' : 'down'}`} style={{ fontSize: 11, color: 'var(--text-light)' }} />
-                  </button>
-                  {detailsOpen && (
-                    <div style={{ padding: '0 18px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {clientObj?.address && (
-                        <a href={`https://maps.apple.com/?q=${encodeURIComponent(clientObj.address)}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, textDecoration: 'none', color: 'inherit' }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <i className="fas fa-map-marker-alt" style={{ color: '#1976d2', fontSize: 13 }} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600, marginBottom: 1 }}>Address</div>
-                            <div style={{ fontSize: 13, color: '#1976d2', fontWeight: 600 }}>{clientObj.address}</div>
-                          </div>
-                        </a>
-                      )}
-                      {clientObj?.contact && (
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f3e5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <i className="fas fa-user" style={{ color: '#7b1fa2', fontSize: 13 }} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600, marginBottom: 1 }}>Contact</div>
-                            <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{clientObj.contact}</div>
-                          </div>
-                        </div>
-                      )}
-                      {clientObj?.phone && (
-                        <a href={`tel:${clientObj.phone}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, textDecoration: 'none', color: 'inherit' }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <i className="fas fa-phone" style={{ color: 'var(--primary)', fontSize: 13 }} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600, marginBottom: 1 }}>Phone</div>
-                            <div style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>{clientObj.phone}</div>
-                          </div>
-                        </a>
-                      )}
-                      {clientObj?.email && (
-                        <a href={`mailto:${clientObj.email}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, textDecoration: 'none', color: 'inherit' }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fff8e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <i className="fas fa-envelope" style={{ color: '#f57f17', fontSize: 13 }} />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600, marginBottom: 1 }}>Email</div>
-                            <div style={{ fontSize: 13, color: '#f57f17', fontWeight: 600 }}>{clientObj.email}</div>
-                          </div>
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ResourceRow
+                  icon="fa-info-circle" color="#1976d2"
+                  label="Job Details"
+                  sublabel={clientObj?.address || undefined}
+                  onPress={() => setFullScreen({ type: 'details', shift, clientObj })}
+                />
               )}
-
-              {/* Notes accordion */}
               {hasNotes && (
-                <div>
-                  <button onClick={() => toggleSection(shift.id, 'notes')} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                    <i className="fas fa-sticky-note" style={{ color: '#f57f17', width: 18, textAlign: 'center' }} />
-                    <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Manager Notes</span>
-                    <i className={`fas fa-chevron-${notesOpen ? 'up' : 'down'}`} style={{ fontSize: 11, color: 'var(--text-light)' }} />
-                  </button>
-                  {notesOpen && (
-                    <div style={{ padding: '0 18px 16px' }}>
-                      {clientObj?.notes && (
-                        <div style={{ background: '#fff8e1', borderRadius: 10, padding: '12px 14px', marginBottom: shift.notes ? 10 : 0 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#f57f17', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Account Notes</div>
-                          <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{clientObj.notes}</div>
-                        </div>
-                      )}
-                      {shift.notes && (
-                        <div style={{ background: '#f3e5f5', borderRadius: 10, padding: '12px 14px' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#7b1fa2', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>From {shift.scheduledByName || 'Manager'}</div>
-                          <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{shift.notes}</div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ResourceRow
+                  icon="fa-sticky-note" color="#f57f17"
+                  label="Manager Notes"
+                  sublabel={shift.scheduledByName ? `From ${shift.scheduledByName}` : undefined}
+                  onPress={() => setFullScreen({ type: 'notes', shift, clientObj })}
+                />
               )}
             </div>
           );
