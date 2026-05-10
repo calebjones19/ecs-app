@@ -4992,7 +4992,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       </div>
 
       {/* ── Date label ── */}
-      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: isMobile ? 14 : 16, marginTop: 8, marginBottom: 12, color: 'var(--text)' }}>
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: isMobile ? 14 : 16, marginTop: 20, marginBottom: 12, color: 'var(--text)' }}>
         {calView === 'day' ? getDayLabel() : calView === 'week' ? getWeekLabel() : getMonthLabel()}
       </div>
 
