@@ -4382,10 +4382,6 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                 const isToday = md.date.getDate() === today.getDate() && md.date.getMonth() === today.getMonth();
                 const dow = md.date.getDay();
                 const coverage = info.count;
-                // Color the dot by coverage level
-                const dotColor = coverage === 0 ? 'transparent' :
-                  coverage < 3 ? '#f59e0b' :
-                  coverage < 6 ? 'var(--primary)' : 'var(--success)';
                 return (
                   <div key={i}
                     onClick={() => { if (md.inMonth) { setSelectedDay(dow); setCalView('day'); } }}
@@ -4407,27 +4403,12 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                     </div>
                     {/* Coverage dot */}
                     <div style={{
-                      width: 6, height: 6, borderRadius: '50%', background: dotColor, marginTop: 3,
-                      boxShadow: coverage > 0 ? `0 0 0 1px ${dotColor}22` : 'none',
+                      width: 5, height: 5, borderRadius: '50%', marginTop: 3,
+                      background: coverage > 0 ? 'var(--primary)' : 'transparent',
                     }} />
-                    {coverage > 0 && (
-                      <div style={{ fontSize: 9, color: 'var(--text-light)', marginTop: 1, fontWeight: 600 }}>{coverage}</div>
-                    )}
                   </div>
                 );
               })}
-            </div>
-          </div>
-          {/* Legend */}
-          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 12, fontSize: 11, color: 'var(--text-light)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b' }} /> 1–2 shifts
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)' }} /> 3–5 shifts
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} /> 6+ shifts
             </div>
           </div>
         </div>
