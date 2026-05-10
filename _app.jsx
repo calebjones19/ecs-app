@@ -4850,42 +4850,45 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   return (
     <div>
       {/* ── Toolbar ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-        {/* Row 1: nav + date label + view toggle */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+
+        {/* Row 1: Day / Week / Month — full width pill toggle */}
+        <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+          {['day', 'week', 'month'].map(v => (
+            <button key={v} onClick={() => setCalView(v)} style={{
+              flex: 1, padding: '10px 0', border: 'none', cursor: 'pointer',
+              fontSize: 14, fontWeight: calView === v ? 700 : 500,
+              background: calView === v ? 'var(--primary)' : 'transparent',
+              color: calView === v ? 'white' : 'var(--text-light)',
+              transition: 'all 0.15s', letterSpacing: 0.2,
+            }}>
+              {v.charAt(0).toUpperCase() + v.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Row 2: nav + date label — left; filter + actions — right */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          {/* Left: navigation + date */}
+          {/* Left: back / today / forward + date */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
             <button className="topbar-btn" onClick={myNavPrev}><i className="fas fa-chevron-left" /></button>
             <button className="topbar-btn" onClick={goToToday} style={{ fontWeight: 600, color: isCurrentWeek ? 'var(--primary)' : undefined }}>
               Today
             </button>
             <button className="topbar-btn" onClick={myNavNext}><i className="fas fa-chevron-right" /></button>
-            <span style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, marginLeft: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, marginLeft: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {calView === 'day' ? getDayLabel() : calView === 'week' ? getWeekLabel() : getMonthLabel()}
             </span>
           </div>
-          {/* Right: view toggle */}
-          <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0 }}>
-            {['day', 'week', 'month'].map(v => (
-              <button key={v} onClick={() => setCalView(v)} style={{
-                padding: '6px 12px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: calView === v ? 700 : 400,
-                background: calView === v ? 'var(--primary)' : 'transparent', color: calView === v ? 'white' : 'var(--text)',
-                transition: 'all 0.15s',
-              }}>
-                {v.charAt(0).toUpperCase() + v.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
 
-        {/* Row 2: filter + actions + group-by + labor */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Filter button */}
-          <button className="topbar-btn" onClick={() => setShowFilterPanel(true)}
-            style={{ color: filterSel.type !== 'all' ? 'var(--primary)' : undefined, borderColor: filterSel.type !== 'all' ? 'var(--primary)' : undefined }}>
-            <i className="fas fa-filter" style={{ marginRight: 5 }} />
-            {filterLabel}
-          </button>
+          {/* Right: filter + actions (+ group-by + labor on desktop) */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+            {/* Filter button */}
+            <button className="topbar-btn" onClick={() => setShowFilterPanel(true)}
+              style={{ color: filterSel.type !== 'all' ? 'var(--primary)' : undefined, borderColor: filterSel.type !== 'all' ? 'var(--primary)' : undefined }}>
+              <i className="fas fa-filter" style={{ marginRight: 5 }} />
+              {filterLabel}
+            </button>
 
           {/* Actions dropdown */}
           {(canEdit || isAdmin || canSchedule) && (
@@ -4965,28 +4968,29 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
             </div>
           )}
 
-          {/* Group by toggle — desktop only */}
-          {!isMobile && (
-            <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
-              {['employee', 'client'].map(g => (
-                <button key={g} onClick={() => setGroupBy(g)} style={{
-                  padding: '6px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: groupBy === g ? 700 : 400,
-                  background: groupBy === g ? 'var(--primary)' : 'transparent', color: groupBy === g ? 'white' : 'var(--text)',
-                  transition: 'all 0.15s',
-                }}>
-                  <i className={`fas ${g === 'employee' ? 'fa-user' : 'fa-building'}`} style={{ marginRight: 6 }} />
-                  {g === 'employee' ? 'By Employee' : 'By Client'}
-                </button>
-              ))}
-            </div>
-          )}
+            {/* Group by toggle — desktop only */}
+            {!isMobile && (
+              <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                {['employee', 'client'].map(g => (
+                  <button key={g} onClick={() => setGroupBy(g)} style={{
+                    padding: '6px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: groupBy === g ? 700 : 400,
+                    background: groupBy === g ? 'var(--primary)' : 'transparent', color: groupBy === g ? 'white' : 'var(--text)',
+                    transition: 'all 0.15s',
+                  }}>
+                    <i className={`fas ${g === 'employee' ? 'fa-user' : 'fa-building'}`} style={{ marginRight: 6 }} />
+                    {g === 'employee' ? 'By Employee' : 'By Client'}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {/* Labor hours toggle — desktop only */}
-          {!isMobile && (
-            <button className="topbar-btn" onClick={() => setShowLabor(!showLabor)} style={{ color: showLabor ? 'var(--primary)' : undefined, borderColor: showLabor ? 'var(--primary)' : undefined }}>
-              <i className="fas fa-chart-bar" /> Labor
-            </button>
-          )}
+            {/* Labor hours toggle — desktop only */}
+            {!isMobile && (
+              <button className="topbar-btn" onClick={() => setShowLabor(!showLabor)} style={{ color: showLabor ? 'var(--primary)' : undefined, borderColor: showLabor ? 'var(--primary)' : undefined }}>
+                <i className="fas fa-chart-bar" /> Labor
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
