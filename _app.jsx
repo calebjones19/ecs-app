@@ -2805,6 +2805,50 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [groupBy, setGroupBy] = useState('employee'); // employee, client
   const [showLabor, setShowLabor] = useState(!isMobile);
 
+  // ── Schedule filter ──
+  // filterSel: { type: 'all' } | { type: 'me' } | { type: 'teams', teams: Set<string> }
+  const allTeamNames = React.useMemo(() =>
+    [...new Set(EMPLOYEES.flatMap(e => e.teams || []))].filter(Boolean).sort()
+  , []);
+  const [filterSel, setFilterSel] = useState({ type: 'all' });
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+  const toggleTeam = (teamName) => {
+    setFilterSel(prev => {
+      let teams;
+      if (prev.type === 'all' || prev.type === 'me') {
+        teams = new Set([teamName]);
+      } else {
+        teams = new Set(prev.teams);
+        if (teams.has(teamName)) { teams.delete(teamName); }
+        else { teams.add(teamName); }
+      }
+      if (teams.size === 0 || teams.size === allTeamNames.length) return { type: 'all' };
+      return { type: 'teams', teams };
+    });
+  };
+
+  const visibleEmpIds = React.useMemo(() => {
+    if (filterSel.type === 'all') return null;
+    if (filterSel.type === 'me') return new Set([authedUser?.id].filter(Boolean));
+    const ids = new Set();
+    EMPLOYEES.forEach(e => {
+      if ((e.teams || []).some(t => filterSel.teams.has(t))) ids.add(e.id);
+    });
+    return ids;
+  }, [filterSel, authedUser?.id]);
+
+  const viewData = React.useMemo(() =>
+    visibleEmpIds === null
+      ? scheduleData
+      : Object.fromEntries(Object.entries(scheduleData).filter(([id]) => visibleEmpIds.has(id)))
+  , [scheduleData, visibleEmpIds]);
+
+  const filterLabel = filterSel.type === 'all' ? 'All' :
+    filterSel.type === 'me' ? 'Me' :
+    filterSel.teams.size === 1 ? [...filterSel.teams][0] :
+    `${filterSel.teams.size} teams`;
+
   // Date helpers — baseDate is always this week's Monday so weekOffset=0 === today's week
   const baseDate = (() => {
     const d = new Date();
@@ -2868,7 +2912,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const getLaborForDay = (dayIndex) => {
     let scheduled = 0;
     let actual = 0;
-    Object.values(scheduleData).forEach(shifts => {
+    Object.values(viewData).forEach(shifts => {
       shifts.filter(s => s.day === dayIndex).forEach(s => {
         const hrs = parseShiftHours(s.time);
         scheduled += hrs;
@@ -2887,7 +2931,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   // Build client-grouped data
   const getClientGroups = () => {
     const clientMap = {};
-    Object.entries(scheduleData).forEach(([empId, shifts]) => {
+    Object.entries(viewData).forEach(([empId, shifts]) => {
       const emp = EMPLOYEES.find(e => e.id === empId);
       if (!emp || emp.status !== 'active') return;
       shifts.forEach(s => {
@@ -2931,7 +2975,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     {
       let count = 0;
       let clients = new Set();
-      Object.values(scheduleData).forEach(shifts => {
+      Object.values(viewData).forEach(shifts => {
         shifts.filter(s => s.day === dayIndex).forEach(s => { count++; clients.add(s.client); });
       });
       return { count, clients: Array.from(clients) };
@@ -3421,7 +3465,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     const dayIndex = selectedDay;
     const dayInfo = weekDays[dayIndex];
     const allShifts = [];
-    Object.entries(scheduleData).forEach(([empId, shifts]) => {
+    Object.entries(viewData).forEach(([empId, shifts]) => {
       const emp = EMPLOYEES.find(e => e.id === empId);
       if (!emp || emp.status !== 'active') return;
       shifts.filter(s => s.day === dayIndex).forEach(s => {
@@ -3602,7 +3646,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           </React.Fragment>
         )}
 
-        {EMPLOYEES.filter(e => e.status === 'active').map(emp => (
+        {EMPLOYEES.filter(e => e.status === 'active' && (visibleEmpIds === null || visibleEmpIds.has(e.id))).map(emp => (
           <React.Fragment key={emp.id}>
             <div className="schedule-employee">
               <div className="avatar sm" style={{ background: emp.color }}>{emp.avatar}</div>
@@ -3612,7 +3656,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
               </div>
             </div>
             {[0,1,2,3,4,5,6].map(day => {
-              const shifts = (scheduleData[emp.id] || []).filter(s => s.day === day);
+              const shifts = (viewData[emp.id] || []).filter(s => s.day === day);
               return (
                 <div className="schedule-cell" key={day}
                   onClick={(e) => { if (canSchedule && e.target === e.currentTarget) openAddShift({ day, employee: String(emp.id) }); }}>
@@ -4089,9 +4133,9 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
         {/* Right: controls */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* View mode toggle — day/week on mobile, day/week/month on desktop */}
+          {/* View mode toggle */}
           <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
-            {(isMobile ? ['day', 'week'] : ['day', 'week', 'month']).map(v => (
+            {['day', 'week', 'month'].map(v => (
               <button key={v} onClick={() => setCalView(v)} style={{
                 padding: '6px 12px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: calView === v ? 700 : 400,
                 background: calView === v ? 'var(--primary)' : 'transparent', color: calView === v ? 'white' : 'var(--text)',
@@ -4101,6 +4145,13 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
               </button>
             ))}
           </div>
+
+          {/* Filter button */}
+          <button className="topbar-btn" onClick={() => setShowFilterPanel(true)}
+            style={{ color: filterSel.type !== 'all' ? 'var(--primary)' : undefined, borderColor: filterSel.type !== 'all' ? 'var(--primary)' : undefined }}>
+            <i className="fas fa-filter" style={{ marginRight: isMobile ? 0 : 5 }} />
+            {!isMobile && filterLabel}
+          </button>
 
           {/* Group by toggle — desktop only */}
           {!isMobile && (
@@ -4141,8 +4192,78 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       {calView === 'day' && <DayTabs />}
       {calView === 'day' && renderDayView()}
       {calView === 'week' && renderWeekView()}
-      {calView === 'month' && !isMobile && renderMonthView()}
+      {calView === 'month' && renderMonthView()}
       {editShiftSheet}
+
+      {/* ── Filter Panel ── */}
+      {showFilterPanel && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 500 }}
+          onClick={() => setShowFilterPanel(false)}>
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', maxHeight: '80vh', overflowY: 'auto', zIndex: 501 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, background: '#ddd', borderRadius: 2, margin: '0 auto 18px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <div style={{ fontWeight: 800, fontSize: 17 }}>Schedule Filter</div>
+              <button onClick={() => setShowFilterPanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', lineHeight: 1 }}>×</button>
+            </div>
+
+            {/* Me */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Personal</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: filterSel.type === 'me' ? 'var(--primary-light)' : 'var(--bg)', borderRadius: 10, cursor: 'pointer', border: `1.5px solid ${filterSel.type === 'me' ? 'var(--primary)' : 'transparent'}` }}>
+                <input type="checkbox" checked={filterSel.type === 'me'} readOnly
+                  style={{ width: 17, height: 17, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  onClick={() => setFilterSel(filterSel.type === 'me' ? { type: 'all' } : { type: 'me' })} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Me</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-light)' }}>Show only my schedule</div>
+                </div>
+                <div className="avatar sm" style={{ background: authedUser?.color || 'var(--primary)', width: 28, height: 28, fontSize: 12 }}>{authedUser?.avatar || '?'}</div>
+              </label>
+            </div>
+
+            {/* All + Teams */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Teams</div>
+
+              {/* All */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: filterSel.type === 'all' ? 'var(--primary-light)' : 'var(--bg)', borderRadius: 10, cursor: 'pointer', border: `1.5px solid ${filterSel.type === 'all' ? 'var(--primary)' : 'transparent'}`, marginBottom: 6 }}>
+                <input type="checkbox" checked={filterSel.type === 'all'} readOnly
+                  style={{ width: 17, height: 17, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  onClick={() => setFilterSel({ type: 'all' })} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>All Teams</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-light)' }}>Show everyone's schedule</div>
+                </div>
+                <i className="fas fa-users" style={{ color: 'var(--primary)', fontSize: 16 }} />
+              </label>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {allTeamNames.map(team => {
+                  const isChecked = filterSel.type === 'all' || (filterSel.type === 'teams' && filterSel.teams.has(team));
+                  const memberCount = EMPLOYEES.filter(e => e.status === 'active' && (e.teams || []).includes(team)).length;
+                  return (
+                    <label key={team} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: isChecked && filterSel.type === 'teams' ? 'var(--primary-light)' : 'var(--bg)', borderRadius: 10, cursor: 'pointer', border: `1.5px solid ${isChecked && filterSel.type === 'teams' ? 'var(--primary)' : 'transparent'}` }}>
+                      <input type="checkbox" checked={isChecked} readOnly
+                        style={{ width: 17, height: 17, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                        onClick={() => toggleTeam(team)} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{team}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{memberCount} member{memberCount !== 1 ? 's' : ''}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button className="topbar-btn primary" style={{ width: '100%', marginTop: 20, padding: '12px 0', fontSize: 14 }}
+              onClick={() => setShowFilterPanel(false)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
 
     </div>
