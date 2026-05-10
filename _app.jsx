@@ -4850,7 +4850,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   return (
     <div>
       {/* ── Toolbar ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 6 }}>
 
         {/* Row 1: Day / Week / Month — full width pill toggle */}
         <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
@@ -4992,7 +4992,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       </div>
 
       {/* ── Date label ── */}
-      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: isMobile ? 14 : 16, marginBottom: 12, color: 'var(--text)' }}>
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: isMobile ? 14 : 16, marginTop: 8, marginBottom: 12, color: 'var(--text)' }}>
         {calView === 'day' ? getDayLabel() : calView === 'week' ? getWeekLabel() : getMonthLabel()}
       </div>
 
