@@ -2808,7 +2808,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   // ── Schedule filter ──
   // filterSel: { type: 'all' } | { type: 'me' } | { type: 'teams', teams: Set<string> }
   const allTeamNames = React.useMemo(() =>
-    [...new Set(EMPLOYEES.flatMap(e => e.teams || []))].filter(Boolean).sort()
+    [...new Set(EMPLOYEES.flatMap(e => e.teams || []))].filter(t => t.toLowerCase().startsWith('team ')).sort()
   , []);
   const [filterSel, setFilterSel] = useState({ type: 'all' });
   const [showFilterPanel, setShowFilterPanel] = useState(false);
