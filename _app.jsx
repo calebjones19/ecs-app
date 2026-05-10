@@ -2604,8 +2604,145 @@ function Chat({ role, authedUser, perm, channels, setChannels, activeChannel, se
   );
 }
 
+// ─── Shift Note Editor ─────────────────────────────────────────
+function NoteEditor({ note, onSave, onDelete, onClose }) {
+  const [title, setTitle] = React.useState(note.title || '');
+  const contentRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.innerHTML = note.content || '';
+      contentRef.current.focus();
+    }
+  }, []);
+
+  const applyFmt = (cmd, val) => {
+    contentRef.current && contentRef.current.focus();
+    document.execCommand(cmd, false, val || null);
+  };
+
+  const handleSave = () => {
+    onSave({ ...note, title, content: contentRef.current ? contentRef.current.innerHTML : (note.content || '') });
+    onClose();
+  };
+
+  const FmtBtn = ({ label, icon, cmd, val, style }) => (
+    <button type="button"
+      onMouseDown={e => { e.preventDefault(); applyFmt(cmd, val); }}
+      style={{ padding: '5px 10px', border: '1.5px solid var(--border)', borderRadius: 6, background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1, ...style }}>
+      {icon ? <i className={`fas ${icon}`} /> : label}
+    </button>
+  );
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 700, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+      onClick={e => { if (e.target === e.currentTarget) handleSave(); }}>
+      <div style={{ background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 16px 36px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 12 }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>{note.id ? 'Edit Note' : 'New Note'}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {note.id && (
+              <button type="button" onClick={() => { onDelete(note.id); onClose(); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: 14, padding: '4px 8px', fontWeight: 600 }}>
+                <i className="fas fa-trash" style={{ marginRight: 5 }} />Delete
+              </button>
+            )}
+            <button type="button" onClick={handleSave}
+              style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, padding: '6px 16px' }}>
+              Done
+            </button>
+          </div>
+        </div>
+
+        <input className="form-input" placeholder="Note title..." value={title}
+          onChange={e => setTitle(e.target.value)}
+          style={{ fontSize: 15, fontWeight: 700 }} />
+
+        {/* Formatting toolbar */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <FmtBtn label="B" cmd="bold" style={{ fontWeight: 900, fontFamily: 'serif' }} />
+          <FmtBtn label={<span style={{ textDecoration: 'underline' }}>U</span>} cmd="underline" />
+          <FmtBtn label="Title" cmd="formatBlock" val="h3" style={{ fontSize: 11, letterSpacing: 0.3 }} />
+          <FmtBtn label="Body" cmd="formatBlock" val="p" style={{ fontSize: 11, letterSpacing: 0.3 }} />
+          <FmtBtn icon="fa-list-ul" cmd="insertUnorderedList" />
+        </div>
+
+        {/* Content editable */}
+        <div
+          ref={contentRef}
+          contentEditable
+          suppressContentEditableWarning
+          style={{ flex: 1, minHeight: 120, maxHeight: 260, overflowY: 'auto', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, lineHeight: 1.6, outline: 'none', color: 'var(--text)' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ShiftNotesEditor({ notes, onChange }) {
+  const [editingNote, setEditingNote] = React.useState(null); // note object being edited, or null
+
+  const addNote = () => {
+    setEditingNote({ id: '', title: '', content: '' }); // id='' means new
+  };
+
+  const saveNote = (updated) => {
+    if (!updated.id) {
+      const newNote = { ...updated, id: Date.now().toString() };
+      onChange([...notes, newNote]);
+    } else {
+      onChange(notes.map(n => n.id === updated.id ? updated : n));
+    }
+  };
+
+  const deleteNote = (id) => {
+    onChange(notes.filter(n => n.id !== id));
+  };
+
+  return (
+    <div>
+      {editingNote && (
+        <NoteEditor
+          note={editingNote}
+          onSave={saveNote}
+          onDelete={deleteNote}
+          onClose={() => setEditingNote(null)}
+        />
+      )}
+
+      {/* Note list */}
+      {notes.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+          {notes.map(note => (
+            <button key={note.id} type="button" onClick={() => setEditingNote(note)}
+              style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#f8fafc', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+              <i className="fas fa-sticky-note" style={{ color: '#f57f17', marginTop: 2, fontSize: 13, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: note.content ? 2 : 0 }}>
+                  {note.title || <span style={{ color: 'var(--text-light)', fontWeight: 400 }}>Untitled note</span>}
+                </div>
+                {note.content && (
+                  <div style={{ fontSize: 12, color: 'var(--text-light)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    dangerouslySetInnerHTML={{ __html: note.content.replace(/<[^>]+>/g, ' ').trim().slice(0, 80) }} />
+                )}
+              </div>
+              <i className="fas fa-chevron-right" style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 3, flexShrink: 0 }} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button type="button" onClick={addNote}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 0', border: '1.5px dashed var(--border)', borderRadius: 10, background: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>
+        <i className="fas fa-plus" style={{ fontSize: 11 }} /> Add Note
+      </button>
+    </div>
+  );
+}
+
 // ─── Schedule ──────────────────────────────────────────────────
-const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', date: '', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '' };
+const EMPTY_SHIFT = { employees: [], client: '', scheduleType: 'specific', date: '', day: 0, startTime: '08:00', endTime: '12:00', flexDays: [], windowType: 'range', windowStart: '08:00', windowEnd: '17:00', repeats: false, frequency: 'weekly', recurrenceStart: '', recurrenceEndType: 'indefinitely', recurrenceEnd: '', shiftNotes: [] };
 
 function Schedule({ role, perm, authedUser, adminMode = false }) {
   const canSchedule = perm?.canSchedule || role === 'admin';
@@ -2924,6 +3061,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           date: newShift.scheduleType === 'specific' ? (newShift.date || null) : null,
           time: timeLabel,
           type: shiftType,
+          shiftNotes: newShift.shiftNotes || [],
           scheduleType: newShift.scheduleType,
           repeats: newShift.repeats,
           frequency: newShift.repeats ? newShift.frequency : null,
@@ -2983,6 +3121,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
       startTime: shift.startTime || parsed.start,
       endTime: shift.endTime || parsed.end,
       notes: shift.notes || '',
+      shiftNotes: shift.shiftNotes || [],
     });
   };
 
@@ -3010,6 +3149,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
         startTime: editingShift.startTime,
         endTime: editingShift.endTime,
         notes: editingShift.notes || '',
+        shiftNotes: editingShift.shiftNotes || [],
         dayVersion: 2,
       });
     } catch(e) { console.error(e); }
@@ -3645,10 +3785,11 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
         </div>
 
         <div className="form-group">
-          <label className="form-label">Notes <span style={{ color: 'var(--text-light)', fontWeight: 400 }}>(optional)</span></label>
-          <textarea className="form-input" rows={2} placeholder="Instructions for this shift..."
-            value={editingShift.notes}
-            onChange={e => setEditingShift(s => ({ ...s, notes: e.target.value }))} />
+          <label className="form-label">Notes</label>
+          <ShiftNotesEditor
+            notes={editingShift.shiftNotes || []}
+            onChange={shiftNotes => setEditingShift(s => ({ ...s, shiftNotes }))}
+          />
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -3844,6 +3985,15 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                 )}
               </div>
             </>)}
+          </div>
+
+          {/* Notes */}
+          <div style={{ borderTop:'1px solid var(--border)', paddingTop:14, marginTop:4 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--text)', marginBottom:10 }}>Notes</div>
+            <ShiftNotesEditor
+              notes={newShift.shiftNotes || []}
+              onChange={shiftNotes => ns({ shiftNotes })}
+            />
           </div>
 
           {(!newShift.employees.length || !newShift.client) && (
@@ -7463,16 +7613,31 @@ function Today({ role, perm, authedUser }) {
 
           {type === 'notes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Structured shift notes (new format) */}
+              {(shift.shiftNotes || []).map(note => (
+                <div key={note.id} style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: 16, padding: '16px 18px' }}>
+                  {note.title && <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>{note.title}</div>}
+                  <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: note.content || '' }} />
+                </div>
+              ))}
+              {/* Legacy plain-text notes fallback */}
+              {!(shift.shiftNotes || []).length && shift.notes && (
+                <div style={{ background: '#f3e5f5', border: '1.5px solid #ce93d8', borderRadius: 16, padding: '16px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#7b1fa2', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>From {shift.scheduledByName || 'Manager'}</div>
+                  <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{shift.notes}</div>
+                </div>
+              )}
+              {/* Account-level notes */}
               {clientObj?.notes && (
                 <div style={{ background: '#fff8e1', border: '1.5px solid #ffe082', borderRadius: 16, padding: '16px 18px' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#f57f17', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Account Notes</div>
                   <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{clientObj.notes}</div>
                 </div>
               )}
-              {shift.notes && (
-                <div style={{ background: '#f3e5f5', border: '1.5px solid #ce93d8', borderRadius: 16, padding: '16px 18px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#7b1fa2', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>From {shift.scheduledByName || 'Manager'}</div>
-                  <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{shift.notes}</div>
+              {!(shift.shiftNotes || []).length && !shift.notes && !clientObj?.notes && (
+                <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-light)' }}>
+                  <i className="fas fa-sticky-note" style={{ fontSize: 36, opacity: 0.2, display: 'block', marginBottom: 12 }} />
+                  <div>No notes for this shift</div>
                 </div>
               )}
             </div>
@@ -7531,7 +7696,7 @@ function Today({ role, perm, authedUser }) {
           const pct = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0;
           const budgeted = clientObj ? (parseFloat(clientObj.budgetedHours) || 0) : 0;
           const hasDetails = !!(clientObj?.address || clientObj?.contact || clientObj?.phone || clientObj?.email);
-          const hasNotes = !!(clientObj?.notes || shift.notes);
+          const hasNotes = !!(clientObj?.notes || shift.notes || (shift.shiftNotes || []).length);
           const shiftChecklists = clientObj ? (checklistsByClient[clientObj.id] || []) : [];
           const checklistCount = shiftChecklists.length || (totalTasks > 0 ? 1 : 0);
 
@@ -7606,7 +7771,7 @@ function Today({ role, perm, authedUser }) {
                 <ResourceRow
                   icon="fa-sticky-note" color="#f57f17"
                   label="Manager Notes"
-                  sublabel={shift.scheduledByName ? `From ${shift.scheduledByName}` : undefined}
+                  sublabel={(shift.shiftNotes||[]).length ? `${(shift.shiftNotes||[]).length} note${(shift.shiftNotes||[]).length !== 1 ? 's' : ''}` : shift.scheduledByName ? `From ${shift.scheduledByName}` : undefined}
                   onPress={() => setFullScreen({ type: 'notes', shift, clientObj })}
                 />
               )}
