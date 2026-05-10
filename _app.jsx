@@ -3407,12 +3407,58 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [showLabor, setShowLabor] = useState(!isMobile);
 
   // ── Schedule filter ──
-  // filterSel: { type: 'all' } | { type: 'me' } | { type: 'teams', teams: Set<string> }
-  const allTeamNames = React.useMemo(() =>
-    [...new Set(EMPLOYEES.flatMap(e => e.teams || []))].filter(t => t.toLowerCase().startsWith('team ')).sort()
-  , []);
+  // filterSel: { type: 'all' } | { type: 'me' } | { type: 'teams', teams: Set<string>, accounts: Set<string>|null }
+  // accounts null = all accounts for those teams; Set = specific client names
+
+  // Role-scoped visible teams: schedulers see only their own teams, admins see all
+  const allTeamNames = React.useMemo(() => {
+    const allTeams = [...new Set(EMPLOYEES.flatMap(e => e.teams || []))]
+      .filter(t => t.toLowerCase().startsWith('team ')).sort();
+    if (isAdmin || canEdit) return allTeams;
+    // Scheduler: only their own teams
+    const myTeams = new Set(authedUser?.teams || []);
+    return allTeams.filter(t => myTeams.has(t));
+  }, [isAdmin, canEdit, authedUser?.id]);
+
+  // Role-scoped accounts per team: schedulers see only their schedulableAccounts
+  const accountsForTeam = React.useMemo(() => {
+    const activeClientList = CLIENTS.filter(c => c.status === 'active');
+    const result = {};
+    allTeamNames.forEach(team => {
+      const teamEmpIds = new Set(EMPLOYEES.filter(e => (e.teams || []).includes(team)).map(e => e.id));
+      if (isAdmin || canEdit) {
+        // Admins: all clients that any team member can schedule, or all active if none configured
+        const teamClientIds = new Set();
+        EMPLOYEES.filter(e => teamEmpIds.has(e.id)).forEach(e => {
+          (e.schedulableAccounts || []).forEach(id => teamClientIds.add(id));
+        });
+        result[team] = teamClientIds.size > 0
+          ? activeClientList.filter(c => teamClientIds.has(c.id))
+          : activeClientList;
+      } else {
+        // Scheduler: only their own schedulable accounts that belong to this team
+        const myClientIds = new Set(authedUser?.schedulableAccounts || []);
+        result[team] = activeClientList.filter(c => myClientIds.has(c.id));
+      }
+    });
+    return result;
+  }, [allTeamNames, isAdmin, canEdit, authedUser?.id]);
+
   const [filterSel, setFilterSel] = useState({ type: 'all' });
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const actionsMenuRef = React.useRef(null);
+
+  // Close actions menu on outside click
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target)) {
+        setShowActionsMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const toggleTeam = (teamName) => {
     setFilterSel(prev => {
@@ -3425,7 +3471,22 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
         else { teams.add(teamName); }
       }
       if (teams.size === 0 || teams.size === allTeamNames.length) return { type: 'all' };
-      return { type: 'teams', teams };
+      return { type: 'teams', teams, accounts: null };
+    });
+  };
+
+  const toggleAccount = (clientName) => {
+    setFilterSel(prev => {
+      if (prev.type !== 'teams') return prev;
+      const current = prev.accounts || new Set();
+      const next = new Set(current);
+      if (next.has(clientName)) { next.delete(clientName); }
+      else { next.add(clientName); }
+      // Count all available accounts for selected teams
+      const allAvail = new Set();
+      prev.teams.forEach(t => (accountsForTeam[t] || []).forEach(c => allAvail.add(c.name)));
+      if (next.size === 0 || next.size >= allAvail.size) return { ...prev, accounts: null };
+      return { ...prev, accounts: next };
     });
   };
 
@@ -3439,14 +3500,28 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     return ids;
   }, [filterSel, authedUser?.id]);
 
-  const viewData = React.useMemo(() =>
-    visibleEmpIds === null
+  const visibleClientNames = React.useMemo(() => {
+    if (filterSel.type !== 'teams') return null;
+    return filterSel.accounts || null; // null = all accounts
+  }, [filterSel]);
+
+  const viewData = React.useMemo(() => {
+    let data = visibleEmpIds === null
       ? scheduleData
-      : Object.fromEntries(Object.entries(scheduleData).filter(([id]) => visibleEmpIds.has(id)))
-  , [scheduleData, visibleEmpIds]);
+      : Object.fromEntries(Object.entries(scheduleData).filter(([id]) => visibleEmpIds.has(id)));
+    if (visibleClientNames !== null) {
+      data = Object.fromEntries(
+        Object.entries(data)
+          .map(([id, shifts]) => [id, shifts.filter(s => visibleClientNames.has(s.client))])
+          .filter(([, shifts]) => shifts.length > 0)
+      );
+    }
+    return data;
+  }, [scheduleData, visibleEmpIds, visibleClientNames]);
 
   const filterLabel = filterSel.type === 'all' ? 'All' :
     filterSel.type === 'me' ? 'Me' :
+    filterSel.accounts ? `${filterSel.accounts.size} account${filterSel.accounts.size !== 1 ? 's' : ''}` :
     filterSel.teams.size === 1 ? [...filterSel.teams][0] :
     `${filterSel.teams.size} teams`;
 
@@ -4285,6 +4360,81 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     const monthDays = getMonthDays();
     const today = new Date(2026, 3, 17); // mock today
 
+    // Mobile: compact coverage calendar (dots only)
+    if (isMobile) {
+      const dayNamesShort = ['S','M','T','W','T','F','S'];
+      return (
+        <div>
+          <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-light)', marginBottom: 12 }}>
+            Tap a day to view shifts
+          </div>
+          <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+            {/* Day headers */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--border)' }}>
+              {dayNamesShort.map((d, i) => (
+                <div key={i} style={{ padding: '8px 0', textAlign: 'center', fontWeight: 700, fontSize: 11, color: 'var(--text-light)', background: 'var(--bg)' }}>{d}</div>
+              ))}
+            </div>
+            {/* Day cells */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+              {monthDays.map((md, i) => {
+                const info = getShiftsForDate(md.date);
+                const isToday = md.date.getDate() === today.getDate() && md.date.getMonth() === today.getMonth();
+                const dow = md.date.getDay();
+                const coverage = info.count;
+                // Color the dot by coverage level
+                const dotColor = coverage === 0 ? 'transparent' :
+                  coverage < 3 ? '#f59e0b' :
+                  coverage < 6 ? 'var(--primary)' : 'var(--success)';
+                return (
+                  <div key={i}
+                    onClick={() => { if (md.inMonth) { setSelectedDay(dow); setCalView('day'); } }}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '7px 2px', cursor: md.inMonth ? 'pointer' : 'default',
+                      opacity: md.inMonth ? 1 : 0.3,
+                      borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--border)' : 'none',
+                      borderBottom: i < monthDays.length - 7 ? '1px solid var(--border)' : 'none',
+                      background: isToday ? 'var(--primary-light)' : 'transparent',
+                    }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: isToday ? 'var(--primary)' : 'transparent',
+                      color: isToday ? 'white' : 'var(--text)',
+                      fontWeight: isToday ? 700 : 400, fontSize: 13,
+                    }}>
+                      {md.date.getDate()}
+                    </div>
+                    {/* Coverage dot */}
+                    <div style={{
+                      width: 6, height: 6, borderRadius: '50%', background: dotColor, marginTop: 3,
+                      boxShadow: coverage > 0 ? `0 0 0 1px ${dotColor}22` : 'none',
+                    }} />
+                    {coverage > 0 && (
+                      <div style={{ fontSize: 9, color: 'var(--text-light)', marginTop: 1, fontWeight: 600 }}>{coverage}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 12, fontSize: 11, color: 'var(--text-light)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b' }} /> 1–2 shifts
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)' }} /> 3–5 shifts
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} /> 6+ shifts
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Desktop: full detail calendar
     return (
       <div>
         {showLabor && (
@@ -4777,25 +4927,83 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
             </button>
           )}
 
-          {(canEdit || isAdmin) && (
-            <button className="topbar-btn" onClick={() => setShowTemplates(true)}>
-              <i className="fas fa-layer-group" /> {!isMobile && 'Templates'}
-            </button>
-          )}
-          {canSchedule && (
-            <button className="topbar-btn" style={{ color: 'var(--primary)', borderColor: 'var(--primary)' }}
-              onClick={() => setShowAutoSchedule(true)}>
-              <i className="fas fa-magic" /> {!isMobile && 'Auto Schedule'}
-            </button>
-          )}
-          {(canEdit || isAdmin) && (
-            <button className="topbar-btn primary" onClick={() => openAddShift()}><i className="fas fa-plus" />{isMobile ? '' : ' Add Shift'}</button>
-          )}
-          {(canEdit || isAdmin) && !isMobile && (
-            <React.Fragment>
-              <button className="topbar-btn"><i className="fas fa-bell" /> Notify All</button>
-              <button className="topbar-btn"><i className="fas fa-download" /> Export</button>
-            </React.Fragment>
+          {/* Actions dropdown */}
+          {(canEdit || isAdmin || canSchedule) && (
+            <div ref={actionsMenuRef} style={{ position: 'relative' }}>
+              <button className="topbar-btn primary" onClick={() => setShowActionsMenu(v => !v)}>
+                <i className="fas fa-bolt" style={{ marginRight: isMobile ? 0 : 5 }} />
+                {!isMobile && 'Actions'}
+                {!isMobile && <i className="fas fa-chevron-down" style={{ marginLeft: 5, fontSize: 10 }} />}
+              </button>
+              {showActionsMenu && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'white',
+                  border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  minWidth: 180, zIndex: 400, overflow: 'hidden',
+                }}>
+                  {(canEdit || isAdmin) && (
+                    <button onClick={() => { setShowActionsMenu(false); openAddShift(); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                      background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
+                      borderBottom: '1px solid var(--border)', fontWeight: 600,
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                      <i className="fas fa-plus" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
+                      Add Shift
+                    </button>
+                  )}
+                  {canSchedule && (
+                    <button onClick={() => { setShowActionsMenu(false); setShowAutoSchedule(true); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                      background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
+                      borderBottom: (canEdit || isAdmin) ? '1px solid var(--border)' : 'none', fontWeight: 600,
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                      <i className="fas fa-magic" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
+                      Auto Schedule
+                    </button>
+                  )}
+                  {(canEdit || isAdmin) && (
+                    <button onClick={() => { setShowActionsMenu(false); setShowTemplates(true); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                      background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
+                      borderBottom: !isMobile ? '1px solid var(--border)' : 'none', fontWeight: 600,
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                      <i className="fas fa-layer-group" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
+                      Templates
+                    </button>
+                  )}
+                  {(canEdit || isAdmin) && !isMobile && (
+                    <React.Fragment>
+                      <button onClick={() => setShowActionsMenu(false)} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                        background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
+                        borderBottom: '1px solid var(--border)', fontWeight: 600,
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                        <i className="fas fa-bell" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
+                        Notify All
+                      </button>
+                      <button onClick={() => setShowActionsMenu(false)} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                        background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
+                        fontWeight: 600,
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                        <i className="fas fa-download" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
+                        Export
+                      </button>
+                    </React.Fragment>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -4852,18 +5060,59 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {allTeamNames.map(team => {
-                  const isChecked = filterSel.type === 'all' || (filterSel.type === 'teams' && filterSel.teams.has(team));
+                  const isTeamChecked = filterSel.type === 'all' || (filterSel.type === 'teams' && filterSel.teams.has(team));
+                  const isTeamActive = filterSel.type === 'teams' && filterSel.teams.has(team);
                   const memberCount = EMPLOYEES.filter(e => e.status === 'active' && (e.teams || []).includes(team)).length;
+                  const teamAccounts = accountsForTeam[team] || [];
+                  const hasAccounts = teamAccounts.length > 0;
                   return (
-                    <label key={team} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: isChecked && filterSel.type === 'teams' ? 'var(--primary-light)' : 'var(--bg)', borderRadius: 10, cursor: 'pointer', border: `1.5px solid ${isChecked && filterSel.type === 'teams' ? 'var(--primary)' : 'transparent'}` }}>
-                      <input type="checkbox" checked={isChecked} readOnly
-                        style={{ width: 17, height: 17, accentColor: 'var(--primary)', cursor: 'pointer' }}
-                        onClick={() => toggleTeam(team)} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{team}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{memberCount} member{memberCount !== 1 ? 's' : ''}</div>
-                      </div>
-                    </label>
+                    <div key={team}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: isTeamActive ? 'var(--primary-light)' : 'var(--bg)', borderRadius: isTeamActive && hasAccounts ? '10px 10px 0 0' : 10, cursor: 'pointer', border: `1.5px solid ${isTeamActive ? 'var(--primary)' : 'transparent'}`, borderBottom: isTeamActive && hasAccounts ? 'none' : undefined }}>
+                        <input type="checkbox" checked={isTeamChecked} readOnly
+                          style={{ width: 17, height: 17, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                          onClick={() => toggleTeam(team)} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{team}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-light)' }}>{memberCount} member{memberCount !== 1 ? 's' : ''}</div>
+                        </div>
+                        {isTeamActive && hasAccounts && (
+                          <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>
+                            {filterSel.accounts ? `${[...filterSel.accounts].filter(a => teamAccounts.some(c => c.name === a)).length}/${teamAccounts.length}` : `All ${teamAccounts.length}`}
+                          </div>
+                        )}
+                      </label>
+                      {/* Account sub-filters — only when this team is actively selected */}
+                      {isTeamActive && hasAccounts && (
+                        <div style={{ border: '1.5px solid var(--primary)', borderTop: 'none', borderRadius: '0 0 10px 10px', background: 'white', padding: '6px 10px 8px' }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 0.6, padding: '4px 4px 6px' }}>Accounts</div>
+                          {/* All accounts shortcut */}
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', cursor: 'pointer', borderRadius: 6, background: !filterSel.accounts ? 'var(--primary-light)' : 'transparent' }}>
+                            <input type="checkbox"
+                              checked={!filterSel.accounts}
+                              readOnly
+                              style={{ width: 14, height: 14, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                              onClick={() => setFilterSel(prev => prev.type === 'teams' ? { ...prev, accounts: null } : prev)} />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>All Accounts</span>
+                          </label>
+                          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                          <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {teamAccounts.map(client => {
+                              const isAccountChecked = !filterSel.accounts || filterSel.accounts.has(client.name);
+                              return (
+                                <label key={client.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', cursor: 'pointer', borderRadius: 6, background: filterSel.accounts && filterSel.accounts.has(client.name) ? 'var(--primary-light)' : 'transparent' }}>
+                                  <input type="checkbox"
+                                    checked={isAccountChecked}
+                                    readOnly
+                                    style={{ width: 14, height: 14, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                    onClick={() => toggleAccount(client.name)} />
+                                  <span style={{ fontSize: 13, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{client.name}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
