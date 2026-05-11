@@ -11175,7 +11175,8 @@ function App() {
     }
   }, [authLoading]);
 
-  if (authLoading) return null; // HTML splash is covering the screen
+  // Only block on splash if we have no cached user — if cache restored a user, render immediately
+  if (authLoading && !authedUser) return null;
 
   if (!authedUser) {
     return <LoginScreen onLogin={setAuthedUser} />;
