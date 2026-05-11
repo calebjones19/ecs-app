@@ -3661,7 +3661,6 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [savingShift, setSavingShift] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAutoSchedule, setShowAutoSchedule] = useState(false);
-  const [showAllAccounts, setShowAllAccounts] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showResetAutoConfirm, setShowResetAutoConfirm] = useState(false);
   const [resettingAuto, setResettingAuto] = useState(false);
@@ -3859,12 +3858,6 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     return data;
   }, [scheduleData, visibleEmpIds, visibleClientNames]);
 
-  // All active clients visible under the current filter — used for "show all accounts" mode
-  const visibleActiveClients = React.useMemo(() => {
-    const all = CLIENTS.filter(c => c.status === 'active');
-    if (visibleClientNames !== null) return all.filter(c => visibleClientNames.has(c.name));
-    return all;
-  }, [visibleClientNames]);
 
   const filterLabel = filterSel.type === 'all' ? 'All' :
     filterSel.type === 'me' ? 'Me' :
@@ -4563,6 +4556,15 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     }
 
     // ── Day timeline: single column ──
+    if (allDayShifts.length === 0) {
+      return (
+        <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+          <i className="fas fa-calendar-day" style={{ fontSize: 32, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+          <div style={{ fontWeight: 600 }}>No shifts scheduled</div>
+          <div style={{ fontSize: 13, marginTop: 4 }}>No one is scheduled for this day</div>
+        </div>
+      );
+    }
     return (
       <div style={{ display: 'flex', background: 'white', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
         {/* Hour labels */}
@@ -4636,12 +4638,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
         if (!byClient[s.client]) byClient[s.client] = [];
         byClient[s.client].push(s);
       });
-      const clientList = showAllAccounts
-        ? visibleActiveClients.map(c => c.name)
-        : Object.keys(byClient);
-      const displayClients = [...new Set([...clientList, ...Object.keys(byClient)])].filter(name =>
-        showAllAccounts || byClient[name]
-      );
+      const displayClients = Object.keys(byClient);
       return (
         <div>
           {showLabor && (() => {
@@ -4754,12 +4751,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const renderWeekView = () => {
     if (groupBy === 'client') {
       const clientGroups = getClientGroups();
-      const weekClientList = showAllAccounts
-        ? visibleActiveClients.map(c => c.name)
-        : Object.keys(clientGroups);
-      const displayWeekClients = [...new Set([...weekClientList, ...Object.keys(clientGroups)])].filter(name =>
-        showAllAccounts || clientGroups[name]
-      );
+      const displayWeekClients = Object.keys(clientGroups);
       return (
         <div className="schedule-grid" style={{ gridTemplateColumns: `200px repeat(7, 1fr)` }}>
           <div className="schedule-header">Account</div>
@@ -5487,18 +5479,6 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                       {showTimeline && <i className="fas fa-check" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)' }} />}
                     </button>
                   )}
-                  {/* Show all accounts toggle */}
-                  <button onClick={() => { setShowAllAccounts(v => !v); setShowActionsMenu(false); }} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
-                    background: showAllAccounts ? 'var(--primary-light)' : 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 14, color: showAllAccounts ? 'var(--primary)' : 'var(--text)', fontWeight: 600,
-                  }}
-                    onMouseEnter={e => { if (!showAllAccounts) e.currentTarget.style.background = 'var(--bg)'; }}
-                    onMouseLeave={e => { if (!showAllAccounts) e.currentTarget.style.background = 'none'; }}>
-                    <i className="fas fa-list" style={{ width: 16, color: showAllAccounts ? 'var(--primary)' : 'var(--text-light)', textAlign: 'center' }} />
-                    Show All Accounts
-                    {showAllAccounts && <i className="fas fa-check" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)' }} />}
-                  </button>
                   {/* Labor toggle */}
                   <button onClick={() => { setShowLabor(v => !v); setShowActionsMenu(false); }} style={{
                     display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
