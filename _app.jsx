@@ -470,6 +470,7 @@ function Home({ role, perm, authedUser, setPage }) {
 // ─── Home Checklists (worker view — view & complete tasks) ──────
 function HomeChecklists({ role, perm, authedUser }) {
   const [selectedClient, setSelectedClient] = useState(null);
+  const [teamFilter, setTeamFilter] = useState('all');
   const [checklists, setChecklists] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [completions, setCompletions] = useState([]);
@@ -526,17 +527,43 @@ function HomeChecklists({ role, perm, authedUser }) {
 
   // ── Level 1: Account list ──
   if (!selectedClient) {
-    const accounts = [...CLIENTS].filter(c => c.status !== 'inactive').sort((a, b) => a.name.localeCompare(b.name));
-    if (accounts.length === 0) return (
-      <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
-        <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
-        <div style={{ fontWeight: 600 }}>No accounts found</div>
-      </div>
-    );
+    const activeAccounts = [...CLIENTS].filter(c => c.status !== 'inactive').sort((a, b) => a.name.localeCompare(b.name));
+
+    // Derive sorted team list from employee data
+    const allTeams = [...new Set(EMPLOYEES.flatMap(e => e.teams || []))].sort();
+
+    // Build team → client IDs map using same dual-lookup as scheduler
+    const clientsForTeam = (team) => {
+      const teamEmpIds = new Set(EMPLOYEES.filter(e => (e.teams || []).includes(team)).map(e => e.id));
+      const teamClientIds = new Set();
+      EMPLOYEES.filter(e => teamEmpIds.has(e.id)).forEach(e => (e.schedulableAccounts || []).forEach(id => teamClientIds.add(id)));
+      activeAccounts.forEach(c => { if ((c.approvedEmployeeIds || []).some(id => teamEmpIds.has(id))) teamClientIds.add(c.id); });
+      return teamClientIds;
+    };
+
+    const teamClientIds = teamFilter !== 'all' ? clientsForTeam(teamFilter) : null;
+    const accounts = teamClientIds ? activeAccounts.filter(c => teamClientIds.has(c.id)) : activeAccounts;
+
     return (
       <div>
-        <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14, fontWeight: 500 }}>Select an account to view its checklists</div>
-        {accounts.map(client => (
+        {/* Team filter pills */}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 16, paddingBottom: 4, scrollbarWidth: 'none' }}>
+          {['all', ...allTeams].map(t => (
+            <button key={t} onClick={() => setTeamFilter(t)} style={{
+              flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              background: teamFilter === t ? 'var(--primary)' : 'var(--border)', color: teamFilter === t ? '#fff' : 'var(--text-main)', transition: 'background 0.15s'
+            }}>
+              {t === 'all' ? 'All' : t}
+            </button>
+          ))}
+        </div>
+
+        {accounts.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+            <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+            <div style={{ fontWeight: 600 }}>No accounts found</div>
+          </div>
+        ) : accounts.map(client => (
           <div key={client.id} className="admin-hub-item" onClick={() => setSelectedClient(client)} style={{ marginBottom: 8 }}>
             <div className="hub-icon" style={{ background: '#b85c4a18', color: '#b85c4a' }}>
               <i className="fas fa-clipboard-check" />
