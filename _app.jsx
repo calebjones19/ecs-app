@@ -1031,7 +1031,7 @@ function EmojiPickerSheet({ show, onSelect, onClose }) {
 }
 
 // ─── Chat ──────────────────────────────────────────────────────
-function Chat({ role, authedUser, perm, channels, setChannels, activeChannel, setActiveChannel, channelMessages, setAllMessages, messageUnsubsRef }) {
+function Chat({ role, authedUser, perm, channels, setChannels, activeChannel, setActiveChannel, channelMessages, setAllMessages, messageUnsubsRef, isPanel, onClose, onThreadChange }) {
   const [message, setMessage] = useState('');
   const [showSendLater, setShowSendLater] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
@@ -1091,6 +1091,8 @@ function Chat({ role, authedUser, perm, channels, setChannels, activeChannel, se
   // Thread state
   const [openThread, setOpenThread] = useState(null);
   const [threadReply, setThreadReply] = useState('');
+  // Notify parent panel when thread opens/closes
+  useEffect(() => { if (onThreadChange) onThreadChange(!!openThread); }, [!!openThread]);
   // Toolbar picker state
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [emojiTab, setEmojiTab] = useState('favorites');
@@ -1910,12 +1912,17 @@ function Chat({ role, authedUser, perm, channels, setChannels, activeChannel, se
   const canSend = channel && isJoined(channel);
 
   return (
-    <div className="chat-layout">
+    <div className={`chat-layout${isPanel ? ' chat-layout-panel' : ''}`}>
       {/* ── Channel Sidebar ── */}
       <div className={`chat-channels ${mobileShowMessages ? 'hidden-mobile' : ''}`}>
         <div className="chat-channels-header">
           <h3>Messages</h3>
           <div style={{ display: 'flex', gap: 4 }}>
+            {isPanel && (
+              <button className="chat-icon-btn" title="Close chat" onClick={onClose} style={{ marginRight: 2 }}>
+                <i className="fas fa-times" />
+              </button>
+            )}
             {chatSidebarTab === 'dms' && (
               <button className="chat-icon-btn" title="New direct message" onClick={() => setShowNewDM(true)}><i className="fas fa-edit" /></button>
             )}
@@ -10809,6 +10816,8 @@ function App() {
   const mobileUserMenuRef = useRef(null);
   const swipeRef = React.useRef(null);
   const [chatUnread, setChatUnread] = useState(0);
+  const [chatPanelOpen, setChatPanelOpen] = useState(false);
+  const [chatPanelHasThread, setChatPanelHasThread] = useState(false);
 
   // Sync active page to global for notification suppression
   useEffect(() => {
@@ -11368,7 +11377,7 @@ function App() {
             <i className="fas fa-search" style={{ fontSize: 12, color: '#9ea2a6' }} />
             <input placeholder="Search..." style={{ fontSize: 13, color: 'white' }} />
           </div>
-          <button className="topnav-icon-btn" onClick={() => setPage('chat')} style={{ position: 'relative' }} title="Chat">
+          <button className="topnav-icon-btn" onClick={() => setChatPanelOpen(prev => !prev)} style={{ position: 'relative' }} title="Chat">
             <i className="fas fa-comments" />
             {chatUnread > 0 && (
               <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, background: 'var(--danger)', borderRadius: 8, border: '2px solid var(--sidebar-bg)', fontSize: 9, fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
@@ -11515,6 +11524,20 @@ function App() {
         <div key={page} className={`content page-enter`} style={page === 'chat' ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {}}>
           {renderPage()}
         </div>
+      </div>
+
+      {/* ── Desktop Chat Side Panel ── */}
+      <div className={`chat-side-panel${chatPanelOpen ? ' open' : ''}${chatPanelHasThread ? ' with-thread' : ''}`}>
+        <Chat
+          role={role} authedUser={authedUser} perm={{ role, isAdmin, canEdit, canSchedule, permLevel }}
+          channels={channels} setChannels={setChannels}
+          activeChannel={activeChannel} setActiveChannel={setActiveChannel}
+          channelMessages={allMessages[activeChannel] || []}
+          setAllMessages={setAllMessages} messageUnsubsRef={messageUnsubsRef}
+          isPanel={true}
+          onClose={() => { setChatPanelOpen(false); setChatPanelHasThread(false); }}
+          onThreadChange={setChatPanelHasThread}
+        />
       </div>
     </div>
   );
