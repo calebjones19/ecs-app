@@ -3402,6 +3402,17 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     return () => window.removeEventListener('ecs-back', handler);
   }, []);
   const isMobile = window.innerWidth <= 768;
+  const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
+  React.useEffect(() => {
+    const mq = window.matchMedia('(orientation: portrait)');
+    const handler = (e) => {
+      setIsPortrait(e.matches);
+      if (e.matches) setCalView('day'); // force day when rotating to portrait
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  const portraitMobile = isMobile && isPortrait;
   const [calView, setCalView] = useState(isMobile ? 'day' : 'week'); // day, week, month
   const [groupBy, setGroupBy] = useState('client'); // employee, client
   const [showLabor, setShowLabor] = useState(!isMobile);
@@ -4854,7 +4865,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
         {/* Row 1: Day / Week / Month — full width pill toggle */}
         <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
-          {['day', 'week', 'month'].map(v => (
+          {(portraitMobile ? ['day'] : ['day', 'week', 'month']).map(v => (
             <button key={v} onClick={() => setCalView(v)} style={{
               flex: 1, padding: '10px 0', border: 'none', cursor: 'pointer',
               fontSize: 14, fontWeight: calView === v ? 700 : 500,
@@ -4865,6 +4876,11 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
               {v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
+          {portraitMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 11, color: 'var(--text-light)', gap: 4, borderLeft: '1px solid var(--border)' }}>
+              <i className="fas fa-rotate" style={{ fontSize: 10 }} /> Rotate for more views
+            </div>
+          )}
         </div>
 
         {/* Row 2: nav + date label — left; filter + actions — right */}
