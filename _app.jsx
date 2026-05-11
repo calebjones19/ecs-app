@@ -5803,42 +5803,6 @@ function ClientList({ role, perm, onCardOpen }) {
     return (
       <div>
         {/* Delete client confirmation modal */}
-        {/* Client dedup modal */}
-        {showClientDedupConfirm && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-            onClick={() => !clientDedupRunning && setShowClientDedupConfirm(false)}>
-            <div style={{ background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
-              <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 16 }}>
-                {clientDedupList.length === 0 ? 'No Duplicates Found' : `Remove ${clientDedupList.length} Duplicate${clientDedupList.length !== 1 ? 's' : ''}?`}
-              </div>
-              {clientDedupList.length === 0 ? (
-                <p style={{ color: 'var(--text-light)', fontSize: 14, marginBottom: 20 }}>All client names are unique — nothing to remove.</p>
-              ) : (
-                <>
-                  <p style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 12 }}>The oldest record for each name will be kept. These duplicates will be permanently deleted:</p>
-                  <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {clientDedupList.map(c => (
-                      <div key={c.id} style={{ fontSize: 13, padding: '6px 10px', background: '#fef2f2', borderRadius: 8, color: 'var(--danger)', fontWeight: 600 }}>{c.name}</div>
-                    ))}
-                  </div>
-                </>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setShowClientDedupConfirm(false)} disabled={clientDedupRunning}
-                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid var(--border)', background: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-                  {clientDedupList.length === 0 ? 'Close' : 'Cancel'}
-                </button>
-                {clientDedupList.length > 0 && (
-                  <button onClick={handleClientDedup} disabled={clientDedupRunning}
-                    style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: 'var(--danger)', fontSize: 14, fontWeight: 700, cursor: clientDedupRunning ? 'wait' : 'pointer', color: 'white' }}>
-                    {clientDedupRunning ? 'Removing…' : 'Remove Duplicates'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         <Modal show={showDeleteClientConfirm} onClose={() => { setShowDeleteClientConfirm(false); setDeleteClientConfirmName(''); }} title="Remove Client">
           <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
@@ -6158,6 +6122,42 @@ function ClientList({ role, perm, onCardOpen }) {
           </button>
         </div>
       </Modal>
+
+      {/* Client dedup modal */}
+      {showClientDedupConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => !clientDedupRunning && setShowClientDedupConfirm(false)}>
+          <div style={{ background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 16 }}>
+              {clientDedupList.length === 0 ? 'No Duplicates Found' : `Remove ${clientDedupList.length} Duplicate${clientDedupList.length !== 1 ? 's' : ''}?`}
+            </div>
+            {clientDedupList.length === 0 ? (
+              <p style={{ color: 'var(--text-light)', fontSize: 14, marginBottom: 20 }}>All client names are unique — nothing to remove.</p>
+            ) : (
+              <>
+                <p style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 12 }}>The oldest record for each name will be kept. These duplicates will be permanently deleted:</p>
+                <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {clientDedupList.map(c => (
+                    <div key={c.id} style={{ fontSize: 13, padding: '6px 10px', background: '#fef2f2', borderRadius: 8, color: 'var(--danger)', fontWeight: 600 }}>{c.name}</div>
+                  ))}
+                </div>
+              </>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowClientDedupConfirm(false)} disabled={clientDedupRunning}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid var(--border)', background: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                {clientDedupList.length === 0 ? 'Close' : 'Cancel'}
+              </button>
+              {clientDedupList.length > 0 && (
+                <button onClick={handleClientDedup} disabled={clientDedupRunning}
+                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: 'var(--danger)', fontSize: 14, fontWeight: 700, cursor: clientDedupRunning ? 'wait' : 'pointer', color: 'white' }}>
+                  {clientDedupRunning ? 'Removing…' : 'Remove Duplicates'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
