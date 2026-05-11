@@ -2998,8 +2998,29 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
 
   const schedulableIds = authedUser?.schedulableAccounts || [];
   const availableClients = (isAdmin || canEdit)
-    ? CLIENTS.filter(c => c.status !== 'inactive')
-    : CLIENTS.filter(c => c.status !== 'inactive' && schedulableIds.includes(c.id));
+    ? CLIENTS.filter(c => c.status !== 'inactive').sort((a, b) => a.name.localeCompare(b.name))
+    : CLIENTS.filter(c => c.status !== 'inactive' && schedulableIds.includes(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+
+  // Team filter for step 1 (admins only)
+  const autoSchedulerTeams = React.useMemo(() => {
+    const allTeams = [...new Set(EMPLOYEES.flatMap(e => e.teams || []))]
+      .filter(t => t.toLowerCase().startsWith('team ')).sort();
+    return allTeams;
+  }, []);
+  const [teamFilter, setTeamFilter] = useState('all'); // 'all' | team name
+
+  // Clients per team: same logic as schedule filter
+  const clientsForTeam = React.useMemo(() => {
+    if (teamFilter === 'all') return availableClients;
+    const teamEmpIds = new Set(EMPLOYEES.filter(e => (e.teams || []).includes(teamFilter)).map(e => e.id));
+    const teamClientIds = new Set();
+    EMPLOYEES.filter(e => teamEmpIds.has(e.id)).forEach(e => {
+      (e.schedulableAccounts || []).forEach(id => teamClientIds.add(id));
+    });
+    return teamClientIds.size > 0
+      ? availableClients.filter(c => teamClientIds.has(c.id))
+      : availableClients;
+  }, [teamFilter, availableClients]);
 
   const getWeekDays = () => {
     const days = [];
@@ -3185,21 +3206,73 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
             <button className="topbar-btn primary" onClick={() => setStep(2)} disabled={selectedClients.size === 0}>Next →</button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-            <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 16 }}>Select accounts to auto-schedule</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-              {availableClients.map(c => {
+
+            {/* Team filter — admins only */}
+            {(isAdmin || canEdit) && autoSchedulerTeams.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 8 }}>Filter by Team</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => setTeamFilter('all')}
+                    className={`cl-pill${teamFilter === 'all' ? ' active' : ''}`}>
+                    All
+                  </button>
+                  {autoSchedulerTeams.map(t => (
+                    <button key={t}
+                      onClick={() => setTeamFilter(t)}
+                      className={`cl-pill${teamFilter === t ? ' active' : ''}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Select / deselect all for current filter */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-light)' }}>
+                {selectedClients.size > 0 ? `${selectedClients.size} selected` : 'Select accounts to auto-schedule'}
+              </div>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--primary)', fontWeight: 600, padding: 0 }}
+                onClick={() => {
+                  const ids = clientsForTeam.map(c => c.id);
+                  const allSel = ids.every(id => selectedClients.has(id));
+                  setSelectedClients(prev => {
+                    const next = new Set(prev);
+                    if (allSel) { ids.forEach(id => next.delete(id)); }
+                    else { ids.forEach(id => next.add(id)); }
+                    return next;
+                  });
+                }}>
+                {clientsForTeam.every(c => selectedClients.has(c.id)) ? 'Deselect All' : 'Select All'}
+              </button>
+            </div>
+
+            {/* Single-column alphabetical list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {clientsForTeam.map(c => {
                 const sel = selectedClients.has(c.id);
                 return (
                   <div key={c.id} onClick={() => toggleClient(c.id)}
-                    style={{ padding: '14px 12px', borderRadius: 12, cursor: 'pointer', position: 'relative',
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, cursor: 'pointer',
                       background: sel ? 'var(--primary-light)' : 'white',
-                      border: `2px solid ${sel ? 'var(--primary)' : 'var(--border)'}` }}>
-                    {sel && <i className="fas fa-check-circle" style={{ position: 'absolute', top: 8, right: 8, color: 'var(--primary)', fontSize: 14 }} />}
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                      <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`} style={{ fontSize: 14, color: c.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
+                      border: `1.5px solid ${sel ? 'var(--primary)' : 'var(--border)'}`,
+                      transition: 'all 0.12s' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+                      background: c.type === 'Residential' ? '#e8f5e9' : '#e3f2fd',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className={`fas ${c.type === 'Residential' ? 'fa-home' : 'fa-building'}`}
+                        style={{ fontSize: 14, color: c.type === 'Residential' ? '#388e3c' : '#1976d2' }} />
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{c.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>{c.type}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: sel ? 'var(--primary)' : 'var(--text)' }}>{c.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{c.type}</div>
+                    </div>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid ${sel ? 'var(--primary)' : 'var(--border)'}`,
+                      background: sel ? 'var(--primary)' : 'transparent', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {sel && <i className="fas fa-check" style={{ fontSize: 10, color: 'white' }} />}
+                    </div>
                   </div>
                 );
               })}
