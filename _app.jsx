@@ -3361,6 +3361,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAutoSchedule, setShowAutoSchedule] = useState(false);
   const [showAllAccounts, setShowAllAccounts] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   const [showResetAutoConfirm, setShowResetAutoConfirm] = useState(false);
   const [resettingAuto, setResettingAuto] = useState(false);
 
@@ -4176,6 +4177,140 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
             })}
           </div>
         )}
+      </div>
+    );
+  };
+
+  // ── Timeline helpers ──
+  const TIMELINE_START = 6;  // 6am
+  const TIMELINE_END   = 21; // 9pm
+  const HOUR_H = 56; // px per hour
+  const toMinutes = (t) => { const [h, m] = (t || '00:00').split(':').map(Number); return h * 60 + m; };
+  const timeToY = (t) => ((toMinutes(t) - TIMELINE_START * 60) / 60) * HOUR_H;
+  const timeToPx = (start, end) => Math.max(22, ((toMinutes(end) - toMinutes(start)) / 60) * HOUR_H - 2);
+  const hours = Array.from({ length: TIMELINE_END - TIMELINE_START }, (_, i) => TIMELINE_START + i);
+  const fmtHour = (h) => h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`;
+
+  // Render timeline view for day (dayIndex) or week (dayIndex = null = all days)
+  const renderTimelineView = (mode = 'day') => {
+    const totalH = (TIMELINE_END - TIMELINE_START) * HOUR_H;
+    const LABEL_W = 44;
+
+    // Gather all shifts for the relevant day(s)
+    const allDayShifts = []; // { ...shift, emp, dayIdx }
+    Object.entries(viewData).forEach(([empId, shifts]) => {
+      const emp = EMPLOYEES.find(e => e.id === empId);
+      if (!emp || emp.status !== 'active') return;
+      shifts.forEach(s => {
+        if (mode === 'day' && s.day !== selectedDay) return;
+        if (!s.startTime) return;
+        allDayShifts.push({ ...s, emp, dayIdx: s.day });
+      });
+    });
+
+    if (mode === 'week') {
+      // ── Week timeline: day columns ──
+      const colW = `calc((100% - ${LABEL_W}px) / 7)`;
+      return (
+        <div style={{ display: 'flex', background: 'white', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+          {/* Hour labels */}
+          <div style={{ width: LABEL_W, flexShrink: 0, borderRight: '1px solid var(--border)', paddingTop: 32 }}>
+            {hours.map(h => (
+              <div key={h} style={{ height: HOUR_H, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingRight: 6, paddingTop: 3 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-light)', fontWeight: 500, whiteSpace: 'nowrap' }}>{fmtHour(h)}</span>
+              </div>
+            ))}
+          </div>
+          {/* Day columns */}
+          {weekDays.map((wd, dayIdx) => {
+            const dayShifts = allDayShifts.filter(s => s.dayIdx === dayIdx);
+            return (
+              <div key={dayIdx} style={{ flex: 1, borderRight: dayIdx < 6 ? '1px solid var(--border)' : 'none', minWidth: 0 }}>
+                {/* Day header */}
+                <div style={{ height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid var(--border)', background: 'var(--bg)', fontSize: 11, fontWeight: 600, color: 'var(--text-light)' }}>
+                  {wd.label}
+                </div>
+                {/* Time grid */}
+                <div style={{ position: 'relative', height: totalH }}>
+                  {hours.map(h => (
+                    <div key={h} style={{ position: 'absolute', top: (h - TIMELINE_START) * HOUR_H, left: 0, right: 0, height: HOUR_H, borderBottom: '1px solid #f0ede8' }} />
+                  ))}
+                  {dayShifts.map((s, i) => {
+                    const top = timeToY(s.startTime);
+                    const height = timeToPx(s.startTime, s.endTime);
+                    return (
+                      <div key={i}
+                        className={`schedule-shift ${s.type}`}
+                        onClick={() => canSchedule && openEditShift(s)}
+                        style={{ position: 'absolute', left: 2, right: 2, top, height, margin: 0, cursor: canSchedule ? 'pointer' : 'default', overflow: 'hidden', zIndex: 1 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, lineHeight: 1.2 }}>{s.emp.name.split(' ')[0]}</div>
+                        <div style={{ fontSize: 9, opacity: 0.8, lineHeight: 1.2 }}>{s.client}</div>
+                      </div>
+                    );
+                  })}
+                  {canSchedule && (
+                    <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}
+                      onClick={() => openAddShift({ day: dayIdx })} />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ── Day timeline: single column ──
+    return (
+      <div style={{ display: 'flex', background: 'white', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        {/* Hour labels */}
+        <div style={{ width: LABEL_W, flexShrink: 0, borderRight: '1px solid var(--border)' }}>
+          {hours.map(h => (
+            <div key={h} style={{ height: HOUR_H, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingRight: 6, paddingTop: 3 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-light)', fontWeight: 500, whiteSpace: 'nowrap' }}>{fmtHour(h)}</span>
+            </div>
+          ))}
+        </div>
+        {/* Shift area */}
+        <div style={{ flex: 1, position: 'relative', height: totalH, minWidth: 0 }}>
+          {hours.map(h => (
+            <div key={h} style={{ position: 'absolute', top: (h - TIMELINE_START) * HOUR_H, left: 0, right: 0, height: HOUR_H, borderBottom: '1px solid #f0ede8' }} />
+          ))}
+          {/* Group overlapping shifts into columns */}
+          {(() => {
+            // Simple overlap detection — assign column index
+            const sorted = [...allDayShifts].sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime));
+            const cols = []; // each col is array of end-times
+            const placed = sorted.map(s => {
+              const start = toMinutes(s.startTime);
+              const end = toMinutes(s.endTime);
+              let col = cols.findIndex(endT => endT <= start);
+              if (col === -1) { col = cols.length; cols.push(end); } else { cols[col] = end; }
+              return { ...s, col };
+            });
+            const totalCols = Math.max(1, cols.length);
+            return placed.map((s, i) => {
+              const top = timeToY(s.startTime);
+              const height = timeToPx(s.startTime, s.endTime);
+              const w = `calc(${100 / totalCols}% - 4px)`;
+              const left = `calc(${(s.col / totalCols) * 100}% + 2px)`;
+              return (
+                <div key={i}
+                  className={`schedule-shift ${s.type}`}
+                  onClick={() => canSchedule && openEditShift(s)}
+                  style={{ position: 'absolute', top, height, width: w, left, margin: 0, cursor: canSchedule ? 'pointer' : 'default', overflow: 'hidden', zIndex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700 }}>{s.emp.name.split(' ')[0]}</div>
+                  <div style={{ fontSize: 10, opacity: 0.85 }}>{s.client}</div>
+                  <div style={{ fontSize: 10, opacity: 0.7 }}>{s.time}</div>
+                </div>
+              );
+            });
+          })()}
+          {canSchedule && (
+            <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}
+              onClick={() => openAddShift({ day: selectedDay })} />
+          )}
+        </div>
       </div>
     );
   };
@@ -5036,6 +5171,20 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                   ))}
                   {/* Divider */}
                   <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
+                  {/* Timeline / all hours toggle */}
+                  {(calView === 'day' || calView === 'week') && (
+                    <button onClick={() => { setShowTimeline(v => !v); setShowActionsMenu(false); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                      background: showTimeline ? 'var(--primary-light)' : 'none', border: 'none', cursor: 'pointer',
+                      fontSize: 14, color: showTimeline ? 'var(--primary)' : 'var(--text)', fontWeight: 600,
+                    }}
+                      onMouseEnter={e => { if (!showTimeline) e.currentTarget.style.background = 'var(--bg)'; }}
+                      onMouseLeave={e => { if (!showTimeline) e.currentTarget.style.background = 'none'; }}>
+                      <i className="fas fa-clock" style={{ width: 16, color: showTimeline ? 'var(--primary)' : 'var(--text-light)', textAlign: 'center' }} />
+                      Show All Hours
+                      {showTimeline && <i className="fas fa-check" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)' }} />}
+                    </button>
+                  )}
                   {/* Show all accounts toggle */}
                   <button onClick={() => { setShowAllAccounts(v => !v); setShowActionsMenu(false); }} style={{
                     display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
@@ -5098,8 +5247,11 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
       {/* ── Calendar Body ── */}
       {calView === 'day' && <DayTabs />}
-      {calView === 'day' && renderDayView()}
-      {calView === 'week' && <div className="schedule-grid-scroll">{renderWeekView()}</div>}
+      {calView === 'day' && (showTimeline ? renderTimelineView('day') : renderDayView())}
+      {calView === 'week' && (showTimeline
+        ? <div className="schedule-grid-scroll">{renderTimelineView('week')}</div>
+        : <div className="schedule-grid-scroll">{renderWeekView()}</div>
+      )}
       {calView === 'month' && renderMonthView()}
       {editShiftSheet}
 
