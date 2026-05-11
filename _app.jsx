@@ -3154,6 +3154,7 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
               endTime: sh.endTime,
               repeats: false,
               shiftNotes: [],
+              source: 'auto',
               createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             });
             count++;
@@ -3359,6 +3360,30 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
   const [savingShift, setSavingShift] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAutoSchedule, setShowAutoSchedule] = useState(false);
+  const [showResetAutoConfirm, setShowResetAutoConfirm] = useState(false);
+  const [resettingAuto, setResettingAuto] = useState(false);
+
+  const autoShiftCount = React.useMemo(() =>
+    Object.values(scheduleData).flat().filter(s => s.source === 'auto').length
+  , [scheduleData]);
+
+  const handleResetAutoSchedule = async () => {
+    setResettingAuto(true);
+    try {
+      const autoShifts = Object.values(scheduleData).flat().filter(s => s.source === 'auto');
+      const chunks = [];
+      for (let i = 0; i < autoShifts.length; i += 490) chunks.push(autoShifts.slice(i, i + 490));
+      for (const chunk of chunks) {
+        const batch = db.batch();
+        chunk.forEach(s => batch.delete(db.collection('scheduled_shifts').doc(s.id)));
+        await batch.commit();
+      }
+      setShowResetAutoConfirm(false);
+    } catch(e) {
+      alert('Error resetting auto-schedule: ' + e.message);
+    }
+    setResettingAuto(false);
+  };
 
   // ── Live-sync shifts from Firestore (with inline Mon→Sun migration) ──
   useEffect(() => {
@@ -4944,12 +4969,24 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                     <button onClick={() => { setShowActionsMenu(false); setShowTemplates(true); }} style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
                       background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
-                      borderBottom: !isMobile ? '1px solid var(--border)' : 'none', fontWeight: 600,
+                      fontWeight: 600,
                     }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                       <i className="fas fa-layer-group" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
                       Templates
+                    </button>
+                  )}
+                  {canSchedule && autoShiftCount > 0 && (
+                    <button onClick={() => { setShowActionsMenu(false); setShowResetAutoConfirm(true); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                      background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--danger)',
+                      fontWeight: 600,
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                      <i className="fas fa-undo" style={{ width: 16, textAlign: 'center' }} />
+                      Reset Auto-Schedule
                     </button>
                   )}
                   {/* Divider */}
@@ -5139,6 +5176,37 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
       {showTemplates && <ScheduleTemplates role={role} perm={perm} authedUser={authedUser} onClose={() => setShowTemplates(false)} />}
       {showAutoSchedule && <AutoScheduler role={role} perm={perm} authedUser={authedUser} scheduleData={scheduleData} weekStart={weekStart} onClose={() => setShowAutoSchedule(false)} onConfirm={() => setShowAutoSchedule(false)} />}
+
+      {/* ── Reset Auto-Schedule Confirmation ── */}
+      {showResetAutoConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => !resettingAuto && setShowResetAutoConfirm(false)}>
+          <div style={{ background: 'white', borderRadius: 18, padding: 28, maxWidth: 380, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#fff0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <i className="fas fa-undo" style={{ fontSize: 22, color: 'var(--danger)' }} />
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 18, textAlign: 'center', marginBottom: 10 }}>Reset Auto-Schedule?</div>
+            <div style={{ fontSize: 14, color: 'var(--text-light)', textAlign: 'center', lineHeight: 1.6, marginBottom: 8 }}>
+              This will remove <strong style={{ color: 'var(--text)' }}>{autoShiftCount} auto-scheduled shift{autoShiftCount !== 1 ? 's' : ''}</strong> — only shifts created by the auto-scheduler.
+            </div>
+            <div style={{ background: '#f0f9f4', border: '1px solid #c3e6cb', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#2d6a4f', marginBottom: 22, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <i className="fas fa-shield-alt" style={{ marginTop: 1, flexShrink: 0 }} />
+              Manually scheduled shifts will not be affected.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowResetAutoConfirm(false)} disabled={resettingAuto}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid var(--border)', background: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--text)' }}>
+                Cancel
+              </button>
+              <button onClick={handleResetAutoSchedule} disabled={resettingAuto}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: 'var(--danger)', fontSize: 14, fontWeight: 700, cursor: resettingAuto ? 'wait' : 'pointer', color: 'white' }}>
+                {resettingAuto ? 'Resetting…' : 'Reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
