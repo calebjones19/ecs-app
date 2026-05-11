@@ -4952,57 +4952,64 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
                       Templates
                     </button>
                   )}
-                  {(canEdit || isAdmin) && !isMobile && (
-                    <React.Fragment>
-                      <button onClick={() => setShowActionsMenu(false)} style={{
-                        display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
-                        background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
-                        borderBottom: '1px solid var(--border)', fontWeight: 600,
-                      }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                        <i className="fas fa-bell" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
-                        Notify All
-                      </button>
-                      <button onClick={() => setShowActionsMenu(false)} style={{
-                        display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
-                        background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
-                        fontWeight: 600,
-                      }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                        <i className="fas fa-download" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
-                        Export
-                      </button>
-                    </React.Fragment>
-                  )}
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
+                  {/* Group by */}
+                  <div style={{ padding: '8px 16px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Group By</div>
+                  {['client', 'employee'].map(g => (
+                    <button key={g} onClick={() => { setGroupBy(g); setShowActionsMenu(false); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 16px',
+                      background: groupBy === g ? 'var(--primary-light)' : 'none', border: 'none', cursor: 'pointer',
+                      fontSize: 14, color: groupBy === g ? 'var(--primary)' : 'var(--text)', fontWeight: groupBy === g ? 700 : 600,
+                    }}
+                      onMouseEnter={e => { if (groupBy !== g) e.currentTarget.style.background = 'var(--bg)'; }}
+                      onMouseLeave={e => { if (groupBy !== g) e.currentTarget.style.background = 'none'; }}>
+                      <i className={`fas ${g === 'client' ? 'fa-building' : 'fa-user'}`} style={{ width: 16, color: groupBy === g ? 'var(--primary)' : 'var(--text-light)', textAlign: 'center' }} />
+                      {g === 'client' ? 'By Account' : 'By Employee'}
+                      {groupBy === g && <i className="fas fa-check" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)' }} />}
+                    </button>
+                  ))}
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
+                  {/* Labor toggle */}
+                  <button onClick={() => { setShowLabor(v => !v); setShowActionsMenu(false); }} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                    background: showLabor ? 'var(--primary-light)' : 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 14, color: showLabor ? 'var(--primary)' : 'var(--text)', fontWeight: 600,
+                    borderTop: 'none',
+                  }}
+                    onMouseEnter={e => { if (!showLabor) e.currentTarget.style.background = 'var(--bg)'; }}
+                    onMouseLeave={e => { if (!showLabor) e.currentTarget.style.background = 'none'; }}>
+                    <i className="fas fa-chart-bar" style={{ width: 16, color: showLabor ? 'var(--primary)' : 'var(--text-light)', textAlign: 'center' }} />
+                    Labor Hours
+                    {showLabor && <i className="fas fa-check" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--primary)' }} />}
+                  </button>
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />
+                  <button onClick={() => setShowActionsMenu(false)} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                    background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)',
+                    borderBottom: '1px solid var(--border)', fontWeight: 600,
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                    <i className="fas fa-bell" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
+                    Notify All
+                  </button>
+                  <button onClick={() => setShowActionsMenu(false)} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px',
+                    background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text)', fontWeight: 600,
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-light)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                    <i className="fas fa-download" style={{ width: 16, color: 'var(--primary)', textAlign: 'center' }} />
+                    Export
+                  </button>
                 </div>
               )}
             </div>
           )}
 
-            {/* Group by toggle — desktop only */}
-            {!isMobile && (
-              <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                {['employee', 'client'].map(g => (
-                  <button key={g} onClick={() => setGroupBy(g)} style={{
-                    padding: '6px 14px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: groupBy === g ? 700 : 400,
-                    background: groupBy === g ? 'var(--primary)' : 'transparent', color: groupBy === g ? 'white' : 'var(--text)',
-                    transition: 'all 0.15s',
-                  }}>
-                    <i className={`fas ${g === 'employee' ? 'fa-user' : 'fa-building'}`} style={{ marginRight: 6 }} />
-                    {g === 'employee' ? 'By Employee' : 'By Client'}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Labor hours toggle — desktop only */}
-            {!isMobile && (
-              <button className="topbar-btn" onClick={() => setShowLabor(!showLabor)} style={{ color: showLabor ? 'var(--primary)' : undefined, borderColor: showLabor ? 'var(--primary)' : undefined }}>
-                <i className="fas fa-chart-bar" /> Labor
-              </button>
-            )}
           </div>
         </div>
       </div>
