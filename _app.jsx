@@ -5594,6 +5594,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 // ─── Clients ───────────────────────────────────────────────────
 function ClientList({ role, perm, onCardOpen }) {
   const canEdit = perm?.canEdit || role === 'admin';
+  const isAdmin = perm?.isAdmin || role === 'admin';
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -5607,6 +5608,46 @@ function ClientList({ role, perm, onCardOpen }) {
   const [approvedEditMode, setApprovedEditMode] = useState(false);
   const [approvedSearch, setApprovedSearch] = useState('');
   const [newClient, setNewClient] = useState({ name:'', contact:'', phone:'', email:'', address:'', type:'Residential', frequency:'Weekly', rate:'', budgetedHours:'', budgetedWorkers:'', notes:'' });
+  const [showClientDedupConfirm, setShowClientDedupConfirm] = useState(false);
+  const [clientDedupList, setClientDedupList] = useState([]);
+  const [clientDedupRunning, setClientDedupRunning] = useState(false);
+
+  const findClientDuplicates = () => {
+    const byName = {};
+    CLIENTS.forEach(c => {
+      const key = (c.name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!byName[key]) byName[key] = [];
+      byName[key].push(c);
+    });
+    const toDelete = [];
+    Object.values(byName).forEach(group => {
+      if (group.length < 2) return;
+      // Sort by createdAt ascending, keep oldest, delete the rest
+      group.sort((a, b) => (a.createdAt?.seconds ?? Infinity) - (b.createdAt?.seconds ?? Infinity));
+      group.slice(1).forEach(c => toDelete.push(c));
+    });
+    setClientDedupList(toDelete);
+    setShowClientDedupConfirm(true);
+  };
+
+  const handleClientDedup = async () => {
+    setClientDedupRunning(true);
+    try {
+      const chunks = [];
+      for (let i = 0; i < clientDedupList.length; i += 490) chunks.push(clientDedupList.slice(i, i + 490));
+      for (const chunk of chunks) {
+        const batch = db.batch();
+        chunk.forEach(c => batch.delete(db.collection('clients').doc(c.id)));
+        await batch.commit();
+      }
+      setShowClientDedupConfirm(false);
+      setClientDedupList([]);
+    } catch(err) {
+      alert('Error removing duplicates: ' + err.message);
+    }
+    setClientDedupRunning(false);
+  };
 
   // Notify parent when a client card is open/closed
   useEffect(() => {
@@ -5757,6 +5798,42 @@ function ClientList({ role, perm, onCardOpen }) {
     return (
       <div>
         {/* Delete client confirmation modal */}
+        {/* Client dedup modal */}
+        {showClientDedupConfirm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+            onClick={() => !clientDedupRunning && setShowClientDedupConfirm(false)}>
+            <div style={{ background: 'white', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 16 }}>
+                {clientDedupList.length === 0 ? 'No Duplicates Found' : `Remove ${clientDedupList.length} Duplicate${clientDedupList.length !== 1 ? 's' : ''}?`}
+              </div>
+              {clientDedupList.length === 0 ? (
+                <p style={{ color: 'var(--text-light)', fontSize: 14, marginBottom: 20 }}>All client names are unique — nothing to remove.</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 12 }}>The oldest record for each name will be kept. These duplicates will be permanently deleted:</p>
+                  <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {clientDedupList.map(c => (
+                      <div key={c.id} style={{ fontSize: 13, padding: '6px 10px', background: '#fef2f2', borderRadius: 8, color: 'var(--danger)', fontWeight: 600 }}>{c.name}</div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setShowClientDedupConfirm(false)} disabled={clientDedupRunning}
+                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid var(--border)', background: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                  {clientDedupList.length === 0 ? 'Close' : 'Cancel'}
+                </button>
+                {clientDedupList.length > 0 && (
+                  <button onClick={handleClientDedup} disabled={clientDedupRunning}
+                    style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: 'var(--danger)', fontSize: 14, fontWeight: 700, cursor: clientDedupRunning ? 'wait' : 'pointer', color: 'white' }}>
+                    {clientDedupRunning ? 'Removing…' : 'Remove Duplicates'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <Modal show={showDeleteClientConfirm} onClose={() => { setShowDeleteClientConfirm(false); setDeleteClientConfirmName(''); }} title="Remove Client">
           <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
@@ -5936,6 +6013,11 @@ function ClientList({ role, perm, onCardOpen }) {
         </div>
         {canEdit && (
           <button className="topbar-btn primary" onClick={() => setShowAdd(true)} style={{ flexShrink: 0 }}><i className="fas fa-plus" /></button>
+        )}
+        {isAdmin && (
+          <button className="topbar-btn" onClick={findClientDuplicates} style={{ flexShrink: 0, color: 'var(--text-light)' }} title="Remove duplicate clients">
+            <i className="fas fa-copy" />
+          </button>
         )}
       </div>
       <div className="cl-filter-pills" style={{ marginBottom: 16 }}>
