@@ -2989,6 +2989,18 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
   const [step, setStep] = useState(1);
   const [selectedClients, setSelectedClients] = useState(new Set());
   const [weekOffset, setWeekOffset] = useState(0);
+  const [dateMode, setDateMode] = useState('week'); // 'day' | 'week' | 'month' | 'range'
+  const [singleDate, setSingleDate] = useState(() => weekStart.toISOString().slice(0, 10));
+  const [monthYear, setMonthYear] = useState(() => {
+    const y = weekStart.getFullYear();
+    const m = String(weekStart.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  });
+  const [rangeStart, setRangeStart] = useState(() => weekStart.toISOString().slice(0, 10));
+  const [rangeEnd, setRangeEnd] = useState(() => {
+    const d = new Date(weekStart); d.setDate(d.getDate() + 6);
+    return d.toISOString().slice(0, 10);
+  });
   const [method, setMethod] = useState('smart-fill');
   const [draft, setDraft] = useState([]);
   const [generating, setGenerating] = useState(false);
@@ -3034,6 +3046,54 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
   const weekDays = getWeekDays();
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+  // All dates in the user's chosen range
+  const scheduleDates = React.useMemo(() => {
+    if (dateMode === 'day') {
+      return [new Date(singleDate + 'T12:00:00')];
+    }
+    if (dateMode === 'week') {
+      return weekDays;
+    }
+    if (dateMode === 'month') {
+      const [y, m] = monthYear.split('-').map(Number);
+      const days = [];
+      const d = new Date(y, m - 1, 1);
+      while (d.getMonth() === m - 1) { days.push(new Date(d)); d.setDate(d.getDate() + 1); }
+      return days;
+    }
+    if (dateMode === 'range') {
+      if (!rangeStart || !rangeEnd) return [];
+      const days = [];
+      const s = new Date(rangeStart + 'T12:00:00');
+      const e = new Date(rangeEnd + 'T12:00:00');
+      const d = new Date(s);
+      while (d <= e) { days.push(new Date(d)); d.setDate(d.getDate() + 1); }
+      return days;
+    }
+    return [];
+  }, [dateMode, singleDate, monthYear, rangeStart, rangeEnd, weekDays]);
+
+  const scheduleLabel = React.useMemo(() => {
+    if (dateMode === 'day') {
+      const d = new Date(singleDate + 'T12:00:00');
+      return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+    if (dateMode === 'week') {
+      return weekDays[0] ? `${monthNames[weekDays[0].getMonth()]} ${weekDays[0].getDate()} – ${monthNames[weekDays[6].getMonth()]} ${weekDays[6].getDate()}, ${weekDays[6].getFullYear()}` : '';
+    }
+    if (dateMode === 'month') {
+      const [y, m] = monthYear.split('-').map(Number);
+      return `${['January','February','March','April','May','June','July','August','September','October','November','December'][m-1]} ${y}`;
+    }
+    if (dateMode === 'range') {
+      if (!rangeStart || !rangeEnd) return 'Select a range';
+      const s = new Date(rangeStart + 'T12:00:00');
+      const e = new Date(rangeEnd + 'T12:00:00');
+      return `${monthNames[s.getMonth()]} ${s.getDate()} – ${monthNames[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+    }
+    return '';
+  }, [dateMode, singleDate, monthYear, rangeStart, rangeEnd, weekDays]);
+
   const toggleClient = (id) => {
     setSelectedClients(prev => {
       const next = new Set(prev);
@@ -3070,8 +3130,8 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
         const workerCount = client.budgetedWorkers || 1;
         const budgetedHours = client.budgetedHours || 8;
 
-        for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
-          const dayDate = weekDays[dayIdx];
+        for (const dayDate of scheduleDates) {
+          const dayIdx = dayDate.getDay(); // 0=Sun … 6=Sat
           const dateStr = dayDate.toISOString().slice(0, 10);
           let shifts = [];
 
@@ -3207,18 +3267,56 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
 
-            {/* Week being scheduled — always visible in Step 1 */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--primary-light)', border: '1.5px solid var(--primary)', borderRadius: 12, padding: '10px 14px', marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 2 }}>Scheduling Week</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
-                  {weekDays[0] && `${monthNames[weekDays[0].getMonth()]} ${weekDays[0].getDate()} – ${monthNames[weekDays[6].getMonth()]} ${weekDays[6].getDate()}, ${weekDays[6].getFullYear()}`}
+            {/* Date range selector */}
+            <div style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: 14, padding: '14px 14px 12px', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 10 }}>Schedule For</div>
+              {/* Mode tabs */}
+              <div style={{ display: 'flex', background: 'var(--bg)', borderRadius: 10, padding: 3, marginBottom: 12 }}>
+                {[['day','Day'],['week','Week'],['month','Month'],['range','Range']].map(([m, lbl]) => (
+                  <button key={m} onClick={() => setDateMode(m)}
+                    style={{ flex: 1, padding: '6px 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: dateMode === m ? 700 : 500,
+                      background: dateMode === m ? 'white' : 'transparent',
+                      color: dateMode === m ? 'var(--primary)' : 'var(--text-light)',
+                      boxShadow: dateMode === m ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
+                      transition: 'all 0.15s' }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+              {/* Day picker */}
+              {dateMode === 'day' && (
+                <input type="date" value={singleDate} onChange={e => setSingleDate(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 14, fontWeight: 600, color: 'var(--text)', background: 'var(--bg)', boxSizing: 'border-box' }} />
+              )}
+              {/* Week picker */}
+              {dateMode === 'week' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w - 1)}><i className="fas fa-chevron-left" /></button>
+                  <span style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{scheduleLabel}</span>
+                  <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w + 1)}><i className="fas fa-chevron-right" /></button>
                 </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w - 1)} title="Previous week"><i className="fas fa-chevron-left" /></button>
-                <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w + 1)} title="Next week"><i className="fas fa-chevron-right" /></button>
-              </div>
+              )}
+              {/* Month picker */}
+              {dateMode === 'month' && (
+                <input type="month" value={monthYear} onChange={e => setMonthYear(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 14, fontWeight: 600, color: 'var(--text)', background: 'var(--bg)', boxSizing: 'border-box' }} />
+              )}
+              {/* Range picker */}
+              {dateMode === 'range' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="date" value={rangeStart} onChange={e => setRangeStart(e.target.value)}
+                    style={{ flex: 1, padding: '8px 8px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 13, fontWeight: 600, color: 'var(--text)', background: 'var(--bg)', boxSizing: 'border-box' }} />
+                  <span style={{ color: 'var(--text-light)', fontWeight: 600, fontSize: 13 }}>→</span>
+                  <input type="date" value={rangeEnd} min={rangeStart} onChange={e => setRangeEnd(e.target.value)}
+                    style={{ flex: 1, padding: '8px 8px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 13, fontWeight: 600, color: 'var(--text)', background: 'var(--bg)', boxSizing: 'border-box' }} />
+                </div>
+              )}
+              {/* Days count */}
+              {scheduleDates.length > 0 && (
+                <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 8, textAlign: 'right' }}>
+                  {scheduleDates.length === 1 ? '1 day' : `${scheduleDates.length} days`}
+                </div>
+              )}
             </div>
 
             {/* Team filter — admins only */}
@@ -3306,21 +3404,15 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
             <button className="topbar-btn primary" onClick={() => { setStep(3); generateDraft(); }}>Next →</button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-              {[...selectedClients].map(id => {
-                const c = CLIENTS.find(x => x.id === id);
-                return c ? <span key={id} style={{ fontSize: 13, background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 6, padding: '3px 10px', fontWeight: 600 }}>{c.name}</span> : null;
-              })}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Week</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w - 1)}><i className="fas fa-chevron-left" /></button>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>
-                  {weekDays[0] && `${monthNames[weekDays[0].getMonth()]} ${weekDays[0].getDate()} – ${monthNames[weekDays[6].getMonth()]} ${weekDays[6].getDate()}, ${weekDays[6].getFullYear()}`}
-                </span>
-                <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w + 1)}><i className="fas fa-chevron-right" /></button>
+            {/* Summary: accounts + date range */}
+            <div style={{ background: 'var(--primary-light)', border: '1.5px solid var(--primary)', borderRadius: 12, padding: '10px 14px', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 4 }}>Scheduling</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{scheduleLabel}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {[...selectedClients].map(id => {
+                  const c = CLIENTS.find(x => x.id === id);
+                  return c ? <span key={id} style={{ fontSize: 12, background: 'white', color: 'var(--primary)', borderRadius: 6, padding: '2px 8px', fontWeight: 600 }}>{c.name}</span> : null;
+                })}
               </div>
             </div>
 
