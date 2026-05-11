@@ -223,6 +223,9 @@ const ESSENCE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAegAAAC6CAYA
 // read the latest data without prop-drilling through every component.
 let EMPLOYEES = [];
 let CLIENTS = [];
+// Module-level seed guards — survive component remounts so seed never runs twice
+let _employeesSeeded = false;
+let _clientsSeeded = false;
 
 const EMPLOYEE_COLORS = ['#4a6741','#5e8a7a','#7c6f64','#c8a84e','#b85c4a','#5a8a4a','#4a7a8a','#8a4a7a','#7a6a4a','#4a5a8a'];
 
@@ -10812,14 +10815,13 @@ function App() {
 
   // Load employees from Firestore (realtime) — updates global + state
   // Auto-fills any EMPLOYEE_SEED entries missing from Firestore on first load
-  const employeesSeededRef = React.useRef(false);
   useEffect(() => {
     const unsub = db.collection('employees').onSnapshot(async (snap) => {
       const emps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       EMPLOYEES = emps;
       setEmployees(emps);
-      if (!employeesSeededRef.current) {
-        employeesSeededRef.current = true;
+      if (!_employeesSeeded) {
+        _employeesSeeded = true;
         try {
           const existingNames = new Set(emps.map(e => e.name));
           const missing = EMPLOYEE_SEED.filter(s => !existingNames.has(s.name));
@@ -10863,15 +10865,14 @@ function App() {
 
   // Load clients from Firestore (realtime) — updates global + state
   // Auto-fills any CLIENT_SEED entries missing from Firestore on first load
-  const clientsSeededRef = React.useRef(false);
   useEffect(() => {
     const unsub = db.collection('clients').onSnapshot(async (snap) => {
       const cls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       CLIENTS = cls;
       setClients(cls);
       // On first snapshot, add any seed clients not already in Firestore (by name)
-      if (!clientsSeededRef.current) {
-        clientsSeededRef.current = true;
+      if (!_clientsSeeded) {
+        _clientsSeeded = true;
         try {
           const existingNames = new Set(cls.map(c => c.name));
           const missing = CLIENT_SEED.filter(s => !existingNames.has(s.name));
