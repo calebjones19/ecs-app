@@ -3207,6 +3207,20 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
 
+            {/* Week being scheduled — always visible in Step 1 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--primary-light)', border: '1.5px solid var(--primary)', borderRadius: 12, padding: '10px 14px', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 2 }}>Scheduling Week</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>
+                  {weekDays[0] && `${monthNames[weekDays[0].getMonth()]} ${weekDays[0].getDate()} – ${monthNames[weekDays[6].getMonth()]} ${weekDays[6].getDate()}, ${weekDays[6].getFullYear()}`}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w - 1)} title="Previous week"><i className="fas fa-chevron-left" /></button>
+                <button className="chat-icon-btn" onClick={() => setWeekOffset(w => w + 1)} title="Next week"><i className="fas fa-chevron-right" /></button>
+              </div>
+            </div>
+
             {/* Team filter — admins only */}
             {(isAdmin || canEdit) && autoSchedulerTeams.length > 0 && (
               <div style={{ marginBottom: 14 }}>

@@ -1,0 +1,10 @@
+{
+  "presets": [
+    ["@babel/preset-env", {
+      "targets": { "browsers": ["last 2 years", "iOS >= 14"] },
+      "modules": false,
+      "loose": true
+    }],
+    ["@babel/preset-react", { "runtime": "classic" }]
+  ]
+}
