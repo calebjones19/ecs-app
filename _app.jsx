@@ -413,13 +413,18 @@ function Toggle({ on, onToggle }) {
 
 // Modal
 function Modal({ show, onClose, title, children }) {
-  if (!show) return null;
+  const [closing, setClosing] = useState(false);
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(() => { setClosing(false); onClose(); }, 200);
+  };
+  if (!show && !closing) return null;
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+    <div className={`modal-overlay motion-overlay${closing ? ' closing' : ''}`} onClick={handleClose}>
+      <div className={`modal motion-sheet${closing ? ' closing' : ''}`} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>
-          <button className="modal-close" onClick={onClose}><i className="fas fa-times" /></button>
+          <button className="modal-close" onClick={handleClose}><i className="fas fa-times" /></button>
         </div>
         {children}
       </div>
@@ -5434,12 +5439,12 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
 
       {/* ── Calendar Body ── */}
       {calView === 'day' && <DayTabs />}
-      {calView === 'day' && (showTimeline ? renderTimelineView('day') : renderDayView())}
+      {calView === 'day' && <div key="day" className="view-enter">{showTimeline ? renderTimelineView('day') : renderDayView()}</div>}
       {calView === 'week' && (showTimeline
-        ? <div className="schedule-grid-scroll">{renderTimelineView('week')}</div>
-        : <div className="schedule-grid-scroll">{renderWeekView()}</div>
+        ? <div key="week-tl" className="schedule-grid-scroll view-enter">{renderTimelineView('week')}</div>
+        : <div key="week" className="schedule-grid-scroll view-enter">{renderWeekView()}</div>
       )}
-      {calView === 'month' && renderMonthView()}
+      {calView === 'month' && <div key="month" className="view-enter">{renderMonthView()}</div>}
       {editShiftSheet}
 
       {/* ── Filter Panel ── */}
