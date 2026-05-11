@@ -11432,31 +11432,46 @@ function App() {
       </div>
 
       {/* ── Mobile Bottom Nav ── */}
-      <div className="mobile-bottom-nav">
-        {[
+      {(() => {
+        const navItems = [
           { id: 'home', icon: 'fa-home', label: 'Home' },
           { id: 'today', icon: 'fa-sun', label: 'Today' },
           { id: 'timesheets', icon: 'fa-clock', label: 'Time' },
           ...(canSchedule ? [{ id: 'admin', icon: 'fa-crown', label: 'Admin' }] : []),
-        ].map(item => (
-          <button key={item.id} className={`mobile-nav-item ${(item.id === 'admin' ? ['shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin','dashboard'].includes(page) : item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page) : page === item.id) ? 'active' : ''}`}
-            onClick={() => {
-              setPage(item.id);
-              setAdminSubPage(null);
-              setTimeout(() => { const el = document.querySelector('.content'); if (el) el.scrollTop = 0; window.scrollTo(0, 0); }, 10);
-            }}>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <i className={`fas ${item.icon}`} />
-              {item.id === 'chat' && chatUnread > 0 && (
-                <span style={{ position: 'absolute', top: -6, right: -8, background: 'var(--danger)', color: '#fff', fontSize: 9, fontWeight: 700, borderRadius: 10, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
-                  {chatUnread > 99 ? '99+' : chatUnread}
-                </span>
-              )}
-            </div>
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </div>
+        ];
+        const isActive = (item) => item.id === 'admin'
+          ? ['shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin','dashboard'].includes(page)
+          : item.id === 'home'
+          ? ['home','my-checklists','dashboard'].includes(page)
+          : page === item.id;
+        const activeIdx = navItems.findIndex(isActive);
+        const n = navItems.length;
+        return (
+          <div className="mobile-bottom-nav" style={{ position: 'relative' }}>
+            {activeIdx >= 0 && (
+              <div className="nav-pill-indicator" style={{ left: `calc(${(activeIdx + 0.5) * (100 / n)}% - 29px)` }} />
+            )}
+            {navItems.map(item => (
+              <button key={item.id} className={`mobile-nav-item${isActive(item) ? ' active' : ''}`}
+                onClick={() => {
+                  setPage(item.id);
+                  setAdminSubPage(null);
+                  setTimeout(() => { const el = document.querySelector('.content'); if (el) el.scrollTop = 0; window.scrollTo(0, 0); }, 10);
+                }}>
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <i className={`fas ${item.icon}`} />
+                  {item.id === 'chat' && chatUnread > 0 && (
+                    <span style={{ position: 'absolute', top: -6, right: -8, background: 'var(--danger)', color: '#fff', fontSize: 9, fontWeight: 700, borderRadius: 10, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+                      {chatUnread > 99 ? '99+' : chatUnread}
+                    </span>
+                  )}
+                </div>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ── Main Content ── */}
       <div className="main">
