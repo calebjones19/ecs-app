@@ -469,36 +469,45 @@ function Home({ role, perm, authedUser, setPage }) {
 
 // ─── Home Checklists (worker view — view & complete tasks) ──────
 function HomeChecklists({ role, perm, authedUser }) {
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [checklists, setChecklists] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [completions, setCompletions] = useState([]);
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  // When a client is selected, load their checklists, tasks, and today's completions
   useEffect(() => {
+    if (!selectedClient) { setChecklists([]); setTasks([]); setCompletions([]); return; }
+    const unsubCL = db.collection('checklists')
+      .where('clientId', '==', selectedClient.id)
+      .where('active', '==', true)
+      .onSnapshot(snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setChecklists(docs.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
+      }, () => {});
     const unsubTasks = db.collection('checklist_tasks')
+      .where('clientId', '==', selectedClient.id)
       .where('active', '==', true)
       .onSnapshot(snap => setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
     const unsubComp = db.collection('checklist_completions')
+      .where('clientId', '==', selectedClient.id)
       .where('date', '==', todayStr)
       .onSnapshot(snap => setCompletions(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {});
-    return () => { unsubTasks(); unsubComp(); };
-  }, []);
+    return () => { unsubCL(); unsubTasks(); unsubComp(); };
+  }, [selectedClient?.id]);
+
+  // Back swipe / ecs-back: go back to account list
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.handled) return;
+      if (selectedClient) { e.detail && (e.detail.handled = true); setSelectedClient(null); }
+    };
+    window.addEventListener('ecs-back', handler);
+    return () => window.removeEventListener('ecs-back', handler);
+  }, [!!selectedClient]);
 
   const completionsByTask = {};
   completions.forEach(c => { completionsByTask[c.taskId] = c; });
-
-  const fmtTime = (t) => {
-    if (!t) return '';
-    const [hh, mm] = t.split(':').map(Number);
-    const ampm = hh < 12 ? 'AM' : 'PM';
-    const h = hh % 12 || 12;
-    return `${h}:${mm.toString().padStart(2,'0')} ${ampm}`;
-  };
-
-  const timeToMins = (t) => {
-    if (!t) return 9999;
-    const [hh, mm] = t.split(':').map(Number);
-    return hh * 60 + mm;
-  };
 
   const toggleCompletion = async (task) => {
     const existing = completionsByTask[task.id];
@@ -515,62 +524,84 @@ function HomeChecklists({ role, perm, authedUser }) {
     }
   };
 
-  // Group tasks by client
-  const tasksByClient = {};
-  tasks.forEach(t => {
-    if (!tasksByClient[t.clientId]) tasksByClient[t.clientId] = { name: t.clientName, tasks: [] };
-    tasksByClient[t.clientId].tasks.push(t);
-  });
-
-  const clientEntries = Object.entries(tasksByClient)
-    .map(([id, { name, tasks: ts }]) => ({ id, name, tasks: ts.sort((a,b) => timeToMins(a.time) - timeToMins(b.time)) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  const totalTasks = tasks.length;
-  const doneTasks = tasks.filter(t => completionsByTask[t.id]).length;
-
-  if (clientEntries.length === 0) {
-    return (
+  // ── Level 1: Account list ──
+  if (!selectedClient) {
+    const accounts = [...CLIENTS].filter(c => c.status !== 'inactive').sort((a, b) => a.name.localeCompare(b.name));
+    if (accounts.length === 0) return (
       <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
         <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>No tasks today</div>
-        <div style={{ fontSize: 13 }}>Tasks are added by your manager in the Checklists section.</div>
+        <div style={{ fontWeight: 600 }}>No accounts found</div>
+      </div>
+    );
+    return (
+      <div>
+        <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14, fontWeight: 500 }}>Select an account to view its checklists</div>
+        {accounts.map(client => (
+          <div key={client.id} className="admin-hub-item" onClick={() => setSelectedClient(client)} style={{ marginBottom: 8 }}>
+            <div className="hub-icon" style={{ background: '#b85c4a18', color: '#b85c4a' }}>
+              <i className="fas fa-clipboard-check" />
+            </div>
+            <div className="hub-text">
+              <div className="hub-label">{client.name}</div>
+              {client.address && <div className="hub-desc">{client.address}</div>}
+            </div>
+            <i className="fas fa-chevron-right" style={{ color: 'var(--text-light)', fontSize: 13 }} />
+          </div>
+        ))}
       </div>
     );
   }
 
+  // ── Level 2: Account's checklists ──
+  const tasksByChecklist = {};
+  tasks.forEach(t => {
+    const key = t.checklistId || '__none__';
+    if (!tasksByChecklist[key]) tasksByChecklist[key] = [];
+    tasksByChecklist[key].push(t);
+  });
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 4 }}>Today's Progress</div>
-          <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: totalTasks > 0 ? `${Math.round(doneTasks/totalTasks*100)}%` : '0%', background: 'var(--success)', borderRadius: 4, transition: 'width 0.3s' }} />
-          </div>
+      <button onClick={() => setSelectedClient(null)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 18, padding: 0 }}>
+        <i className="fas fa-chevron-left" /> All Accounts
+      </button>
+      <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 4 }}>{selectedClient.name}</div>
+      {selectedClient.address && <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 20 }}>{selectedClient.address}</div>}
+
+      {checklists.length === 0 && tasks.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+          <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>No checklists</div>
+          <div style={{ fontSize: 13 }}>No checklists have been created for this account yet.</div>
         </div>
-        <div style={{ fontWeight: 700, fontSize: 15, color: doneTasks === totalTasks && totalTasks > 0 ? 'var(--success)' : 'var(--text)' }}>
-          {doneTasks}/{totalTasks}
-        </div>
-      </div>
-      <div className="home-tasks-section">
-        {clientEntries.map(client => (
-          <div key={client.id}>
-            <div className="home-task-client">{client.name}</div>
-            {client.tasks.map(task => {
-              const done = !!completionsByTask[task.id];
-              return (
-                <div key={task.id} className={`home-task-row${done ? ' done' : ''}`} onClick={() => toggleCompletion(task)}>
-                  <div className={`home-task-check${done ? ' checked' : ''}`}>
-                    {done && <i className="fas fa-check" />}
-                  </div>
-                  <span className="home-task-text">{task.text}</span>
-                  {task.time && <span className="home-task-time">{fmtTime(task.time)}</span>}
+      ) : (
+        checklists.map(cl => {
+          const clTasks = (tasksByChecklist[cl.id] || []).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+          const done = clTasks.filter(t => completionsByTask[t.id]).length;
+          return (
+            <div key={cl.id} className="card" style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{cl.name}</div>
+                <div style={{ fontSize: 13, color: done === clTasks.length && clTasks.length > 0 ? 'var(--success)' : 'var(--text-light)', fontWeight: 600 }}>{done}/{clTasks.length}</div>
+              </div>
+              {clTasks.length > 0 && (
+                <div style={{ height: 5, background: 'var(--border)', borderRadius: 3, marginBottom: 14, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: clTasks.length > 0 ? `${Math.round(done/clTasks.length*100)}%` : '0%', background: 'var(--success)', borderRadius: 3, transition: 'width 0.3s' }} />
                 </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+              )}
+              {clTasks.map(task => {
+                const isDone = !!completionsByTask[task.id];
+                return (
+                  <div key={task.id} className={`home-task-row${isDone ? ' done' : ''}`} onClick={() => toggleCompletion(task)}>
+                    <div className={`home-task-check${isDone ? ' checked' : ''}`}>{isDone && <i className="fas fa-check" />}</div>
+                    <span className="home-task-text">{task.text}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
