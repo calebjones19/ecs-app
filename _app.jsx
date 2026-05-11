@@ -10932,83 +10932,21 @@ function App() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   // Load employees from Firestore (realtime) — updates global + state
-  // Auto-fills any EMPLOYEE_SEED entries missing from Firestore on first load
   useEffect(() => {
-    const unsub = db.collection('employees').onSnapshot(async (snap) => {
+    const unsub = db.collection('employees').onSnapshot((snap) => {
       const emps = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       EMPLOYEES = emps;
       setEmployees(emps);
-      if (!_employeesSeeded) {
-        _employeesSeeded = true;
-        try {
-          const existingNames = new Set(emps.map(e => e.name));
-          const missing = EMPLOYEE_SEED.filter(s => !existingNames.has(s.name));
-          if (missing.length > 0) {
-            const chunks = [];
-            for (let i = 0; i < missing.length; i += 490) chunks.push(missing.slice(i, i + 490));
-            for (const chunk of chunks) {
-              const batch = db.batch();
-              chunk.forEach((seed, idx) => {
-                const initials = seed.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                const color = EMPLOYEE_COLORS[(emps.length + idx) % EMPLOYEE_COLORS.length];
-                const ref = db.collection('employees').doc();
-                batch.set(ref, {
-                  name: seed.name,
-                  role: seed.role || 'Cleaning Technician',
-                  teams: seed.teams || [],
-                  kioskCode: seed.kioskCode || '',
-                  startDate: seed.startDate || '',
-                  permission: seed.permission || 'viewer',
-                  phone: '',
-                  phoneNormalized: '',
-                  email: '',
-                  payRate: 0,
-                  address: '',
-                  emergencyContact: '',
-                  type: 'employee',
-                  status: 'active',
-                  avatar: initials,
-                  color,
-                  createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                });
-              });
-              await batch.commit();
-            }
-          }
-        } catch (e) { console.warn('Auto-seed employees failed:', e); }
-      }
     });
     return () => unsub();
   }, []);
 
   // Load clients from Firestore (realtime) — updates global + state
-  // Auto-fills any CLIENT_SEED entries missing from Firestore on first load
   useEffect(() => {
-    const unsub = db.collection('clients').onSnapshot(async (snap) => {
+    const unsub = db.collection('clients').onSnapshot((snap) => {
       const cls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       CLIENTS = cls;
       setClients(cls);
-      // On first snapshot, add any seed clients not already in Firestore (by name)
-      if (!_clientsSeeded) {
-        _clientsSeeded = true;
-        try {
-          const existingNames = new Set(cls.map(c => c.name));
-          const missing = CLIENT_SEED.filter(s => !existingNames.has(s.name));
-          if (missing.length > 0) {
-            // Firestore batches max 500 writes; chunk if needed
-            const chunks = [];
-            for (let i = 0; i < missing.length; i += 490) chunks.push(missing.slice(i, i + 490));
-            for (const chunk of chunks) {
-              const batch = db.batch();
-              chunk.forEach(seed => {
-                const ref = db.collection('clients').doc();
-                batch.set(ref, { name: seed.name, address: seed.address, type: seed.type, contact: '', phone: '', email: '', frequency: 'Weekly', rate: 0, budgetedHours: 0, budgetedWorkers: 0, notes: '', status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-              });
-              await batch.commit();
-            }
-          }
-        } catch (e) { console.warn('Auto-seed clients failed:', e); }
-      }
     });
     return () => unsub();
   }, []);
