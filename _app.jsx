@@ -11128,7 +11128,17 @@ function App() {
     { id: 'home',       label: 'Home',  icon: 'fa-home',  singlePage: true },
     { id: 'today',      label: 'Today', icon: 'fa-sun',   singlePage: true },
     { id: 'timesheets', label: 'Time',  icon: 'fa-clock', singlePage: true },
-    ...(canSchedule ? [{ id: 'admin', label: 'Admin', icon: 'fa-crown', singlePage: true }] : []),
+    ...(canSchedule ? [{
+      id: 'admin', label: 'Admin', icon: 'fa-crown',
+      children: [
+        { id: 'admin-schedule', icon: 'fa-calendar-alt',   label: 'Scheduling',        desc: 'Create & manage team shifts',      color: '#4a6741' },
+        { id: 'shifts',         icon: 'fa-exchange-alt',   label: 'Shift Swaps',        desc: 'Pending swap requests',            color: '#c8a84e' },
+        { id: 'admin-timeoff',  icon: 'fa-calendar-times', label: 'Time Off',           desc: 'Review pending requests',          color: '#5e8a7a' },
+        { id: 'checklists',     icon: 'fa-clipboard-check',label: 'Checklists',         desc: 'Create & manage task lists',       color: '#b85c4a' },
+        { id: 'announcements',  icon: 'fa-bullhorn',       label: 'Announcements',      desc: 'Post updates to your teams',       color: '#4a6741' },
+        ...(canEdit ? [{ id: 'people', icon: 'fa-users', label: 'People', desc: 'Employees, teams & clients', color: '#7c6f64' }] : []),
+      ],
+    }] : []),
   ];
   const navItems = buildNavItems();
 
@@ -11322,7 +11332,7 @@ function App() {
                 </div>
                 <div className="topnav-dropdown">
                   {item.children.map(child => (
-                    <div key={child.id} className={`dd-item ${page === child.id ? 'active' : ''}`} onClick={() => setPage(child.id)}>
+                    <div key={child.id} className={`dd-item ${page === 'admin' && adminSubPage === child.id ? 'active' : ''}`} onClick={() => { setPage('admin'); setAdminSubPage(child.id); }}>
                       <div className="dd-icon" style={{ background: child.color + '18', color: child.color }}>
                         <i className={`fas ${child.icon}`} />
                       </div>
