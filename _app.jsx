@@ -3035,9 +3035,7 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
     availableClients.forEach(c => {
       if ((c.approvedEmployeeIds || []).some(id => teamEmpIds.has(id))) teamClientIds.add(c.id);
     });
-    return teamClientIds.size > 0
-      ? availableClients.filter(c => teamClientIds.has(c.id))
-      : availableClients;
+    return availableClients.filter(c => teamClientIds.has(c.id));
   }, [teamFilter, availableClients]);
 
   const getWeekDays = () => {
@@ -3658,9 +3656,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
         activeClientList.forEach(c => {
           if ((c.approvedEmployeeIds || []).some(id => teamEmpIds.has(id))) teamClientIds.add(c.id);
         });
-        result[team] = teamClientIds.size > 0
-          ? activeClientList.filter(c => teamClientIds.has(c.id))
-          : activeClientList;
+        result[team] = activeClientList.filter(c => teamClientIds.has(c.id));
       } else {
         // Scheduler: only their own schedulable accounts that belong to this team
         const myClientIds = new Set(authedUser?.schedulableAccounts || []);
