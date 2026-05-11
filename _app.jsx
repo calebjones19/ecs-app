@@ -8714,7 +8714,7 @@ function Timesheets({ role, authedUser, perm }) {
   const canSchedule = perm?.canSchedule || role === 'admin';
   const [activeEntry, setActiveEntry] = useState(null); // { category, label, clockIn, firestoreId }
   const [timesheetEntries, setTimesheetEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(new Date());
   const [showClockInModal, setShowClockInModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null); // { id, clockIn, clockOut, label }
@@ -11462,7 +11462,7 @@ function App() {
           ...(canSchedule ? [{ id: 'admin', icon: 'fa-crown', label: 'Admin' }] : []),
         ];
         const isActive = (item) => item.id === 'admin'
-          ? ['shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin','dashboard'].includes(page)
+          ? ['shifts','checklists','availability','notifications','admin-schedule','admin-timeoff','admin'].includes(page)
           : item.id === 'home'
           ? ['home','my-checklists','dashboard'].includes(page)
           : page === item.id;
