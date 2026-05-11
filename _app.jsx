@@ -11185,12 +11185,14 @@ function App() {
       swipeRef.current = null;
     }
   };
+  const HOME_SUBPAGES = { dashboard: 'Dashboard', 'my-checklists': 'Checklists', schedule: 'My Schedule', notifications: 'Notifications' };
   const handleAppTouchEnd = (e) => {
     if (!swipeRef.current) return;
     const dx = e.changedTouches[0].clientX - swipeRef.current.x;
     const dy = Math.abs(e.changedTouches[0].clientY - swipeRef.current.y);
     if (dx > 60 && dy < dx) {
-      window.dispatchEvent(new CustomEvent('ecs-back', { detail: {} }));
+      if (HOME_SUBPAGES[page]) setPage('home');
+      else window.dispatchEvent(new CustomEvent('ecs-back', { detail: {} }));
     }
     swipeRef.current = null;
   };
@@ -11341,14 +11343,16 @@ function App() {
       {/* ── Mobile Header ── */}
       <div className="mobile-header">
         <div className="mobile-header-left">
-          {page === 'admin' && adminSubPage && (
-            <button className="mobile-header-back" onClick={() => window.dispatchEvent(new CustomEvent('ecs-back', { detail: {} }))}>
+          {(HOME_SUBPAGES[page] || (page === 'admin' && adminSubPage)) && (
+            <button className="mobile-header-back" onClick={() => HOME_SUBPAGES[page] ? setPage('home') : window.dispatchEvent(new CustomEvent('ecs-back', { detail: {} }))}>
               <i className="fas fa-chevron-left" /> Back
             </button>
           )}
         </div>
         <div className="mobile-header-center">
-          <span className="mobile-header-title">ECS</span>
+          <span className="mobile-header-title">
+            {HOME_SUBPAGES[page] || (page === 'admin' && adminSubPage ? adminSubPage.replace('admin-','').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) : 'ECS')}
+          </span>
         </div>
         <div className="mobile-header-right">
           <button className="topnav-icon-btn" onClick={() => setPage('chat')} style={{ position: 'relative' }}>
