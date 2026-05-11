@@ -4155,7 +4155,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     const uid = authedUser?.id;
     const myShifts = uid ? (scheduleData[uid] || []).filter(s => s.day === dayIndex) : [];
     if (myShifts.length === 0) {
-      return <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>You have no shifts scheduled for this day.</p></div>;
+      return <div className="empty-state"><div className="empty-icon"><i className="fas fa-calendar-day" /></div><h3>No shifts scheduled</h3><p>You have no shifts scheduled for this day.</p></div>;
     }
     const iconBg = { morning: '#e8f5e9', afternoon: '#fff8e1', evening: '#f3e5f5' };
     const iconColor = { morning: '#388e3c', afternoon: '#f57f17', evening: '#7b1fa2' };
@@ -4581,7 +4581,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
             </div>
           )}
           {allShifts.length === 0 && (
-            <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{canCreate ? 'Click above or on any empty space to add a shift.' : 'No shifts scheduled for this day.'}</p></div>
+            <div className="empty-state"><div className="empty-icon"><i className="fas fa-calendar-day" /></div><h3>No shifts scheduled</h3><p>{canCreate ? 'Click above or tap any empty space to add a shift.' : 'No shifts scheduled for this day.'}</p>{canCreate && <button className="empty-cta" onClick={() => openAddShift({ day: dayIndex })}><i className="fas fa-plus" /> Add Shift</button>}</div>
           )}
         </div>
       );
@@ -4634,7 +4634,7 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           </div>
         )}
         {allShifts.length === 0 && (
-          <div className="empty-state"><i className="fas fa-calendar-day" /><h3>No shifts scheduled</h3><p>{canCreate ? 'Click the button above to add a shift.' : 'No shifts scheduled for this day.'}</p></div>
+          <div className="empty-state"><div className="empty-icon"><i className="fas fa-calendar-day" /></div><h3>No shifts scheduled</h3><p>{canCreate ? 'Click the button above to add a shift.' : 'No shifts scheduled for this day.'}</p>{canCreate && <button className="empty-cta" onClick={() => openAddShift({ day: dayIndex })}><i className="fas fa-plus" /> Add Shift</button>}</div>
         )}
       </div>
     );
@@ -6085,7 +6085,7 @@ function ClientList({ role, perm, onCardOpen }) {
           </div>
         ))}
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-light)' }}>No clients found</div>
+          <div className="empty-state"><div className="empty-icon"><i className="fas fa-building" /></div><h3>No clients found</h3><p>Try a different search or filter.</p></div>
         )}
       </div>
 
@@ -6604,7 +6604,7 @@ function EmployeeProfiles({ role, perm }) {
             </div>
           ))}
           {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-light)' }}>No employees found</div>
+            <div className="empty-state"><div className="empty-icon"><i className="fas fa-users" /></div><h3>No employees found</h3><p>Try a different search or filter.</p></div>
           )}
         </div>
         </>
@@ -7199,7 +7199,17 @@ function MyAvailabilityEditor({ authedUser }) {
 
   const fmtTime = (t) => { if (!t) return ''; const [h, m] = t.split(':').map(Number); const ap = h < 12 ? 'AM' : 'PM'; return `${h % 12 || 12}:${m.toString().padStart(2,'0')} ${ap}`; };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 40 }}><i className="fas fa-spinner fa-spin" style={{ fontSize: 22, color: 'var(--primary)' }} /></div>;
+  if (loading) return (
+    <div>
+      {[1,2,3].map(i => (
+        <div key={i} className="skeleton-card">
+          <div className="skeleton skeleton-line title" />
+          <div className="skeleton skeleton-line medium" />
+          <div className="skeleton skeleton-line short" />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div>
@@ -8915,9 +8925,26 @@ function Timesheets({ role, authedUser, perm }) {
 
   const todayDate = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-  if (loading) {
-    return <div style={{ textAlign: 'center', padding: 40 }}><i className="fas fa-spinner fa-spin" style={{ fontSize: 24, color: 'var(--primary)' }} /></div>;
-  }
+  if (loading) return (
+    <div>
+      <div className="skeleton-card" style={{ textAlign: 'center', padding: 32 }}>
+        <div className="skeleton" style={{ width: 80, height: 80, borderRadius: '50%', margin: '0 auto 16px' }} />
+        <div className="skeleton skeleton-line medium" style={{ margin: '0 auto 10px' }} />
+        <div className="skeleton skeleton-line short" style={{ margin: '0 auto' }} />
+      </div>
+      {[1,2].map(i => (
+        <div key={i} className="skeleton-card">
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div className="skeleton skeleton-avatar" />
+            <div style={{ flex: 1 }}>
+              <div className="skeleton skeleton-line medium" />
+              <div className="skeleton skeleton-line short" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div>
