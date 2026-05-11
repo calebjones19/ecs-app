@@ -3021,13 +3021,19 @@ function AutoScheduler({ role, perm, authedUser, scheduleData, weekStart, onClos
   }, []);
   const [teamFilter, setTeamFilter] = useState('all'); // 'all' | team name
 
-  // Clients per team: same logic as schedule filter
+  // Clients per team: dual-lookup via employee schedulableAccounts + client approvedEmployeeIds
   const clientsForTeam = React.useMemo(() => {
     if (teamFilter === 'all') return availableClients;
     const teamEmpIds = new Set(EMPLOYEES.filter(e => (e.teams || []).includes(teamFilter)).map(e => e.id));
+    if (teamEmpIds.size === 0) return availableClients;
     const teamClientIds = new Set();
+    // Source 1: schedulableAccounts on employees
     EMPLOYEES.filter(e => teamEmpIds.has(e.id)).forEach(e => {
       (e.schedulableAccounts || []).forEach(id => teamClientIds.add(id));
+    });
+    // Source 2: approvedEmployeeIds on clients (catches cases where schedulableAccounts isn't set)
+    availableClients.forEach(c => {
+      if ((c.approvedEmployeeIds || []).some(id => teamEmpIds.has(id))) teamClientIds.add(c.id);
     });
     return teamClientIds.size > 0
       ? availableClients.filter(c => teamClientIds.has(c.id))
@@ -3644,10 +3650,13 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
     allTeamNames.forEach(team => {
       const teamEmpIds = new Set(EMPLOYEES.filter(e => (e.teams || []).includes(team)).map(e => e.id));
       if (isAdmin || canEdit) {
-        // Admins: all clients that any team member can schedule, or all active if none configured
+        // Admins: dual-lookup via schedulableAccounts + approvedEmployeeIds
         const teamClientIds = new Set();
         EMPLOYEES.filter(e => teamEmpIds.has(e.id)).forEach(e => {
           (e.schedulableAccounts || []).forEach(id => teamClientIds.add(id));
+        });
+        activeClientList.forEach(c => {
+          if ((c.approvedEmployeeIds || []).some(id => teamEmpIds.has(id))) teamClientIds.add(c.id);
         });
         result[team] = teamClientIds.size > 0
           ? activeClientList.filter(c => teamClientIds.has(c.id))
