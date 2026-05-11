@@ -364,23 +364,32 @@
       top: 60px;
       right: 0;
       bottom: 0;
-      width: 380px;
+      /* 2 panels: sidebar 200px + messages flex = 520px total */
+      width: min(520px, 100vw);
       background: white;
       border-left: 1px solid rgba(0,0,0,0.09);
       box-shadow: -8px 0 40px rgba(0,0,0,0.12);
       transform: translateX(100%);
-      transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+                  width 0.32s cubic-bezier(0.4, 0, 0.2, 1);
       z-index: 400;
       overflow: hidden;
     }
     .chat-side-panel.open { transform: translateX(0); }
-    .chat-side-panel.with-thread { width: 700px; }
-    .chat-side-panel .chat-layout { height: 100%; flex: 1; width: 100%; }
-    .chat-side-panel .chat-channels { width: 240px; flex-shrink: 0; }
-    .chat-side-panel .thread-panel { width: 340px; animation: none; border-left: 1px solid var(--border); }
-    .chat-side-panel.with-thread .chat-main { border-right: 1px solid var(--border); }
-    /* Panel mode: channel sidebar is always visible (no mobile tab/back behavior) */
+    /* 3 panels: sidebar 200px + messages flex + thread 280px = 800px total */
+    .chat-side-panel.with-thread { width: min(800px, 100vw); }
+
+    /* Inner layout — fill the panel, let flex do the work */
+    .chat-side-panel .chat-layout { height: 100%; flex: 1; width: 100%; overflow: hidden; min-width: 0; }
+    .chat-side-panel .chat-channels { width: 200px; min-width: 160px; flex-shrink: 0; }
+    .chat-side-panel .chat-main { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .chat-side-panel .thread-panel { width: 280px; min-width: 220px; flex-shrink: 0; animation: none; }
+
+    /* Always show both sidebar and messages — suppress mobile hide classes */
+    .chat-layout-panel .chat-channels,
     .chat-layout-panel .chat-channels.hidden-mobile { display: flex !important; }
+    .chat-layout-panel .chat-main,
+    .chat-layout-panel .chat-main.hidden-mobile { display: flex !important; flex: 1; min-width: 0; }
   }
   @keyframes slideInThread { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
   .thread-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
