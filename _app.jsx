@@ -11118,7 +11118,6 @@ function App() {
   const buildNavItems = () => {
     const items = [
       { id: 'home', label: 'Home', icon: 'fa-home', desc: 'Your home screen', color: '#4a6741', singlePage: true },
-      { id: 'chat', label: 'Chat', icon: 'fa-comments', desc: 'Team messaging', color: '#7c6f64', badge: chatUnread || 0, singlePage: true },
     ];
     if (canSchedule) {
       // Scheduler+ sees Operations group
@@ -11147,7 +11146,10 @@ function App() {
         { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability', desc: 'Set when you can work', color: '#5e8a7a' },
       ]});
     }
-    items.push({ id: 'notifications', label: 'Settings', icon: 'fa-cog', desc: 'Notification preferences', color: '#6b7568', singlePage: true });
+    if (canSchedule) {
+      items.push({ id: 'admin', label: 'Admin', icon: 'fa-crown', singlePage: true });
+    }
+    items.push({ id: 'notifications', label: 'Settings', icon: 'fa-cog', singlePage: true });
     return items;
   };
   const navItems = buildNavItems();
@@ -11316,7 +11318,9 @@ function App() {
         <div className="topnav-links">
           {navItems.map(item => {
             const isActive = item.singlePage
-              ? (item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page) : page === item.id)
+              ? (item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page)
+                : item.id === 'admin' ? ['admin','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff'].includes(page)
+                : page === item.id)
               : item.children?.some(c => c.id === page);
 
             if (item.singlePage) {
@@ -11325,7 +11329,7 @@ function App() {
                   <div className={`topnav-link ${isActive ? 'active' : ''}`} onClick={() => setPage(item.id)}>
                     <i className={`fas ${item.icon}`} />
                     {item.label}
-                    {item.badge && <span className="link-badge">{item.badge}</span>}
+                    {item.badge > 0 && <span className="link-badge">{item.badge}</span>}
                   </div>
                 </div>
               );
@@ -11364,9 +11368,16 @@ function App() {
             <i className="fas fa-search" style={{ fontSize: 12, color: '#9ea2a6' }} />
             <input placeholder="Search..." style={{ fontSize: 13, color: 'white' }} />
           </div>
-          <button className="topnav-icon-btn">
+          <button className="topnav-icon-btn" onClick={() => setPage('chat')} style={{ position: 'relative' }} title="Chat">
+            <i className="fas fa-comments" />
+            {chatUnread > 0 && (
+              <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, background: 'var(--danger)', borderRadius: 8, border: '2px solid var(--sidebar-bg)', fontSize: 9, fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                {chatUnread > 99 ? '99+' : chatUnread}
+              </span>
+            )}
+          </button>
+          <button className="topnav-icon-btn" title="Notifications">
             <i className="fas fa-bell" />
-            <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, background: 'var(--danger)', borderRadius: '50%', border: '2px solid var(--sidebar-bg)' }} />
           </button>
           <div ref={userMenuRef} style={{ position: 'relative' }}>
             <div className="avatar sm" style={{ background: 'var(--primary)', cursor: 'pointer', fontSize: 12 }} onClick={() => setShowUserMenu(!showUserMenu)}>
