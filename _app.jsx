@@ -11123,44 +11123,13 @@ function App() {
     window.location.reload(true);
   };
 
-  // Navigation structure — built dynamically based on permission level
-  const buildNavItems = () => {
-    const items = [
-      { id: 'home', label: 'Home', icon: 'fa-home', desc: 'Your home screen', color: '#4a6741', singlePage: true },
-    ];
-    if (canSchedule) {
-      // Scheduler+ sees Operations group
-      const opsChildren = [
-        { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule', desc: 'View your upcoming shifts', color: '#4a6741' },
-        { id: 'timesheets', icon: 'fa-clock', label: 'Timesheets', desc: 'Clock in/out records & payroll hours', color: '#5a8a4a' },
-        { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Swap requests & open shift pickups', color: '#c8a84e', badge: 2 },
-        { id: 'checklists', icon: 'fa-clipboard-check', label: 'Manage Checklists', desc: 'Create and manage job site task lists', color: '#b85c4a' },
-        { id: 'dashboard', icon: 'fa-chart-bar', label: 'Dashboard', desc: 'Stats & hours overview', color: '#5e8a7a' },
-      ];
-      items.push({ id: 'operations', label: 'Operations', icon: 'fa-briefcase', children: opsChildren });
-      if (canEdit) {
-        // Editor+ sees People group
-        items.push({ id: 'people', label: 'People', icon: 'fa-users', children: [
-          { id: 'admin', icon: 'fa-users', label: 'People', desc: 'Employees, teams & clients', color: '#7c6f64' },
-          { id: 'availability', icon: 'fa-calendar-check', label: 'Availability', desc: 'Weekly availability for each team member', color: '#5e8a7a' },
-        ]});
-      }
-    } else {
-      // Viewer sees My Work group
-      items.push({ id: 'mywork', label: 'My Work', icon: 'fa-briefcase', children: [
-        { id: 'my-checklists', icon: 'fa-clipboard-check', label: 'Checklists', desc: 'View & complete today\'s tasks', color: '#b85c4a' },
-        { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule', desc: 'View your upcoming shifts', color: '#4a6741' },
-        { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out', desc: 'Track your hours', color: '#5a8a4a' },
-        { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Request swaps or pick up shifts', color: '#c8a84e' },
-        { id: 'availability', icon: 'fa-calendar-check', label: 'My Availability', desc: 'Set when you can work', color: '#5e8a7a' },
-      ]});
-    }
-    if (canSchedule) {
-      items.push({ id: 'admin', label: 'Admin', icon: 'fa-crown', singlePage: true });
-    }
-    items.push({ id: 'notifications', label: 'Settings', icon: 'fa-cog', singlePage: true });
-    return items;
-  };
+  // Desktop nav mirrors mobile bottom nav — same items, same order
+  const buildNavItems = () => [
+    { id: 'home',       label: 'Home',  icon: 'fa-home',  singlePage: true },
+    { id: 'today',      label: 'Today', icon: 'fa-sun',   singlePage: true },
+    { id: 'timesheets', label: 'Time',  icon: 'fa-clock', singlePage: true },
+    ...(canSchedule ? [{ id: 'admin', label: 'Admin', icon: 'fa-crown', singlePage: true }] : []),
+  ];
   const navItems = buildNavItems();
 
   const buildSidebarNav = () => {
@@ -11326,11 +11295,11 @@ function App() {
 
         <div className="topnav-links">
           {navItems.map(item => {
-            const isActive = item.singlePage
-              ? (item.id === 'home' ? ['home','my-checklists','dashboard'].includes(page)
-                : item.id === 'admin' ? ['admin','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff'].includes(page)
-                : page === item.id)
-              : item.children?.some(c => c.id === page);
+            const isActive = item.id === 'admin'
+              ? ['admin','shifts','checklists','availability','notifications','admin-schedule','admin-timeoff'].includes(page)
+              : item.id === 'home'
+              ? ['home','my-checklists','dashboard'].includes(page)
+              : page === item.id;
 
             if (item.singlePage) {
               return (
