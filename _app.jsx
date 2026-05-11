@@ -8925,30 +8925,9 @@ function Timesheets({ role, authedUser, perm }) {
 
   const todayDate = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-  if (loading) return (
-    <div>
-      <div className="skeleton-card" style={{ textAlign: 'center', padding: 32 }}>
-        <div className="skeleton" style={{ width: 80, height: 80, borderRadius: '50%', margin: '0 auto 16px' }} />
-        <div className="skeleton skeleton-line medium" style={{ margin: '0 auto 10px' }} />
-        <div className="skeleton skeleton-line short" style={{ margin: '0 auto' }} />
-      </div>
-      {[1,2].map(i => (
-        <div key={i} className="skeleton-card">
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div className="skeleton skeleton-avatar" />
-            <div style={{ flex: 1 }}>
-              <div className="skeleton skeleton-line medium" />
-              <div className="skeleton skeleton-line short" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
   return (
     <div>
-      {/* Clock display — always visible */}
+      {/* Clock display — always visible, no loading gate */}
       <div className="card" style={{ textAlign: 'center', marginBottom: 16 }}>
         <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 4 }}>{todayDate}</div>
         <div className="clock-display">{activeEntry ? getElapsed(activeEntry.clockIn) : formatTime(now)}</div>
@@ -9053,6 +9032,21 @@ function Timesheets({ role, authedUser, perm }) {
       )}
 
       {/* Today's Timesheets */}
+      {loading ? (
+        <div>
+          {[1,2].map(i => (
+            <div key={i} className="skeleton-card">
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div className="skeleton skeleton-avatar" />
+                <div style={{ flex: 1 }}>
+                  <div className="skeleton skeleton-line medium" />
+                  <div className="skeleton skeleton-line short" style={{ marginBottom: 0 }} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <span style={{ fontWeight: 700 }}>Today's Timesheets {isAdmin && timesheetEntries.length > 0 ? `(${timesheetEntries.length})` : ''}</span>
@@ -9103,6 +9097,7 @@ function Timesheets({ role, authedUser, perm }) {
           </div>
         )}
       </div>
+      )}
 
       {/* Admin: Edit timesheet modal */}
       {editingEntry && isAdmin && (
@@ -11475,9 +11470,6 @@ function App() {
         const n = navItems.length;
         return (
           <div className="mobile-bottom-nav">
-            {activeIdx >= 0 && (
-              <div className="nav-pill-indicator" style={{ left: `calc(${(activeIdx * (100 / n))}% + ${(100 / n / 2)}% - 29px)` }} />
-            )}
             {navItems.map(item => (
               <button key={item.id} className={`mobile-nav-item${isActive(item) ? ' active' : ''}`}
                 onClick={() => {
