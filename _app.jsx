@@ -11474,9 +11474,9 @@ function App() {
         const activeIdx = navItems.findIndex(isActive);
         const n = navItems.length;
         return (
-          <div className="mobile-bottom-nav" style={{ position: 'relative' }}>
+          <div className="mobile-bottom-nav">
             {activeIdx >= 0 && (
-              <div className="nav-pill-indicator" style={{ left: `calc(${(activeIdx + 0.5) * (100 / n)}% - 29px)` }} />
+              <div className="nav-pill-indicator" style={{ left: `calc(${(activeIdx * (100 / n))}% + ${(100 / n / 2)}% - 29px)` }} />
             )}
             {navItems.map(item => (
               <button key={item.id} className={`mobile-nav-item${isActive(item) ? ' active' : ''}`}
