@@ -10953,11 +10953,14 @@ function App() {
     return () => unsub();
   }, []);
 
+  // Hard safety net: independent of all Firebase/Firestore — always clears loading after 5s
+  useEffect(() => {
+    const t = setTimeout(() => setAuthLoading(false), 5000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Listen for Firebase auth state — check phone against Firestore employees
   useEffect(() => {
-    // Safety net: never stay stuck on loading screen more than 8 seconds
-    const loadingTimeout = setTimeout(() => setAuthLoading(false), 8000);
-
     // Try to restore cached employee data immediately (avoids flash of login screen)
     // Also apply permission migration to cached data so UI is correct instantly
     try {
@@ -10978,7 +10981,6 @@ function App() {
     } catch (e) {}
 
     const unsubscribe = firebaseAuth.onAuthStateChanged(async (user) => {
-      clearTimeout(loadingTimeout);
       if (user) {
         try {
           let snap;
@@ -11042,7 +11044,7 @@ function App() {
       }
       setAuthLoading(false);
     });
-    return () => { unsubscribe(); clearTimeout(loadingTimeout); };
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
