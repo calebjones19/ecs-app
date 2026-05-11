@@ -5916,6 +5916,45 @@ function EmployeeProfiles({ role, perm }) {
   const [savingPrimary, setSavingPrimary] = useState(false);
   const [newEmp, setNewEmp] = useState({ name: '', phone: '', email: '', role: 'Cleaner', permission: 'viewer', type: 'employee', payRate: '', address: '', emergencyContact: '', teams: [], managerId: '', managerName: '' });
   const [availableTeams, setAvailableTeams] = useState([]);
+  const [showDedupConfirm, setShowDedupConfirm] = useState(false);
+  const [dedupList, setDedupList] = useState([]); // docs to delete
+  const [dedupRunning, setDedupRunning] = useState(false);
+
+  const findDuplicates = () => {
+    const byName = {};
+    EMPLOYEES.forEach(e => {
+      const key = (e.name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!byName[key]) byName[key] = [];
+      byName[key].push(e);
+    });
+    const toDelete = [];
+    Object.values(byName).forEach(group => {
+      if (group.length < 2) return;
+      // Keep the first (assume lowest doc index = oldest); delete the rest
+      group.slice(1).forEach(e => toDelete.push(e));
+    });
+    setDedupList(toDelete);
+    setShowDedupConfirm(true);
+  };
+
+  const handleDedup = async () => {
+    setDedupRunning(true);
+    try {
+      const chunks = [];
+      for (let i = 0; i < dedupList.length; i += 490) chunks.push(dedupList.slice(i, i + 490));
+      for (const chunk of chunks) {
+        const batch = db.batch();
+        chunk.forEach(e => batch.delete(db.collection('employees').doc(e.id)));
+        await batch.commit();
+      }
+      setShowDedupConfirm(false);
+      setDedupList([]);
+    } catch(err) {
+      alert('Error removing duplicates: ' + err.message);
+    }
+    setDedupRunning(false);
+  };
 
   // Load teams for dropdowns
   useEffect(() => {
@@ -6217,6 +6256,11 @@ function EmployeeProfiles({ role, perm }) {
             </div>
             {canEdit && (
               <button className="topbar-btn primary" onClick={() => setShowAdd(true)} style={{ flexShrink: 0 }}><i className="fas fa-plus" /> Add</button>
+            )}
+            {isAdmin && (
+              <button className="topbar-btn" onClick={findDuplicates} style={{ flexShrink: 0, color: 'var(--text-light)' }} title="Remove duplicate employees">
+                <i className="fas fa-copy" />
+              </button>
             )}
           </div>
           <div className="cl-filter-pills">
@@ -6794,6 +6838,52 @@ function EmployeeProfiles({ role, perm }) {
           )}
         </div>
       )}
+      {/* ── Dedup Confirmation ── */}
+      {showDedupConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => !dedupRunning && setShowDedupConfirm(false)}>
+          <div style={{ background: 'white', borderRadius: 18, padding: 28, maxWidth: 420, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 6 }}>
+              {dedupList.length === 0 ? 'No Duplicates Found' : `Remove ${dedupList.length} Duplicate${dedupList.length !== 1 ? 's' : ''}?`}
+            </div>
+            {dedupList.length === 0 ? (
+              <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 20 }}>All employee names are unique — nothing to remove.</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 12 }}>
+                  The following duplicate entries will be deleted. One copy of each name will be kept.
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1, marginBottom: 16, border: '1px solid var(--border)', borderRadius: 10, padding: '8px 0' }}>
+                  {dedupList.map(e => (
+                    <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px', borderBottom: '1px solid var(--border)' }}>
+                      <div className="avatar sm" style={{ background: e.color || 'var(--primary)', flexShrink: 0 }}>{e.avatar || e.name?.charAt(0)}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{e.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-light)' }}>{e.role || ''}{e.teams?.length ? ` · ${e.teams.join(', ')}` : ''}</div>
+                      </div>
+                      <span style={{ fontSize: 11, color: 'var(--danger)', fontWeight: 600 }}>DUPLICATE</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowDedupConfirm(false)} disabled={dedupRunning}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid var(--border)', background: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                {dedupList.length === 0 ? 'Close' : 'Cancel'}
+              </button>
+              {dedupList.length > 0 && (
+                <button onClick={handleDedup} disabled={dedupRunning}
+                  style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: 'var(--danger)', fontSize: 14, fontWeight: 700, cursor: dedupRunning ? 'wait' : 'pointer', color: 'white' }}>
+                  {dedupRunning ? 'Removing…' : 'Remove Duplicates'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       </>}
     </div>
   );
