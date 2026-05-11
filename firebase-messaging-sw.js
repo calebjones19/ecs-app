@@ -92,9 +92,11 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Cache only static assets — never cache index.html so updates always reach users
-const CACHE_NAME = 'essence-v5';
-const STATIC_ASSETS = [
+// Cache the app shell for offline support
+const CACHE_NAME = 'essence-v3';
+const OFFLINE_URLS = [
+  '/ecs-app/',
+  '/ecs-app/index.html',
   '/ecs-app/icons/icon-192.png',
   '/ecs-app/icons/icon-512.png',
 ];
@@ -102,36 +104,21 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS))
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    // Delete ALL old caches
     caches.keys().then((names) =>
       Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))
     ).then(() => self.clients.claim())
   );
 });
 
+// Network-first strategy for HTML, cache-first for static assets
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-
-  const url = new URL(event.request.url);
-  const isHTML = event.request.mode === 'navigate'
-    || url.pathname.endsWith('/')
-    || url.pathname.endsWith('index.html');
-
-  if (isHTML) {
-    // HTML: always network, no cache — ensures updates always load
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match('/ecs-app/index.html'))
-    );
-    return;
-  }
-
-  // Static assets: network-first, cache fallback
   event.respondWith(
     fetch(event.request)
       .then((response) => {

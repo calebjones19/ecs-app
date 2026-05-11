@@ -10806,8 +10806,6 @@ function App() {
   const isAdmin = permLevel >= 3;      // admin only
   const role = isAdmin ? 'admin' : canEdit ? 'editor' : canSchedule ? 'scheduler' : 'employee';
   const [page, setPage] = useState('home');
-  const [prevPage, setPrevPage] = useState(null);
-  const navigateTo = (dest) => { setPrevPage(page); setPage(dest); };
   const [adminSubPage, setAdminSubPage] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [toast, setToast] = useState(null);
@@ -10951,12 +10949,6 @@ function App() {
       setClients(cls);
     });
     return () => unsub();
-  }, []);
-
-  // Hard safety net: independent of all Firebase/Firestore — always clears loading after 5s
-  useEffect(() => {
-    const t = setTimeout(() => setAuthLoading(false), 5000);
-    return () => clearTimeout(t);
   }, []);
 
   // Listen for Firebase auth state — check phone against Firestore employees
@@ -11144,7 +11136,7 @@ function App() {
   const renderPage = () => {
     const perm = { role, isAdmin, canEdit, canSchedule, permLevel };
     switch (page) {
-      case 'home': return <Home role={role} perm={perm} authedUser={authedUser} setPage={navigateTo} />;
+      case 'home': return <Home role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       case 'dashboard': return <Dashboard role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       case 'my-checklists': return <HomeChecklists role={role} perm={perm} authedUser={authedUser} />;
       case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm}
@@ -11177,8 +11169,7 @@ function App() {
     }
   }, [authLoading]);
 
-  // Only block on splash if we have no cached user — if cache restored a user, render immediately
-  if (authLoading && !authedUser) return null;
+  if (authLoading) return null; // HTML splash is covering the screen
 
   if (!authedUser) {
     return <LoginScreen onLogin={setAuthedUser} />;
@@ -11203,28 +11194,6 @@ function App() {
     }
     swipeRef.current = null;
   };
-
-  // Drill-down pages: show back button + title in mobile header
-  const DRILL_DOWN_PAGES = {
-    'dashboard':     { title: 'Dashboard',   back: 'home' },
-    'my-checklists': { title: 'Checklists',  back: 'home' },
-    'schedule':      { title: 'My Schedule', back: 'home' },
-    'notifications': { title: 'Notifications', back: prevPage || 'home' },
-  };
-  const drillDown = DRILL_DOWN_PAGES[page];
-
-  // App-level ecs-back: handle swipe-back for drill-down pages
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.detail?.handled) return;
-      if (drillDown) {
-        e.detail && (e.detail.handled = true);
-        setPage(drillDown.back);
-      }
-    };
-    window.addEventListener('ecs-back', handler);
-    return () => window.removeEventListener('ecs-back', handler);
-  }, [page, prevPage]);
 
   return (
     <div className="app" onTouchStart={handleAppTouchStart} onTouchEnd={handleAppTouchEnd}>
@@ -11350,7 +11319,7 @@ function App() {
                   <i className="fas fa-user" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
                   <span style={{ fontSize: 14 }}>My Profile</span>
                 </div>
-                <div className="dd-item" onClick={() => { setShowUserMenu(false); navigateTo('notifications'); }}>
+                <div className="dd-item" onClick={() => { setShowUserMenu(false); setPage('notifications'); }}>
                   <i className="fas fa-cog" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
                   <span style={{ fontSize: 14 }}>Notification Settings</span>
                 </div>
@@ -11372,16 +11341,14 @@ function App() {
       {/* ── Mobile Header ── */}
       <div className="mobile-header">
         <div className="mobile-header-left">
-          {(drillDown || (page === 'admin' && adminSubPage)) && (
+          {page === 'admin' && adminSubPage && (
             <button className="mobile-header-back" onClick={() => window.dispatchEvent(new CustomEvent('ecs-back', { detail: {} }))}>
               <i className="fas fa-chevron-left" /> Back
             </button>
           )}
         </div>
         <div className="mobile-header-center">
-          <span className="mobile-header-title">
-            {drillDown ? drillDown.title : (page === 'admin' && adminSubPage) ? adminSubPage.replace('admin-', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'ECS'}
-          </span>
+          <span className="mobile-header-title">ECS</span>
         </div>
         <div className="mobile-header-right">
           <button className="topnav-icon-btn" onClick={() => setPage('chat')} style={{ position: 'relative' }}>
@@ -11404,7 +11371,7 @@ function App() {
                   <i className="fas fa-user" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
                   <span style={{ fontSize: 14 }}>My Profile</span>
                 </div>
-                <div className="dd-item" onClick={() => { setShowUserMenu(false); navigateTo('notifications'); }}>
+                <div className="dd-item" onClick={() => { setShowUserMenu(false); setPage('notifications'); }}>
                   <i className="fas fa-cog" style={{ width: 20, textAlign: 'center', color: 'var(--text-light)' }} />
                   <span style={{ fontSize: 14 }}>Notification Settings</span>
                 </div>
