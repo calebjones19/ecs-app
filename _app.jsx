@@ -470,7 +470,15 @@ function Home({ role, perm, authedUser, setPage }) {
 // ─── Home Checklists (worker view — view & complete tasks) ──────
 function HomeChecklists({ role, perm, authedUser }) {
   const [selectedClient, setSelectedClient] = useState(null);
-  const [teamFilter, setTeamFilter] = useState('all');
+  const [selectedTeams, setSelectedTeams] = useState(new Set()); // empty = all
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = React.useRef(null);
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handler = (e) => { if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [filterOpen]);
   const [checklists, setChecklists] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [completions, setCompletions] = useState([]);
@@ -529,33 +537,70 @@ function HomeChecklists({ role, perm, authedUser }) {
   if (!selectedClient) {
     const activeAccounts = [...CLIENTS].filter(c => c.status !== 'inactive').sort((a, b) => a.name.localeCompare(b.name));
 
-    // Derive sorted team list from employee data
-    const allTeams = [...new Set(EMPLOYEES.flatMap(e => e.teams || []))].sort();
+    // Account teams only — those starting with "Team " (excludes Leadership, GHS, etc.)
+    const accountTeams = [...new Set(EMPLOYEES.flatMap(e => e.teams || []))]
+      .filter(t => t.startsWith('Team '))
+      .sort();
 
-    // Build team → client IDs map using same dual-lookup as scheduler
-    const clientsForTeam = (team) => {
-      const teamEmpIds = new Set(EMPLOYEES.filter(e => (e.teams || []).includes(team)).map(e => e.id));
-      const teamClientIds = new Set();
-      EMPLOYEES.filter(e => teamEmpIds.has(e.id)).forEach(e => (e.schedulableAccounts || []).forEach(id => teamClientIds.add(id)));
-      activeAccounts.forEach(c => { if ((c.approvedEmployeeIds || []).some(id => teamEmpIds.has(id))) teamClientIds.add(c.id); });
-      return teamClientIds;
+    // Build client IDs for a given team via dual-lookup
+    const clientIdsForTeam = (team) => {
+      const empIds = new Set(EMPLOYEES.filter(e => (e.teams || []).includes(team)).map(e => e.id));
+      const ids = new Set();
+      EMPLOYEES.filter(e => empIds.has(e.id)).forEach(e => (e.schedulableAccounts || []).forEach(id => ids.add(id)));
+      activeAccounts.forEach(c => { if ((c.approvedEmployeeIds || []).some(id => empIds.has(id))) ids.add(c.id); });
+      return ids;
     };
 
-    const teamClientIds = teamFilter !== 'all' ? clientsForTeam(teamFilter) : null;
-    const accounts = teamClientIds ? activeAccounts.filter(c => teamClientIds.has(c.id)) : activeAccounts;
+    // Union of client IDs across all selected teams
+    let accounts = activeAccounts;
+    if (selectedTeams.size > 0) {
+      const union = new Set();
+      selectedTeams.forEach(t => clientIdsForTeam(t).forEach(id => union.add(id)));
+      accounts = activeAccounts.filter(c => union.has(c.id));
+    }
+
+    const toggleTeam = (t) => {
+      setSelectedTeams(prev => {
+        const next = new Set(prev);
+        next.has(t) ? next.delete(t) : next.add(t);
+        return next;
+      });
+    };
+
+    const filterLabel = selectedTeams.size === 0
+      ? 'All Teams'
+      : selectedTeams.size === 1
+        ? [...selectedTeams][0]
+        : `${selectedTeams.size} Teams`;
 
     return (
       <div>
-        {/* Team filter pills */}
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 16, paddingBottom: 4, scrollbarWidth: 'none' }}>
-          {['all', ...allTeams].map(t => (
-            <button key={t} onClick={() => setTeamFilter(t)} style={{
-              flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              background: teamFilter === t ? 'var(--primary)' : 'var(--border)', color: teamFilter === t ? '#fff' : 'var(--text-main)', transition: 'background 0.15s'
-            }}>
-              {t === 'all' ? 'All' : t}
-            </button>
-          ))}
+        {/* Team filter dropdown */}
+        <div ref={filterRef} style={{ position: 'relative', marginBottom: 16 }}>
+          <button
+            onClick={() => setFilterOpen(o => !o)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 10, border: '1.5px solid var(--border)', background: selectedTeams.size > 0 ? 'var(--primary)' : 'var(--card)', color: selectedTeams.size > 0 ? '#fff' : 'var(--text-main)', fontWeight: 600, fontSize: 14, cursor: 'pointer', width: '100%', justifyContent: 'space-between' }}
+          >
+            <span><i className="fas fa-filter" style={{ marginRight: 8, opacity: 0.7 }} />{filterLabel}</span>
+            <i className={`fas fa-chevron-${filterOpen ? 'up' : 'down'}`} style={{ fontSize: 12, opacity: 0.7 }} />
+          </button>
+          {filterOpen && (
+            <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, background: 'var(--card)', border: '1.5px solid var(--border)', borderRadius: 12, boxShadow: '0 6px 24px rgba(0,0,0,0.12)', zIndex: 100, padding: '8px 0', overflow: 'hidden' }}>
+              {selectedTeams.size > 0 && (
+                <button onClick={() => { setSelectedTeams(new Set()); setFilterOpen(false); }} style={{ width: '100%', padding: '10px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: 13, color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }}>
+                  Clear filter
+                </button>
+              )}
+              {accountTeams.map(t => (
+                <label key={t} onClick={() => toggleTeam(t)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500, color: 'var(--text-main)' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: 5, border: '2px solid', borderColor: selectedTeams.has(t) ? 'var(--primary)' : 'var(--border)', background: selectedTeams.has(t) ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                    {selectedTeams.has(t) && <i className="fas fa-check" style={{ fontSize: 11, color: '#fff' }} />}
+                  </div>
+                  {t}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
 
         {accounts.length === 0 ? (
