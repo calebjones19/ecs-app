@@ -707,26 +707,18 @@
     .mobile-bottom-nav {
       display: flex;
       position: fixed;
-      bottom: env(safe-area-inset-bottom, 0px);
+      bottom: 0;
       left: 0;
       right: 0;
-      height: 60px;
+      height: calc(60px + env(safe-area-inset-bottom, 0px));
       background: var(--sidebar-bg);
       z-index: 100;
       justify-content: space-around;
       align-items: center;
       padding: 0 4px;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
       box-shadow: 0 -1px 0 rgba(255,255,255,0.06), 0 -8px 24px rgba(0,0,0,0.28);
       transition: transform 0.2s ease;
-    }
-    .mobile-bottom-nav::after {
-      content: '';
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      height: env(safe-area-inset-bottom, 0px);
-      background: var(--sidebar-bg);
     }
     .mobile-nav-item {
       flex: 1;
