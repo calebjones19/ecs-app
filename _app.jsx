@@ -3704,6 +3704,21 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
             migBatch.update(doc.ref, { day: d.day, dayVersion: 2 });
             needsMig = true;
           }
+          // If startTime/endTime missing (old shifts), parse from the time string
+          if (!d.startTime && d.time && d.time.includes('-')) {
+            const parts = d.time.split('-');
+            const parseHM = (s) => {
+              s = (s || '').trim();
+              const isAm = s.endsWith('a'); const isPm = s.endsWith('p');
+              const h = parseInt(s);
+              if (isNaN(h)) return null;
+              if (isAm) return `${h === 12 ? 0 : h}:00`.padStart(5, '0');
+              if (isPm) return `${h === 12 ? 12 : h + 12}:00`.padStart(5, '0');
+              return `${h}:00`.padStart(5, '0');
+            };
+            const st = parseHM(parts[0]); const et = parseHM(parts[1]);
+            if (st) d = { ...d, startTime: st, endTime: et || st };
+          }
           if (!data[d.employeeId]) data[d.employeeId] = [];
           data[d.employeeId].push(d);
         });
@@ -4120,6 +4135,8 @@ function Schedule({ role, perm, authedUser, adminMode = false }) {
           day: dayIdx,
           date: newShift.scheduleType === 'specific' ? (newShift.date || null) : null,
           time: timeLabel,
+          startTime: newShift.scheduleType === 'specific' ? (newShift.startTime || null) : (newShift.windowStart || null),
+          endTime: newShift.scheduleType === 'specific' ? (newShift.endTime || null) : (newShift.windowEnd || null),
           type: shiftType,
           shiftNotes: newShift.shiftNotes || [],
           scheduleType: newShift.scheduleType,
@@ -10580,8 +10597,8 @@ function AdminTimeOff({ role, perm, authedUser }) {
 }
 
 // ── AdminSchedule: scheduling wrapper for admins ──────────────────────────────
-function AdminSchedule({ role, perm }) {
-  return <Schedule role={role} perm={perm} adminMode={true} />;
+function AdminSchedule({ role, perm, authedUser }) {
+  return <Schedule role={role} perm={perm} authedUser={authedUser} adminMode={true} />;
 }
 
 // ── Teams Management ─────────────────────────────────────────────────────────
@@ -10841,7 +10858,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
         case 'announcements': return <Announcements role={role} perm={perm} authedUser={authedUser} />;
         case 'shifts': return <ShiftSwaps role={role} perm={perm} />;
         case 'checklists': return <Checklists role={role} perm={perm} authedUser={authedUser} />;
-        case 'admin-schedule': return <AdminSchedule role={role} perm={perm} />;
+        case 'admin-schedule': return <AdminSchedule role={role} perm={perm} authedUser={authedUser} />;
         case 'admin-timeoff': return <AdminTimeOff role={role} perm={perm} authedUser={authedUser} />;
         case 'teams': return <TeamsManager role={role} perm={perm} />;
         default: return null;
