@@ -223,6 +223,11 @@ const ESSENCE_LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAegAAAC6CAYA
 // read the latest data without prop-drilling through every component.
 let EMPLOYEES = [];
 let CLIENTS = [];
+
+const WAREHOUSE = { id: 'warehouse', name: 'Warehouse', address: 'ECS Warehouse', status: 'active' };
+const INVENTORY_CATEGORIES = ['Chemicals', 'Equipment', 'Paper Products', 'Trash Liners', 'Microfiber & Supplies', 'Other'];
+const INVENTORY_UNITS = ['bottles', 'rolls', 'bags', 'units', 'pairs', 'boxes', 'gallons', 'cases'];
+
 // Module-level seed guards — survive component remounts so seed never runs twice
 let _employeesSeeded = false;
 let _clientsSeeded = false;
@@ -452,7 +457,7 @@ function Home({ role, perm, authedUser, setPage }) {
         </div>
         <div className="home-widget" onClick={() => setPage && setPage('my-checklists')}>
           <div className="home-widget-icon" style={{ background: '#b85c4a' }}><i className="fas fa-clipboard-check" /></div>
-          <h4>Checklists</h4>
+          <h4>Accounts</h4>
         </div>
         <div className="home-widget" onClick={() => setPage && setPage('schedule')}>
           <div className="home-widget-icon" style={{ background: '#5e8a7a' }}><i className="fas fa-calendar-alt" /></div>
@@ -467,9 +472,167 @@ function Home({ role, perm, authedUser, setPage }) {
   );
 }
 
-// ─── Home Checklists (worker view — view & complete tasks) ──────
-function HomeChecklists({ role, perm, authedUser }) {
+// ─── AccountInventory (worker view — request supplies) ──────────
+function AccountInventory({ location, authedUser, perm }) {
+  const [items, setItems] = useState([]);
+  const [showRequest, setShowRequest] = useState(false);
+  const [requestItem, setRequestItem] = useState(null);
+  const [reqForm, setReqForm] = useState({ itemName: '', category: 'Chemicals', unit: 'bottles', qty: 1, notes: '' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!location?.id) return;
+    const unsub = db.collection('inventory')
+      .where('locationId', '==', location.id)
+      .onSnapshot(snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setItems(docs.sort((a, b) => (a.itemName || '').localeCompare(b.itemName || '')));
+      }, () => {});
+    return () => unsub();
+  }, [location?.id]);
+
+  const openRequestBlank = () => {
+    setRequestItem(null);
+    setReqForm({ itemName: '', category: 'Chemicals', unit: 'bottles', qty: 1, notes: '' });
+    setShowRequest(true);
+  };
+
+  const openRequestItem = (item) => {
+    setRequestItem(item);
+    setReqForm({ itemName: item.itemName, category: item.category || 'Chemicals', unit: item.unit || 'bottles', qty: 1, notes: '' });
+    setShowRequest(true);
+  };
+
+  const submitRequest = async () => {
+    if (!reqForm.itemName || reqForm.qty < 1) return;
+    setSaving(true);
+    try {
+      await db.collection('inventory_requests').add({
+        locationId: location.id,
+        locationName: location.name,
+        itemName: reqForm.itemName,
+        category: reqForm.category,
+        unit: reqForm.unit,
+        quantityRequested: parseInt(reqForm.qty),
+        requestedById: authedUser?.id || '',
+        requestedByName: authedUser?.name || '',
+        requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        status: 'pending',
+        notes: reqForm.notes,
+      });
+      const admins = EMPLOYEES.filter(e => e.permission === 'admin' && e.status !== 'inactive');
+      admins.forEach(emp => {
+        sendPushNotification(emp.id, 'Supply Request', `${location.name}: ${reqForm.qty} ${reqForm.unit} of ${reqForm.itemName}`, 'inventory_request', { locationId: location.id });
+      });
+      setShowRequest(false);
+      setReqForm({ itemName: '', category: 'Chemicals', unit: 'bottles', qty: 1, notes: '' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Group items by category
+  const byCategory = {};
+  items.forEach(item => {
+    const cat = item.category || 'Other';
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(item);
+  });
+  const categoriesPresent = INVENTORY_CATEGORIES.filter(c => byCategory[c]);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 17 }}>Inventory</div>
+        <button onClick={openRequestBlank} style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+          Request Supply
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+          <i className="fas fa-boxes" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>No inventory tracked</div>
+          <div style={{ fontSize: 13 }}>No inventory tracked for this location yet. Use the button above to request supplies.</div>
+        </div>
+      ) : (
+        categoriesPresent.map(cat => (
+          <div key={cat} style={{ marginBottom: 18 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{cat}</div>
+            {byCategory[cat].map(item => (
+              <div key={item.id} className="card" style={{ marginBottom: 8, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{item.itemName}</div>
+                    <button onClick={() => openRequestItem(item)} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '4px 0 0', marginTop: 2 }}>
+                      Request
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-light)', whiteSpace: 'nowrap' }}>
+                    {item.quantity ?? 0} {item.unit || ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))
+      )}
+
+      {/* Request modal */}
+      {showRequest && (
+        <>
+          <div onClick={() => setShowRequest(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 499 }} />
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', zIndex: 500 }}>
+            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 4 }}>Request Supply</div>
+            {requestItem && <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 16 }}>{requestItem.itemName}</div>}
+            {!requestItem && (
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Item Name</label>
+                <input className="form-input" value={reqForm.itemName} onChange={e => setReqForm(f => ({ ...f, itemName: e.target.value }))} placeholder="e.g. Glass Cleaner" />
+              </div>
+            )}
+            {!requestItem && (
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Category</label>
+                <select className="form-select" value={reqForm.category} onChange={e => setReqForm(f => ({ ...f, category: e.target.value }))}>
+                  {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Unit</label>
+                <select className="form-select" value={reqForm.unit} onChange={e => setReqForm(f => ({ ...f, unit: e.target.value }))}>
+                  {INVENTORY_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Quantity</label>
+                <input className="form-input" type="number" min="1" value={reqForm.qty} onChange={e => setReqForm(f => ({ ...f, qty: e.target.value }))} />
+              </div>
+            </div>
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label className="form-label">Notes (optional)</label>
+              <textarea className="form-input" rows={2} value={reqForm.notes} onChange={e => setReqForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any additional details..." style={{ resize: 'none' }} />
+            </div>
+            <button
+              onClick={submitRequest}
+              disabled={saving || !reqForm.itemName || reqForm.qty < 1}
+              style={{ width: '100%', padding: '14px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: 'pointer', opacity: (saving || !reqForm.itemName || reqForm.qty < 1) ? 0.5 : 1 }}
+            >
+              {saving ? 'Sending...' : 'Send Request'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Home Accounts (worker view — checklists & inventory) ────────
+function HomeAccounts({ role, perm, authedUser }) {
   const [selectedClient, setSelectedClient] = useState(null);
+  const [accountTab, setAccountTab] = useState('checklists');
   const [selectedTeams, setSelectedTeams] = useState(new Set()); // empty = all
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = React.useRef(null);
@@ -573,8 +736,12 @@ function HomeChecklists({ role, perm, authedUser }) {
         ? [...selectedTeams][0]
         : `${selectedTeams.size} Teams`;
 
+    // Always append WAREHOUSE at the bottom
+    const displayAccounts = [...accounts, WAREHOUSE];
+
     return (
       <div>
+        <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 14 }}>Select an account</div>
         {/* Team filter dropdown */}
         <div ref={filterRef} style={{ position: 'relative', marginBottom: 16 }}>
           <button
@@ -603,15 +770,15 @@ function HomeChecklists({ role, perm, authedUser }) {
           )}
         </div>
 
-        {accounts.length === 0 ? (
+        {displayAccounts.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
             <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
             <div style={{ fontWeight: 600 }}>No accounts found</div>
           </div>
-        ) : accounts.map(client => (
-          <div key={client.id} className="admin-hub-item" onClick={() => setSelectedClient(client)} style={{ marginBottom: 8 }}>
-            <div className="hub-icon" style={{ background: '#b85c4a18', color: '#b85c4a' }}>
-              <i className="fas fa-clipboard-check" />
+        ) : displayAccounts.map(client => (
+          <div key={client.id} className="admin-hub-item" onClick={() => { setSelectedClient(client); setAccountTab('checklists'); }} style={{ marginBottom: 8 }}>
+            <div className="hub-icon" style={{ background: client.id === 'warehouse' ? '#2563eb18' : '#b85c4a18', color: client.id === 'warehouse' ? '#2563eb' : '#b85c4a' }}>
+              <i className={`fas ${client.id === 'warehouse' ? 'fa-warehouse' : 'fa-clipboard-check'}`} />
             </div>
             <div className="hub-text">
               <div className="hub-label">{client.name}</div>
@@ -624,7 +791,7 @@ function HomeChecklists({ role, perm, authedUser }) {
     );
   }
 
-  // ── Level 2: Account's checklists ──
+  // ── Level 2: Account detail with tabs ──
   const tasksByChecklist = {};
   tasks.forEach(t => {
     const key = t.checklistId || '__none__';
@@ -638,41 +805,73 @@ function HomeChecklists({ role, perm, authedUser }) {
         <i className="fas fa-chevron-left" /> All Accounts
       </button>
       <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 4 }}>{selectedClient.name}</div>
-      {selectedClient.address && <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 20 }}>{selectedClient.address}</div>}
+      {selectedClient.address && <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 16 }}>{selectedClient.address}</div>}
 
-      {checklists.length === 0 && tasks.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
-          <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>No checklists</div>
-          <div style={{ fontSize: 13 }}>No checklists have been created for this account yet.</div>
-        </div>
-      ) : (
-        checklists.map(cl => {
-          const clTasks = (tasksByChecklist[cl.id] || []).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-          const done = clTasks.filter(t => completionsByTask[t.id]).length;
-          return (
-            <div key={cl.id} className="card" style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>{cl.name}</div>
-                <div style={{ fontSize: 13, color: done === clTasks.length && clTasks.length > 0 ? 'var(--success)' : 'var(--text-light)', fontWeight: 600 }}>{done}/{clTasks.length}</div>
-              </div>
-              {clTasks.length > 0 && (
-                <div style={{ height: 5, background: 'var(--border)', borderRadius: 3, marginBottom: 14, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: clTasks.length > 0 ? `${Math.round(done/clTasks.length*100)}%` : '0%', background: 'var(--success)', borderRadius: 3, transition: 'width 0.3s' }} />
-                </div>
-              )}
-              {clTasks.map(task => {
-                const isDone = !!completionsByTask[task.id];
-                return (
-                  <div key={task.id} className={`home-task-row${isDone ? ' done' : ''}`} onClick={() => toggleCompletion(task)}>
-                    <div className={`home-task-check${isDone ? ' checked' : ''}`}>{isDone && <i className="fas fa-check" />}</div>
-                    <span className="home-task-text">{task.text}</span>
-                  </div>
-                );
-              })}
+      {/* Tab pills */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {['checklists', 'inventory'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setAccountTab(tab)}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 20,
+              border: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              background: accountTab === tab ? 'var(--primary)' : 'var(--border)',
+              color: accountTab === tab ? '#fff' : 'var(--text-light)',
+              transition: 'all 0.15s',
+            }}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {accountTab === 'checklists' && (
+        <>
+          {checklists.length === 0 && tasks.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+              <i className="fas fa-clipboard-check" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>No checklists</div>
+              <div style={{ fontSize: 13 }}>No checklists have been created for this account yet.</div>
             </div>
-          );
-        })
+          ) : (
+            checklists.map(cl => {
+              const clTasks = (tasksByChecklist[cl.id] || []).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+              const done = clTasks.filter(t => completionsByTask[t.id]).length;
+              return (
+                <div key={cl.id} className="card" style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{cl.name}</div>
+                    <div style={{ fontSize: 13, color: done === clTasks.length && clTasks.length > 0 ? 'var(--success)' : 'var(--text-light)', fontWeight: 600 }}>{done}/{clTasks.length}</div>
+                  </div>
+                  {clTasks.length > 0 && (
+                    <div style={{ height: 5, background: 'var(--border)', borderRadius: 3, marginBottom: 14, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: clTasks.length > 0 ? `${Math.round(done/clTasks.length*100)}%` : '0%', background: 'var(--success)', borderRadius: 3, transition: 'width 0.3s' }} />
+                    </div>
+                  )}
+                  {clTasks.map(task => {
+                    const isDone = !!completionsByTask[task.id];
+                    return (
+                      <div key={task.id} className={`home-task-row${isDone ? ' done' : ''}`} onClick={() => toggleCompletion(task)}>
+                        <div className={`home-task-check${isDone ? ' checked' : ''}`}>{isDone && <i className="fas fa-check" />}</div>
+                        <span className="home-task-text">{task.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </>
+      )}
+
+      {accountTab === 'inventory' && (
+        <AccountInventory location={selectedClient} authedUser={authedUser} perm={perm} />
       )}
     </div>
   );
@@ -10829,6 +11028,401 @@ function Announcements({ role, perm, authedUser, homeView }) {
   );
 }
 
+// ── AdminInventory ────────────────────────────────────────────────────────────
+function AdminInventory({ role, perm, authedUser }) {
+  const [invTab, setInvTab] = useState('inventory');
+  const [selectedLocation, setSelectedLocation] = useState(WAREHOUSE);
+  const [items, setItems] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [itemForm, setItemForm] = useState({ itemName: '', category: 'Chemicals', unit: 'bottles', quantity: 0, minQuantity: 0, notes: '' });
+  const [showFulfill, setShowFulfill] = useState(null);
+  const [fulfillNotes, setFulfillNotes] = useState('');
+  const [deductWarehouse, setDeductWarehouse] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const locations = [WAREHOUSE, ...CLIENTS.filter(c => c.status !== 'inactive').sort((a, b) => a.name.localeCompare(b.name))];
+
+  // Realtime items for selected location
+  useEffect(() => {
+    if (!selectedLocation?.id) return;
+    const unsub = db.collection('inventory')
+      .where('locationId', '==', selectedLocation.id)
+      .onSnapshot(snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setItems(docs.sort((a, b) => (a.itemName || '').localeCompare(b.itemName || '')));
+      }, () => {});
+    return () => unsub();
+  }, [selectedLocation?.id]);
+
+  // Realtime requests (all)
+  useEffect(() => {
+    const unsub = db.collection('inventory_requests')
+      .orderBy('requestedAt', 'desc')
+      .onSnapshot(snap => {
+        setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, () => {});
+    return () => unsub();
+  }, []);
+
+  const openAddItem = () => {
+    setEditItem(null);
+    setItemForm({ itemName: '', category: 'Chemicals', unit: 'bottles', quantity: 0, minQuantity: 0, notes: '' });
+    setShowAddItem(true);
+  };
+
+  const openEditItem = (item) => {
+    setEditItem(item);
+    setItemForm({ itemName: item.itemName || '', category: item.category || 'Chemicals', unit: item.unit || 'bottles', quantity: item.quantity ?? 0, minQuantity: item.minQuantity ?? 0, notes: item.notes || '' });
+    setShowAddItem(true);
+  };
+
+  const saveItem = async () => {
+    if (!itemForm.itemName) return;
+    setSaving(true);
+    try {
+      const data = {
+        locationId: selectedLocation.id,
+        locationName: selectedLocation.name,
+        itemName: itemForm.itemName,
+        category: itemForm.category,
+        unit: itemForm.unit,
+        quantity: parseInt(itemForm.quantity) || 0,
+        minQuantity: parseInt(itemForm.minQuantity) || 0,
+        notes: itemForm.notes,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedById: authedUser?.id || '',
+      };
+      if (editItem) {
+        await db.collection('inventory').doc(editItem.id).update(data);
+      } else {
+        await db.collection('inventory').add(data);
+      }
+      setShowAddItem(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteItem = async (item) => {
+    if (!window.confirm(`Delete "${item.itemName}"?`)) return;
+    await db.collection('inventory').doc(item.id).delete();
+  };
+
+  const openFulfill = (req) => {
+    setShowFulfill(req);
+    setFulfillNotes('');
+    setDeductWarehouse(true);
+  };
+
+  const fulfillRequest = async () => {
+    if (!showFulfill) return;
+    setSaving(true);
+    try {
+      const req = showFulfill;
+      // Find warehouse item
+      const warehouseItem = items.find(i => req.locationId === 'warehouse'
+        ? false
+        : i.locationId === 'warehouse' && i.itemName.toLowerCase() === req.itemName.toLowerCase()
+      );
+      // Actually search warehouse items directly
+      const warehouseSnap = await db.collection('inventory')
+        .where('locationId', '==', 'warehouse')
+        .get();
+      const wItem = warehouseSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .find(i => i.itemName.toLowerCase() === req.itemName.toLowerCase());
+
+      if (deductWarehouse && wItem) {
+        const newQty = Math.max(0, (wItem.quantity || 0) - req.quantityRequested);
+        await db.collection('inventory').doc(wItem.id).update({ quantity: newQty, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+
+      // Update destination location inventory
+      const destSnap = await db.collection('inventory')
+        .where('locationId', '==', req.locationId)
+        .get();
+      const destItem = destSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .find(i => i.itemName.toLowerCase() === req.itemName.toLowerCase());
+      if (destItem) {
+        await db.collection('inventory').doc(destItem.id).update({ quantity: (destItem.quantity || 0) + req.quantityRequested, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      } else {
+        await db.collection('inventory').add({
+          locationId: req.locationId,
+          locationName: req.locationName,
+          itemName: req.itemName,
+          category: req.category || 'Other',
+          unit: req.unit || 'units',
+          quantity: req.quantityRequested,
+          minQuantity: 0,
+          notes: '',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedById: authedUser?.id || '',
+        });
+      }
+
+      await db.collection('inventory_requests').doc(req.id).update({
+        status: 'fulfilled',
+        fulfilledById: authedUser?.id || '',
+        fulfilledByName: authedUser?.name || '',
+        fulfilledAt: firebase.firestore.FieldValue.serverTimestamp(),
+        notes: fulfillNotes,
+      });
+      setShowFulfill(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const relativeTime = (ts) => {
+    if (!ts) return '';
+    const date = ts.toDate ? ts.toDate() : new Date(ts);
+    const diff = Date.now() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  };
+
+  // Group items by category
+  const byCategory = {};
+  items.forEach(item => {
+    const cat = item.category || 'Other';
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(item);
+  });
+  const categoriesPresent = INVENTORY_CATEGORIES.filter(c => byCategory[c]);
+
+  const pendingRequests = requests.filter(r => r.status === 'pending');
+  const fulfilledRequests = requests.filter(r => r.status === 'fulfilled');
+
+  // For fulfill modal: check if warehouse has the item
+  const [warehouseCheckItem, setWarehouseCheckItem] = useState(null);
+  useEffect(() => {
+    if (!showFulfill) { setWarehouseCheckItem(null); return; }
+    db.collection('inventory').where('locationId', '==', 'warehouse').get().then(snap => {
+      const wItem = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .find(i => i.itemName.toLowerCase() === showFulfill.itemName.toLowerCase());
+      setWarehouseCheckItem(wItem || null);
+    });
+  }, [showFulfill?.id]);
+
+  return (
+    <div>
+      <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 16 }}>Inventory</div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {[{ id: 'inventory', label: 'Inventory' }, { id: 'requests', label: `Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}` }].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setInvTab(tab.id)}
+            style={{ padding: '8px 18px', borderRadius: 20, border: 'none', fontWeight: 600, fontSize: 13, cursor: 'pointer', background: invTab === tab.id ? 'var(--primary)' : 'var(--border)', color: invTab === tab.id ? '#fff' : 'var(--text-light)', transition: 'all 0.15s' }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Inventory Tab ── */}
+      {invTab === 'inventory' && (
+        <div>
+          {/* Location pills */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 16 }}>
+            {locations.map(loc => (
+              <button
+                key={loc.id}
+                onClick={() => setSelectedLocation(loc)}
+                style={{ flexShrink: 0, padding: '6px 14px', borderRadius: 20, border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer', background: selectedLocation?.id === loc.id ? 'var(--primary)' : 'var(--border)', color: selectedLocation?.id === loc.id ? '#fff' : 'var(--text-light)', whiteSpace: 'nowrap' }}
+              >
+                {loc.name}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+            <button onClick={openAddItem} style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              + Add Item
+            </button>
+          </div>
+
+          {items.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+              <i className="fas fa-boxes" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+              <div style={{ fontWeight: 600 }}>No items tracked here</div>
+            </div>
+          ) : (
+            categoriesPresent.map(cat => (
+              <div key={cat} style={{ marginBottom: 18 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{cat}</div>
+                {byCategory[cat].map(item => (
+                  <div key={item.id} className="card" style={{ marginBottom: 8, padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15 }}>{item.itemName}</div>
+                        <div style={{ fontSize: 13, color: 'var(--text-light)' }}>{item.quantity ?? 0} {item.unit || ''}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => openEditItem(item)} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 15 }}>
+                          <i className="fas fa-pencil-alt" />
+                        </button>
+                        <button onClick={() => deleteItem(item)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 15 }}>
+                          <i className="fas fa-trash" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ── Requests Tab ── */}
+      {invTab === 'requests' && (
+        <div>
+          {pendingRequests.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10 }}>Pending</div>
+              {pendingRequests.map(req => (
+                <div key={req.id} className="card" style={{ marginBottom: 10, borderLeft: '4px solid #f59e0b', padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{req.locationName}</div>
+                      <div style={{ fontSize: 14, marginTop: 2 }}>{req.quantityRequested} {req.unit} of {req.itemName}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 4 }}>
+                        {req.requestedByName} · {relativeTime(req.requestedAt)}
+                      </div>
+                    </div>
+                    <button onClick={() => openFulfill(req)} style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontWeight: 600, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+                      Fulfill
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {fulfilledRequests.length > 0 && (
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10 }}>Fulfilled</div>
+              {fulfilledRequests.map(req => (
+                <div key={req.id} className="card" style={{ marginBottom: 10, padding: '12px 14px', opacity: 0.7 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{req.locationName}</div>
+                  <div style={{ fontSize: 14, marginTop: 2 }}>{req.quantityRequested} {req.unit} of {req.itemName}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 4 }}>
+                    {req.requestedByName} · {relativeTime(req.requestedAt)} · Fulfilled by {req.fulfilledByName}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {requests.length === 0 && (
+            <div className="card" style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--text-light)' }}>
+              <i className="fas fa-inbox" style={{ fontSize: 36, opacity: 0.2, marginBottom: 12, display: 'block' }} />
+              <div style={{ fontWeight: 600 }}>No supply requests yet</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add/Edit item sheet */}
+      {showAddItem && (
+        <>
+          <div onClick={() => setShowAddItem(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 499 }} />
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', zIndex: 500, maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>{editItem ? 'Edit Item' : 'Add Item'}</div>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Item Name</label>
+              <input className="form-input" value={itemForm.itemName} onChange={e => setItemForm(f => ({ ...f, itemName: e.target.value }))} placeholder="e.g. Glass Cleaner" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Category</label>
+              <select className="form-select" value={itemForm.category} onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}>
+                {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Unit</label>
+                <select className="form-select" value={itemForm.unit} onChange={e => setItemForm(f => ({ ...f, unit: e.target.value }))}>
+                  {INVENTORY_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">Quantity</label>
+                <input className="form-input" type="number" min="0" value={itemForm.quantity} onChange={e => setItemForm(f => ({ ...f, quantity: e.target.value }))} />
+              </div>
+            </div>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Min Quantity</label>
+              <input className="form-input" type="number" min="0" value={itemForm.minQuantity} onChange={e => setItemForm(f => ({ ...f, minQuantity: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label className="form-label">Notes</label>
+              <textarea className="form-input" rows={2} value={itemForm.notes} onChange={e => setItemForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'none' }} />
+            </div>
+            <button
+              onClick={saveItem}
+              disabled={saving || !itemForm.itemName}
+              style={{ width: '100%', padding: 14, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: 'pointer', opacity: (saving || !itemForm.itemName) ? 0.5 : 1 }}
+            >
+              {saving ? 'Saving...' : 'Save Item'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Fulfill modal */}
+      {showFulfill && (
+        <>
+          <div onClick={() => setShowFulfill(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 499 }} />
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', zIndex: 500, maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 4 }}>Fulfill Request</div>
+            <div style={{ fontSize: 14, color: 'var(--text-light)', marginBottom: 16 }}>
+              {showFulfill.locationName} — {showFulfill.quantityRequested} {showFulfill.unit} of {showFulfill.itemName}
+            </div>
+
+            {warehouseCheckItem && showFulfill.locationId !== 'warehouse' && (
+              <div className="card" style={{ marginBottom: 14, padding: '12px 14px', background: 'var(--bg)' }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Transfer from Warehouse</div>
+                <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 10 }}>
+                  Warehouse has {warehouseCheckItem.quantity} {warehouseCheckItem.unit} available
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14 }}>
+                  <input type="checkbox" checked={deductWarehouse} onChange={e => setDeductWarehouse(e.target.checked)} />
+                  Deduct from Warehouse inventory
+                </label>
+              </div>
+            )}
+
+            <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>
+              Only mark as fulfilled once items have been physically delivered.
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label className="form-label">Notes (optional)</label>
+              <textarea className="form-input" rows={2} value={fulfillNotes} onChange={e => setFulfillNotes(e.target.value)} style={{ resize: 'none' }} />
+            </div>
+
+            <button
+              onClick={fulfillRequest}
+              disabled={saving}
+              style={{ width: '100%', padding: 14, background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}
+            >
+              {saving ? 'Processing...' : 'Mark as Fulfilled'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── AdminPanel: full-page admin hub ──────────────────────────────────────────
 function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSubPage }) {
   const adminPage = adminSubPage;
@@ -10849,6 +11443,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
     { id: 'admin-schedule', icon: 'fa-calendar-alt', label: 'Scheduling', desc: 'Create & manage team shifts', color: '#4a6741' },
     { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps', desc: 'Pending swap requests', color: '#c8a84e' },
     { id: 'admin-timeoff', icon: 'fa-calendar-times', label: 'Time Off Requests', desc: 'Review pending requests', color: '#5e8a7a' },
+    { id: 'admin-inventory', icon: 'fa-boxes', label: 'Inventory', desc: 'Manage supplies & requests', color: '#2563eb' },
   ];
 
   if (adminPage !== null) {
@@ -10860,6 +11455,7 @@ function AdminPanel({ role, perm, authedUser, setPage, adminSubPage, setAdminSub
         case 'checklists': return <Checklists role={role} perm={perm} authedUser={authedUser} />;
         case 'admin-schedule': return <AdminSchedule role={role} perm={perm} authedUser={authedUser} />;
         case 'admin-timeoff': return <AdminTimeOff role={role} perm={perm} authedUser={authedUser} />;
+        case 'admin-inventory': return <AdminInventory role={role} perm={perm} authedUser={authedUser} />;
         case 'teams': return <TeamsManager role={role} perm={perm} />;
         default: return null;
       }
@@ -11174,6 +11770,7 @@ function App() {
         { id: 'admin-timeoff',  icon: 'fa-calendar-times', label: 'Time Off',           desc: 'Review pending requests',          color: '#5e8a7a' },
         { id: 'checklists',     icon: 'fa-clipboard-check',label: 'Checklists',         desc: 'Create & manage task lists',       color: '#b85c4a' },
         { id: 'announcements',  icon: 'fa-bullhorn',       label: 'Announcements',      desc: 'Post updates to your teams',       color: '#4a6741' },
+        { id: 'admin-inventory', icon: 'fa-boxes',         label: 'Inventory',          desc: 'Manage supplies & requests',       color: '#2563eb' },
         ...(canEdit ? [{ id: 'people', icon: 'fa-users', label: 'People', desc: 'Employees, teams & clients', color: '#7c6f64' }] : []),
       ],
     }] : []),
@@ -11203,7 +11800,7 @@ function App() {
       }
     } else {
       sections.push({ section: "My Work", items: [
-        { id: 'my-checklists', icon: 'fa-clipboard-check', label: 'Checklists' },
+        { id: 'my-checklists', icon: 'fa-clipboard-check', label: 'Accounts' },
         { id: 'schedule', icon: 'fa-calendar-alt', label: 'My Schedule' },
         { id: 'timesheets', icon: 'fa-clock', label: 'Clock In/Out' },
         { id: 'shifts', icon: 'fa-exchange-alt', label: 'Shift Swaps' },
@@ -11221,7 +11818,7 @@ function App() {
   const pageTitles = {
     home: 'Home',
     dashboard: 'Dashboard',
-    'my-checklists': 'Checklists',
+    'my-checklists': 'Accounts',
     chat: 'Chat',
     today: 'Today',
     schedule: 'My Schedule',
@@ -11238,7 +11835,7 @@ function App() {
     switch (page) {
       case 'home': return <Home role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
       case 'dashboard': return <Dashboard role={role} perm={perm} authedUser={authedUser} setPage={setPage} />;
-      case 'my-checklists': return <HomeChecklists role={role} perm={perm} authedUser={authedUser} />;
+      case 'my-checklists': return <HomeAccounts role={role} perm={perm} authedUser={authedUser} />;
       case 'chat': return <Chat role={role} authedUser={authedUser} perm={perm}
         channels={channels} setChannels={setChannels}
         activeChannel={activeChannel} setActiveChannel={setActiveChannel}
@@ -11285,7 +11882,7 @@ function App() {
       swipeRef.current = null;
     }
   };
-  const HOME_SUBPAGES = { dashboard: 'Dashboard', 'my-checklists': 'Checklists', schedule: 'My Schedule', notifications: 'Notifications' };
+  const HOME_SUBPAGES = { dashboard: 'Dashboard', 'my-checklists': 'Accounts', schedule: 'My Schedule', notifications: 'Notifications' };
   const handleAppTouchEnd = (e) => {
     if (!swipeRef.current) return;
     const dx = e.changedTouches[0].clientX - swipeRef.current.x;
